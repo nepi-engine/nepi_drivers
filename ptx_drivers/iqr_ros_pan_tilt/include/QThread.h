@@ -22,37 +22,40 @@
 ** SOFTWARE.
 *******************************************************************************/
 
-#include "drivers/iqr_ros_pan_tilt/QThread.h"
 
-QThread::QThread()
+#ifndef QTHREAD_H
+#define QTHREAD_H
+#include <iostream>
+#include <thread>
+#include <functional>
+
+class QThread
 {
-  threadStatus = THREAD_STATUS_NEW;
-}
+public:
+  enum THREAD_STATUS
+  {
+    THREAD_STATUS_NEW = 0,
+    THREAD_STATUS_RUNNING = 1,
+    THREAD_STATUS_EXIT = -1
+  };
 
-QThread::~QThread()
-{
-}
+  QThread();
+  virtual ~QThread();
 
-void QThread::start()
-{
-  td = new std::thread(std::bind(&QThread::run, this));
-  threadStatus = THREAD_STATUS_RUNNING;
-}
+  void start();
+  void join();
+  void detach();
 
-void QThread::join()
-{
-  td->join();
-  threadStatus = THREAD_STATUS_EXIT;
-}
+  std::thread::id getPid() const;
+  THREAD_STATUS getThreadStatus() const { return threadStatus; };
 
-void QThread::detach()
-{
-  td->detach();
-  threadStatus = THREAD_STATUS_EXIT;
-}
 
-std::thread::id QThread::getPid() const
-{
-  return  td->get_id();
-}
+protected:
+  virtual void run() = 0;
 
+private:
+  THREAD_STATUS threadStatus;
+  std::thread *td;
+};
+
+#endif //QTHREAD_H

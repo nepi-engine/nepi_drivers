@@ -13,7 +13,7 @@ import rospy
 from nepi_edge_sdk_base import nepi_ros
 from nepi_edge_sdk_base import nepi_nex
 
-from nepi_drivers.ptx_device_if import ROSPTXActuatorIF
+from nepi_edge_sdk_base.device_if_ptx import ROSPTXActuatorIF
 
 PKG_NAME = 'PTX_ONVIF_GENERIC' # Use in display menus
 DESCRIPTION = 'Driver package for generic ONVIF pan tilt devices'

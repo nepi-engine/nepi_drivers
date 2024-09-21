@@ -58,15 +58,16 @@ class AfTowerLightDiscovery:
   active_devices_dict = dict()
   node_name = "af_tower_light"
   ################################################          
-  def __init__(self, nex_dict = TEST_NEX_DICT):
+  def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
-    self.nex_dict = nex_dict
-    #rospy.logwarn(self.log_name + ":  Discovery class instantiated with nex_dict " + str(self.nex_dict))
-    self.search_ids = nex_dict['discovery_ids']
+
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
-  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace):
+  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, nex_dict = TEST_NEX_DICT):
+    self.nex_dict = nex_dict
+    #rospy.logwarn(self.log_name + ":  Discovery class instantiated with nex_dict " + str(self.nex_dict))
+    self.search_ids = nex_dict['discovery_ids']
     self.base_namespace = base_namespace
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
@@ -133,7 +134,7 @@ class AfTowerLightDiscovery:
     [success, msg, sub_process] = nepi_nex.launchDriverNode(file_name, ros_node_name, device_path = path_str)
     if success:
       self.active_devices_dict[path_str] = {'ros_node_name': ros_node_name, 'sub_process': sub_process}
-      self.active_paths_list.append(path_str)
+    return success
 
 
 if __name__ == '__main__':

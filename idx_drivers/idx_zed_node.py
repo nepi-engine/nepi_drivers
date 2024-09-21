@@ -24,7 +24,7 @@ import dynamic_reconfigure.client
 import numpy as np
 import tf
 
-from nepi_drivers.idx_device_if import ROSIDXSensorIF
+from nepi_edge_sdk_base.device_if_idx import ROSIDXSensorIF
 
 from nepi_edge_sdk_base import nepi_ros
 from nepi_edge_sdk_base import nepi_nav
@@ -231,15 +231,31 @@ class ZedCamNode(object):
         ZED_BASE_NAMESPACE = nepi_ros.get_base_namespace() + self.zed_type + "/zed_node/"
 
         # Now that Zed SDK is started, we can set up the reconfig client
-        nepi_ros.sleep(2,10)
+        nepi_ros.sleep(5,10)
         success = False
-        while success == False and not rospy.is_shutdown():
+        timeout = 5
+        waittime = 1
+        timer = 0
+        self.zed_dynamic_reconfig_client = None
+        while success == False and timer < timeout and not rospy.is_shutdown():
           try:
             self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=30)
             success = True
           except Exception as e:
             rospy.loginfo(self.node_name + ": " +str(e))
-            nepi_ros.sleep(1,10)
+            nepi_ros.sleep(waittime,10)
+            timer += waittime
+        if timer >= timeout or self.zed_dynamic_reconfig_client is None:
+          rospy.logwarn(self.node_name + ": Failed to connect to zed_node using launch process" + str(zed_ros_wrapper_run_cmd))
+          rospy.logwarn(self.node_name + ": Killing node named: " + ZED_BASE_NAMESPACE)
+          success = nepi_nex.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
+          if success:
+            time.sleep(2)
+          rospy.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
+          return
+        rospy.logwarn(self.node_name + ": Zed DRC: " + str(self.zed_dynamic_reconfig_client))
+        time.sleep(2)
+
 
 
         # Zed control topics
@@ -390,8 +406,25 @@ class ZedCamNode(object):
 
         ## Initiation Complete
         rospy.loginfo(self.node_name + ": " + "Initialization Complete")
-        # Now start the node
+        # Now start zed node check process
+        self.attempts = 0
+        rospy.Timer(rospy.Duration(3), self.checkZedNodeCb)
         rospy.spin()
+
+    def checkZedNodeCb(self,timer):
+      poll = self.zed_ros_wrapper_proc.poll()
+      #rospy.logwarn(self.node_name + ": " + "Zed_Node process poll returned " + str(poll))
+      running = poll is None
+      if running:
+        self.attempts = 0
+      else:
+        self.attempts += 1
+      if self.attempts > 2:
+        rospy.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
+
+      
+
+
 
     #**********************
     # Sensor setting functions

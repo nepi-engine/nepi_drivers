@@ -28,7 +28,7 @@ import copy
 from nepi_edge_sdk_base import nepi_ros 
 from nepi_edge_sdk_base import nepi_nav
 
-from nepi_drivers_rbx.rbx_device_if import ROSRBXRobotIF
+from nepi_edge_sdk_base.device_if_rbx import ROSRBXRobotIF
 
 from std_msgs.msg import Empty, Int8, UInt8, UInt32, Bool, String, Float32, Float64
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
@@ -41,12 +41,36 @@ from sensor_msgs.msg import Image, NavSatFix, BatteryState
 
 from nepi_ros_interfaces.msg import AxisControls
 
+PKG_NAME = 'RBX_ARDUPILOT' # Use in display menus
+DESCRIPTION = 'Driver package for ardupilot autopilot systems'
+FILE_TYPE = 'NODE'
+CLASS_NAME = 'ArdupilotNode' # Should Match Class Name
+GROUP ='RBX'
+GROUP_ID = 'ARDU' 
+
+DRIVER_PKG_NAME = 'None' # 'Required Driver PKG_NAME or 'None'
+DRIVER_INTERFACES = ['USBSERIAL'] # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
+DRIVER_OPTIONS_1_NAME = 'System Type'
+DRIVER_OPTIONS_1 = ['Real','SITL'] # List of string options. Selected option passed to driver
+DRIVER_DEFAULT_OPTION_1 = 'Real'
+DRIVER_OPTIONS_2_NAME = 'None'
+DRIVER_OPTIONS_2 = [] # List of string options. Selected option passed to driver
+DRIVER_DEFAULT_OPTION_2 = 'None'
+
+DISCOVERY_PKG_NAME = 'RBX_ARDUPILOT' # 'Required Discovery PKG_NAME or 'None'
+DISCOVERY_METHOD = 'AUTO'  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
+DISCOVERY_IDS = []  # List of string identifiers for discovery process
+DISCOVERY_IGNORE_IDS = ['ttyACM'] # List of string identifiers for discovery process
+
+
+
+
 #########################################
 # Node Class
 #########################################
 
 #class ardupilot_rbx_node(object):
-class ArdupilotRBX:
+class ArdupilotNode:
   DEFAULT_NODE_NAME = "ardupilot" # connection port added once discovered
 
   CAP_SETTINGS = [["Float","takeoff_height_m","0.0","10000.0"],
@@ -875,7 +899,7 @@ class ArdupilotRBX:
 # Main
 #########################################
 if __name__ == '__main__':
-  ArdupilotRBX()
+  ArdupilotNode()
 
 
 

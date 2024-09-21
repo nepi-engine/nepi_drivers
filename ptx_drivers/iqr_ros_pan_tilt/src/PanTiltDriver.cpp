@@ -21,7 +21,7 @@
 ** OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ** SOFTWARE.
 *********************************************************************************/
-#include "drivers/iqr_ros_pan_tilt/PanTiltDriver.h"
+#include "PanTiltDriver.h"
 
 static inline void delay(const uint32_t ms)
 {

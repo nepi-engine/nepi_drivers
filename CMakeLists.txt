@@ -110,7 +110,7 @@ catkin_python_setup()
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-	#INCLUDE_DIRS include
+	INCLUDE_DIRS include
 	CATKIN_DEPENDS sensor_msgs nepi_ros_interfaces nepi_edge_sdk_base
 )
 
@@ -159,11 +159,6 @@ target_link_libraries(iqr_ros_pan_tilt_node
 
 
 
-set( DRIVER_INSTALL_FOLDER
-  # Must hard-coded 
-  /opt/nepi/ros/lib/nepi_drivers
-)
-
 catkin_install_python(PROGRAMS
   idx_drivers/idx_genicam_node.py
   idx_drivers/idx_genicam_discovery.py 
@@ -172,11 +167,12 @@ catkin_install_python(PROGRAMS
   idx_drivers/idx_v4l2_discovery.py
   idx_drivers/idx_v4l2_driver.py
   idx_drivers/idx_zed_node.py
+  idx_drivers/idx_zed_discovery.py
   idx_drivers/idx_onvif_generic_node.py 
   idx_drivers/idx_onvif_econroutecam_node.py
   idx_drivers/idx_onvif_econroutecam_driver.py
   idx_drivers/idx_onvif_generic_driver.py
-  DESTINATION ${DRIVER_INSTALL_FOLDER}
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 
@@ -187,7 +183,7 @@ catkin_install_python(PROGRAMS
   ptx_drivers/ptx_onvif_generic_node.py 
   ptx_drivers/ptx_onvif_sidusss109ht_driver.py 
   ptx_drivers/ptx_onvif_sidusss109ht_node.py
-  DESTINATION ${DRIVER_INSTALL_FOLDER}
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 
@@ -196,7 +192,14 @@ catkin_install_python(PROGRAMS
   lsx_drivers/lsx_aftowerlight_discovery.py
   lsx_drivers/lsx_sealite_node.py
   lsx_drivers/lsx_sealite_discovery.py
-  DESTINATION ${DRIVER_INSTALL_FOLDER}
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+
+catkin_install_python(PROGRAMS
+  rbx_drivers/rbx_ardupilot_node.py
+  rbx_drivers/rbx_ardupilot_discovery.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 ## Mark executables and/or libraries for installation
@@ -211,7 +214,7 @@ install(TARGETS
   iqr_ros_pan_tilt_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${DRIVER_INSTALL_FOLDER}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 ## Mark cpp header files for installation - Msgs and Services (generated headers) are under the project name subdir
@@ -221,9 +224,17 @@ install(DIRECTORY include/${PROJECT_NAME}/
   PATTERN ".svn" EXCLUDE
 )
 
+
 ## Non-generated headers are located directly in include and get copied to the root of include in the install directory
 install(DIRECTORY include/
   DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.h"
+  PATTERN ".svn" EXCLUDE
+)
+
+## Non-generated headers are located directly in include and get copied to the root of include in the install directory
+install(DIRECTORY ptx_drivers/iqr_ros_pan_tilt/include
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
   FILES_MATCHING PATTERN "*.h"
   PATTERN ".svn" EXCLUDE
 )

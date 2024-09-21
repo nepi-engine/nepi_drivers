@@ -71,26 +71,26 @@ class SealiteDiscovery:
   baud_int = 57600
   addr_str = "001"
   ################################################          
-  def __init__(self, nex_dict = TEST_NEX_DICT):
+  def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
-    self.nex_dict = nex_dict
-    #rospy.logwarn(self.log_name + ":  Discovery class instantiated with nex_dict " + str(self.nex_dict))
-    br_list = []
-    br_sel = self.nex_dict['driver_set_option_1']
-    if br_sel != "All":
-      br_list.append(int(br_sel))
-    else:
-      for br in br_list:
-        if br != "All":
-          br_list.append(int(br))
-    self.baudrate_list = br_list
-    addr_range = int(self.nex_dict['driver_set_option_2'])
-    self.addr_list = list(range(1,addr_range+1))
-    self.ignore_id_list = self.nex_dict['discovery_ignore_ids']
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
-  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace):
+  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace,nex_dict):
+    self.nex_dict = nex_dict
+    #rospy.logwarn(self.log_name + ":  Discovery class instantiated with nex_dict " + str(self.nex_dict))
+    baudrate_list = []
+    baudrate_sel = self.nex_dict['driver_set_option_1']
+    if baudrate_sel != "All":
+      baudrate_list.append(int(baudrate_sel))
+    else:
+      for baudrate in baudrate_list:
+        if baudrate != "All":
+          baudrate_list.append(int(baudrate))
+    self.baudrate_list = baudrate_list
+    addr_range = int(self.nex_dict['driver_set_option_2'])
+    self.addr_list = list(range(1,addr_range+1))
+    self.ignore_id_list = self.nex_dict['discovery_ignore_ids']
     self.base_namespace = base_namespace
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
@@ -163,10 +163,10 @@ class SealiteDiscovery:
             #print("Waiting for response")
             rospy.sleep(.005)
             bs = serial_port.readline()
+            response = bs.decode()
           except Exception as e:
-            rospy.logerr('%s: Got a serial read/write error (%s)', self.node_name, str(e))
+            #rospy.logerr('%s: Got a serial read/write error (%s)', self.node_name, str(e))
             break
-          response = bs.decode()
           if len(response) > 2:
             rospy.loginfo(self.node_name + ": Got response: " + response)
             if response[3] == ',':

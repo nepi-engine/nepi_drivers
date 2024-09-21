@@ -22,7 +22,7 @@
 ** SOFTWARE.
 *******************************************************************************/
 
-#include "drivers/iqr_ros_pan_tilt/QThread.h"
+#include "QThread.h"
 
 QThread::QThread()
 {

@@ -15,7 +15,7 @@ import rospy
 import threading
 import cv2
 
-from nepi_drivers.idx_device_if import ROSIDXSensorIF
+from nepi_edge_sdk_base.device_if_idx import ROSIDXSensorIF
 
 from nepi_edge_sdk_base import nepi_ros
 from nepi_edge_sdk_base import nepi_img

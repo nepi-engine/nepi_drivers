@@ -21,7 +21,7 @@ import time
 import re
 import sys
 
-from nepi_drivers.lsx_device_if import ROSLSXDeviceIF
+from nepi_edge_sdk_base.device_if_lsx import ROSLSXDeviceIF
 
 from nepi_ros_interfaces.msg import LSXStatus
 

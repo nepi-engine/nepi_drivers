@@ -7,8 +7,7 @@
  * License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
  */
 #include "iqr_ros_pan_tilt_node.h"
-#include "ptx_interface.h"
-#include "iqr_ros_pan_tilt/PanTiltDriver.h"
+#include "PanTiltDriver.h"
 
 #define NODE_NAME "iqr_pan_tilt"
 

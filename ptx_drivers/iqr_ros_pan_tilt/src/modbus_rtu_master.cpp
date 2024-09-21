@@ -1,4 +1,4 @@
-#include "drivers/iqr_ros_pan_tilt/modbus_rtu_master.h"
+#include "modbus_rtu_master.h"
 
 #include <ros/ros.h>
 

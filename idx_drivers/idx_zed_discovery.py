@@ -56,12 +56,10 @@ TEST_NEX_DICT = {
     'msg': ""
     }
 
-
-
 class ZedCamDiscovery:
   NEPI_DEFAULT_CFG_PATH = '/opt/nepi/ros/etc/'
-  CHECK_INTERVAL_S = 3.0
-
+  CHECK_INTERVAL_S = 5.0
+  device_dict = dict()
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"                                   
   def __init__(self):
@@ -74,8 +72,7 @@ class ZedCamDiscovery:
     ################################################
     # Start discovery process
 
-    self.deviceList = []
-    self.includeDevices = rospy.get_param('~included_devices', self.nex_dict['discovery_ids'])
+    self.includedDevices = rospy.get_param('~included_devices', self.nex_dict['discovery_ids'])
     self.excludedDevices = rospy.get_param('~excluded_devices', self.nex_dict['discovery_ignore_ids'])
 
     rospy.Timer(rospy.Duration(self.CHECK_INTERVAL_S), self.detectAndManageDevices)
@@ -104,9 +101,8 @@ class ZedCamDiscovery:
         device_type = device_type.split(':')[0]
         
         # Honor the exclusion list
-        if device_type in self.excludedDevices:
-          device_type = None
-          #continue
+        if device_type not in self.includedDevices:
+          continue
 
       elif line.startswith('/dev/video'):
         device_path = line
@@ -138,19 +134,14 @@ class ZedCamDiscovery:
         active_paths.append(device_path) # To check later that the device list has no entries for paths that have disappeared
         known_device = False
         # Check if this device is already known and launched
-        for device in self.deviceList:
-          #rospy.loginfo(self.node_name + ": " + "device exists check")
-          #rospy.loginfo(self.node_name + ": " + device)
-          #rospy.loginfo(self.node_name + ": " + active_paths)
-          if device['device_class'] != 'v4l2':
-            continue
-
+        for path in self.device_dict.keys():
+          device = self.device_dict[path]
           if device['device_path'] == device_path:
             known_device = True
             if device['device_type'] != device_type:
               # Uh oh -- device has switched on us!
               # Kill previous and start new?
-              rospy.logwarn(self.node_name + ": detected V4L2 device type change (" + device['device_type'] + "-->" + 
+              rospy.logwarn(self.node_name + ": detected Zed device type change (" + device['device_type'] + "-->" + 
                             device_type + ") for device at " + device_path)
               self.stopAndPurgeDeviceNode(device['node_namespace'])
               self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
@@ -161,26 +152,28 @@ class ZedCamDiscovery:
             break
 
         if not known_device:
+          rospy.logwarn(self.node_name + ": Starting zed on path" + device_path)
           self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
 
     # Handle devices which no longer have a valid active V4L2 device path
-
-    for device in self.deviceList:
+    for path in self.device_dict.keys():
+      device = self.device_dict[path]
       if device['device_class'] != 'v4l2':
         continue
 
-      if device['device_path'] not in active_paths:
-        rospy.logwarn(self.node_name + ': ' + device['node_namespace'] + ' path ' + device['device_path'] + ' no longer exists... device disconnected?')
-        self.stopAndPurgeDeviceNode(device['node_namespace'])
+        if device['device_path'] not in active_paths:
+          rospy.logwarn(self.node_name + ': ' + device['node_namespace'] + ' path ' + device['device_path'] + ' no longer exists... device disconnected?')
+          self.stopAndPurgeDeviceNode(device['node_namespace'])
 
   def startDeviceNode(self, dtype, path, bus):
     # First, get a unique name
     if dtype is not None:
-      if dtype in self.includeDevices:
+      if dtype in self.includedDevices:
         root_name = dtype.replace('-','').replace(' ','').lower() 
 
         same_type_count = 0
-        for device in self.deviceList:
+        for path in self.device_dict.keys():
+          device = self.device_dict[path]
           if device['device_type'] == dtype:
             same_type_count += 1
 
@@ -192,7 +185,8 @@ class ZedCamDiscovery:
         device_node_name += '_' + id
 
         device_exists = False
-        for device in self.deviceList:
+        for path in self.device_dict.keys():
+          device = self.device_dict[path]
           if device['node_name'] == device_node_name:
             device_exists = True
 
@@ -205,36 +199,39 @@ class ZedCamDiscovery:
           # Now start the node via rosrun
           # rosrun nepi_drivers_idx zed_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
           rospy.loginfo(self.node_name + ": " + "idx_device_mgr: Launching node " + device_node_name)
-          if dtype in self.includeDevices:
+          if dtype in self.includedDevices:
             #Setup required param server nex_dict for discovery node
             self.nex_dict['device_dict']={'zed_type': root_name}
             dict_param_name = device_node_name + "/nex_dict"
             rospy.set_param(dict_param_name,self.nex_dict)
             file_name = self.nex_dict['node_file_name']
             #Try and launch node
+            self.device_dict[path] = {'device_class': 'v4l2', 'device_path': path, 'device_type': dtype, 
+                                      'node_name': device_node_name, 'node_namespace': device_node_namespace}
             [success, msg, sub_process] = nepi_nex.launchDriverNode(file_name, device_node_name)
-            if success:
-              self.deviceList.append({'device_class': 'v4l2', 'device_path': path, 'device_type': dtype, 
-                                      'node_name': device_node_name, 'node_namespace': device_node_namespace,
-                                      'node_subprocess': sub_process})
-            else:
-              rospy.loginfo(self.node_name + ": " + msg)
+            self.device_dict[path]['node_subprocess'] = sub_process
+            rospy.loginfo(self.node_name + ": " + msg)
 
   def stopAndPurgeDeviceNode(self, node_namespace):
-    rospy.loginfo(self.node_name + ": stopping " + node_namespace)
-    for i, device in enumerate(self.deviceList):
+    rospy.logwarn(self.node_name + ": stopping " + node_namespace)
+    purge_path = None
+    for path in self.device_dict.keys():
+      device = self.device_dict[path]
       if device['node_namespace'] == node_namespace:
         node_name = device['node_namespace'].split("/")[-1]
         sub_process = device['node_subprocess']
         success = nepi_nex.killDriverNode(node_name,sub_process)
-        # And remove it from the list
-        self.deviceList.pop(i)  
-    if success == False:
-      rospy.logwarn(self.node_name + ": Unable to stop unknown node " + node_namespace)
+        if success:
+          purge_path = path
+        else:
+          rospy.logwarn(self.node_name + ": Unable to stop unknown node " + node_namespace)
+    if purge_path is not None:
+      del self.device_dict[purge_path]
 
 
   def deviceNodeIsRunning(self, node_namespace):
-    for device in self.deviceList:
+    for path in self.device_dict.keys():
+      device = self.device_dict[path]
       if device['node_namespace'] == node_namespace:
         if device['node_subprocess'].poll() is not None:
           return False

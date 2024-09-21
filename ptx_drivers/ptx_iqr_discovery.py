@@ -60,14 +60,15 @@ class IqrPanTiltDiscovery:
   active_devices_dict = dict()
   node_name = "iqr_pan_tilt"
   ################################################          
-  def __init__(self, nex_dict = TEST_NEX_DICT):
+  def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
-    self.nex_dict = nex_dict
-    self.search_id = nex_dict['discovery_ids'][0]
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
-  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace):
+  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, nex_dict = TEST_NEX_DICT):
+    self.nex_dict = nex_dict
+    self.search_id = nex_dict['discovery_ids'][0]
+
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace

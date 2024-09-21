@@ -15,7 +15,7 @@ from ptx_onvif_generic_node import OnvifPanTiltNode
 from nepi_edge_sdk_base import nepi_ros
 from nepi_edge_sdk_base import nepi_nex
 
-from nepi_drivers.ptx_device_if import ROSPTXActuatorIF
+from nepi_edge_sdk_base.device_if_ptx import ROSPTXActuatorIF
 from nepi_edge_sdk_base.save_cfg_if import SaveCfgIF
 
 PKG_NAME = 'PTX_IQR' # Use in display menus
