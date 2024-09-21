@@ -239,7 +239,7 @@ class ZedCamNode(object):
         self.zed_dynamic_reconfig_client = None
         while success == False and timer < timeout and not rospy.is_shutdown():
           try:
-            self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=30)
+            self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=3)
             success = True
           except Exception as e:
             rospy.loginfo(self.node_name + ": " +str(e))
