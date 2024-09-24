@@ -100,10 +100,9 @@ class ZedCamDiscovery:
         # Some v4l2-ctl outputs have an additional ':'
         device_type = device_type.split(':')[0]
         
-        # Honor the exclusion list
-        if device_type not in self.includedDevices:
-          continue
-
+      # Honor the exclusion list
+      if device_type not in self.includedDevices:
+        continue
       elif line.startswith('/dev/video'):
         device_path = line
         
@@ -151,7 +150,7 @@ class ZedCamDiscovery:
               self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
             break
 
-        if not known_device:
+        if known_device == False:
           rospy.logwarn(self.node_name + ": Starting zed on path" + device_path)
           self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
 
