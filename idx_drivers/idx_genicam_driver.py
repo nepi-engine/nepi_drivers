@@ -8,35 +8,67 @@
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 import sys
-import rospy
 import math
 import cv2
 from copy import deepcopy
 import time
 import threading
 
+from nepi_edge_sdk_base import nepi_msg
+
 import numpy as np
 from harvesters.core import Harvester
 import genicam.genapi
 from genicam.genapi import EAccessMode
-
-# FIXME: incurring a lot of extra function calls when DBG is False, but handy for now
-DBG=False
-DBG_ROS=False
-if DBG_ROS:
-    import rospy
-def DBG_PRINT(*args, **kwargs):
-    if not DBG:
-        return
-    print_func = rospy.logfatal if DBG_ROS else print
-    print_func(*args, **kwargs)
 
 ################### Genicam Driver Configuration #########################
 ##########################################################################
 
 PKG_NAME = 'IDX_GENICAM' # Use in display menus
 FILE_TYPE = 'DRIVER'
-CLASS_NAME = 'GenicamCamDriver'
+DRIVER_DICT = dict(
+class_name = 'GenicamCamDriver'
+)
+
+
+TEST_NEX_DICT = {
+'group': 'IDX',
+'group_id': 'GENICAM',
+'pkg_name': 'IDX_GENICAM',
+'NODE_DICT': {
+    'file_name': 'idx_genicam_node.py',
+    'module_name': 'idx_genicam_node',
+    'class_name': 'GenicamCamNode',
+},
+'DRIVER_DICT': {
+    'file_name': 'idx_genicam_driver.py' ,
+    'module_name': 'idx_genicam_driver' ,
+    'class_name':  'GenicamCamDriver'
+},
+'DISCOERY_DICT': {
+    'file_name': 'idx_genicam_discovery.py',
+    'module_name': 'idx_genicam_discovery',
+    'class_name': 'GenicamCamDiscovery',
+    'interfaces': ['USB','IP'],
+    'options_1_dict': {
+        'default_option': 'None',
+        'set_option': 'None'
+    },
+    'options_2_dict': {
+        'default_option': 'None',
+        'set_option': 'None'
+    },
+    'method': 'AUTO', 
+    'include_ids': [],
+    'exclude_ids': []
+},
+'DEVICE_DICT': {'model':'0','serial_number': '1'},
+'path': '/opt/nepi/ros/lib/nepi_drivers',
+'order': 1,
+'active': True,
+'msg': ""
+}
+
 
 
 DEFAULT_GENTL_PATHS = [
@@ -70,8 +102,6 @@ class GenicamCamDriver(object):
         self.consec_failed_frames = 0
         self.connected = False
         self.resolution = None
-           
-        DBG_PRINT(f"Initializing {self._name()}")
 
         # Make sure harvester library handle is up to date.
         self.harvester = harvester
@@ -81,11 +111,9 @@ class GenicamCamDriver(object):
                 gentl_paths = [gentl_paths]
             for path in gentl_paths:
                 self.harvester.add_file(path)
-            DBG_PRINT("Detecting devices...")
             self.harvester.update()
         if len(self.harvester.device_info_list) < 1:
             raise Exception("No genicam devices detected")
-        DBG_PRINT(f"{len(self.harvester.device_info_list)} genicam devices detected")
         # Find and connect to the specified device.
         search_keys = dict()
         search_keys["access_status"] = genicam.gentl.DEVICE_ACCESS_STATUS_LIST.DEVICE_ACCESS_STATUS_READWRITE.value
@@ -101,14 +129,7 @@ class GenicamCamDriver(object):
         self.model = self.device.remote_device.module.model
         self.serial_number = self.device.remote_device.module.serial_number
         self.connected = True
-        DBG_PRINT(f"Connected to {self._name()}")
-        DBG_PRINT("Discovering camera controls")
-
         ret, msg = self.initCameraControlsDict()
-        if not ret:
-            DBG_PRINT("Initialization failed, failed to initialize camera controls: " + msg)
-        else:
-            DBG_PRINT("Initialization complete")
 
     def _name(self):
         model = "unspecified" if self.model is None else self.model
@@ -126,7 +147,6 @@ class GenicamCamDriver(object):
             self.stopImageAcquisition(hold_lock=True)
 
         try:
-            DBG_PRINT(f"Attempting to set node {name} to {val}...")
             self.camera_settings[name]["node"].value = val
         except KeyError:
             ret, msg = False, f"Node does not exist (set {name} {val})"
@@ -151,11 +171,6 @@ class GenicamCamDriver(object):
                 rb_error = rb_error or (rb != val) # Integer comparison or comparison to 0.0
             if rb_error:
                 ret, msg = False, f"Readback error: {rb} != {val} (set {name} {val})"
-
-        if ret:
-            DBG_PRINT(f"Successfully set node {name} to {val}")
-        else:
-            DBG_PRINT(f"Failed to set node {name} to {val}")
 
         if img_acq_running_cache:
             self.startImageAcquisition(hold_lock=True)
@@ -239,10 +254,8 @@ class GenicamCamDriver(object):
         height, msg = self._getNodeVal("Height")
         if width is None:
             width = 0
-            DBG_PRINT(f"Failed setting initial width: {msg}")
         elif height is None:
             height = 0
-            DBG_PRINT(f"Failed setting initial height: {msg}")
         #else:
             #self.setResolution({"width": width, "height": height})
         self.resolution = dict(width = width,height = height)
@@ -298,10 +311,10 @@ class GenicamCamDriver(object):
         video_settings_dict = dict()
         fmt, msg = self._getNodeVal("PixelFormat")
         if fmt is None:
+            pass
             # If we fail to read the pixel format we still want to return
             # successfully, because we should still be able to provide width
             # and height. So, we just log the error and move on.
-            DBG_PRINT(msg)
         width = self.resolution["width"]
         height = self.resolution["height"]
         video_settings_dict["format"] = fmt
@@ -314,7 +327,6 @@ class GenicamCamDriver(object):
 
     def setResolution(self, resolution_dict):
         # TODO: Maybe resolution adjustment should be based on "Binning" or "Decimation" controls, not in s/w via cv2.resize()
-        DBG_PRINT(f"setResolution {resolution_dict}")
         width_too_small = resolution_dict["width"] < self.camera_settings["Width"]["min"]
         width_too_large = resolution_dict["width"] > self.camera_settings["Width"]["max"]
         height_too_small = resolution_dict["height"] < self.camera_settings["Height"]["min"]
@@ -328,7 +340,6 @@ class GenicamCamDriver(object):
         NUM_OPTIONS = 20
         available_framerates = [self.camera_settings["AcquisitionFrameRate"]["min"],self.camera_settings["AcquisitionFrameRate"]["max"]]
         framerates = [math.ceil(available_framerates[0]), math.floor(available_framerates[1])]
-        DBG_PRINT(framerates)
         return True, framerates
 
     def setFramerate(self, max_fps):
@@ -339,16 +350,12 @@ class GenicamCamDriver(object):
         if fps_too_low or fps_too_high:
             return False, "Invalid framerate requested"
         ret = self._setNodeVal("AcquisitionFrameRate", max_fps)
-        #rospy.loginfo("GenC_Driver: Set Framerate")
-        #rospy.loginfo(ret)
         return ret
 
     def getFramerate(self):
         if "AcquisitionFrameRate" not in self.camera_settings:
             return False, "Camera does not provide framerate information"
         ret = self._getNodeVal("AcquisitionFrameRate")
-        #rospy.loginfo("GenC_Driver: Get Framerate")
-        #rospy.loginfo(ret)
         return ret[1],round(ret[0],2)
 
     def getCurrentFormat(self):
@@ -386,9 +393,7 @@ class GenicamCamDriver(object):
         if not hold_lock:
             self.img_acq_lock.acquire()
         self.img_acq_running = True
-        DBG_PRINT("starting device...")
         self.device.start()
-        DBG_PRINT("device started")
         if not hold_lock:
             self.img_acq_lock.release()
         return True, "Success"
@@ -398,10 +403,8 @@ class GenicamCamDriver(object):
             return True, "Not presently capturing from genicam device " + self._name()
         if not hold_lock:
             self.img_acq_lock.acquire()
-        DBG_PRINT("stopping device...")
         self.device.stop()
         time.sleep(0.05)
-        DBG_PRINT("device stopped")
         self.img_acq_running = False
         if not hold_lock:
             self.img_acq_lock.release()
@@ -451,31 +454,22 @@ class GenicamCamDriver(object):
 
 def test_genicam_cam_driver(model, serial_number, harvester, test_camera_controls=True,
         test_image_acquisition=True, dump_lut=False):
-    DBG_PRINT(f"\nTESTING {model}/{serial_number}\n")
     cam = GenicamCamDriver(model=model, serial_number=serial_number,
             harvester=harvester)
-    if test_camera_controls:
-        for c in cam.camera_controls:
-            DBG_PRINT(c)
-            DBG_PRINT(cam.camera_controls[c])
     last_frame = None
     if test_image_acquisition:
         cam.startImageAcquisition()
         num_frames = 60
         num_successful_frames = 0
         t0 = time.time()
-        DBG_PRINT(f"Attempting to capture {num_frames} frames...")
         for _ in range(num_frames):
             frame, timestamp, ret, msg = cam.getImage()
             if ret:
                 num_successful_frames += 1
                 last_frame = frame
-            else:
-                DBG_PRINT("\nMissed frame: " + msg)
         if last_frame is not None:
             duration = time.time() - t0
             fps = num_successful_frames / duration
-            DBG_PRINT(f"Captured {num_successful_frames} frames in {duration:0.3f} seconds ({fps} fps).")
             plt.rcParams["figure.figsize"] = (12, 8)
             plt.imshow(last_frame)
             plt.show()
@@ -500,7 +494,6 @@ if __name__ == '__main__':
         h.add_file(path)
     h.update()
     devices_to_test = h.device_info_list
-    DBG_PRINT(devices_to_test)
     for dut in devices_to_test:
         test_genicam_cam_driver(model=dut.model,
                 serial_number=dut.serial_number,

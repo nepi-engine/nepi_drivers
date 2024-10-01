@@ -8,34 +8,25 @@
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
-import rospy
 
 from nepi_edge_sdk_base import nepi_ros
-from nepi_edge_sdk_base import nepi_nex
+from nepi_edge_sdk_base import nepi_msg
+from nepi_edge_sdk_base import nepi_drv
+from nepi_edge_sdk_base import nepi_settings
 
 from nepi_edge_sdk_base.device_if_ptx import ROSPTXActuatorIF
 
 PKG_NAME = 'PTX_ONVIF_GENERIC' # Use in display menus
-DESCRIPTION = 'Driver package for generic ONVIF pan tilt devices'
 FILE_TYPE = 'NODE'
-CLASS_NAME = 'OnvifPanTiltNode' # Should Match Class Name
-GROUP ='PTX'
-GROUP_ID = 'ONVIF' 
+NODE_DICT = dict(
+description = 'Driver package for generic ONVIF pan tilt devices',
+class_name = 'OnvifPanTiltNode', # Should Match Class Name,
+group ='PTX',
+group_id = 'ONVIF' ,
+driver_pkg_name = 'PTX_ONVIF_GENERIC', # 'Required Driver PKG_NAME or 'None'
+discovery_pkg_name = 'None' # 'Required Discovery PKG_NAME or 'None'
+)
 
-
-DRIVER_PKG_NAME = 'PTX_ONVIF_GENERIC' # 'Required Driver PKG_NAME or 'None'
-DRIVER_INTERFACES = ['IP'] # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
-DRIVER_OPTIONS_1_NAME = 'None'
-DRIVER_OPTIONS_1 = [] # List of string options. Selected option passed to driver
-DRIVER_DEFAULT_OPTION_1 = 'None'
-DRIVER_OPTIONS_2_NAME = 'None'
-DRIVER_OPTIONS_2 = [] # List of string options. Selected option passed to driver
-DRIVER_DEFAULT_OPTION_2 = 'None'
-
-DISCOVERY_PKG_NAME = 'None' # 'Required Driver PKG_NAME or 'None'
-DISCOVERY_METHOD = 'OTHER'  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
-DISCOVERY_IDS = []  # List of string identifiers for discovery process
-DISCOVERY_IGNORE_IDS = [] # List of string identifiers for discovery process
 
 class OnvifPanTiltNode:
     DEFAULT_DRIVER_PATHS = ["/opt/nepi/ros/lib/nepi_drivers/"]
@@ -58,71 +49,69 @@ class OnvifPanTiltNode:
 
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
-    nex_dict = dict()                             
+    drv_dict = dict()                                                    
     def __init__(self):
-        # Launch the ROS node
-        rospy.init_node(name=self.DEFAULT_NODE_NAME) # Node name could be overridden via remapping
-        self.node_name = rospy.get_name().split('/')[-1]
-        # Get nex_dict from param servers
-        rospy.loginfo("Starting " + self.node_name)
+        #### APP NODE INIT SETUP ####
+        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+        self.node_name = nepi_ros.get_node_name()
+        self.base_namespace = nepi_ros.get_base_namespace()
+        nepi_msg.createMsgPublishers(self)
+        nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+        ##############################
+        # Get required drv driver dict info
         try:
-            self.nex_dict = rospy.get_param('~nex_dict') # Crash if not provide
+            self.drv_dict = nepi_ros.get_param(self,'~drv_dict') # Crash if not provide
         except Exception as e:
-            rospy.signal_shutdown("Failed to read nex_dict from param server for node " + self.node_name + " with exception: " + str(e))
-        self.driver_name = self.nex_dict['driver_name']
-        self.driver_file = self.nex_dict['driver_file_name']
-        self.driver_path = self.nex_dict['driver_file_path']
-        self.driver_module = self.nex_dict['driver_module_name']
-        self.driver_class_name = self.nex_dict['driver_class_name']
-        self.driver_interfaces = self.nex_dict['driver_interfaces']
-        self.driver_options_1 = self.nex_dict['driver_options_1']
-        self.driver_option_1 = self.nex_dict['driver_set_option_1']
-        # import driver class fromn driver module
+            nepi_ros.signal_shutdown("Failed to read drv_dict from param server for node " + self.node_name + " with exception: " + str(e))
+        self.driver_path = self.drv_dict['path']
+        self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
+        self.driver_module = self.drv_dict['DRIVER_DICT']['module_name']
+        self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
 
 
         # Require the camera connection parameters to have been set
-        if not rospy.has_param('~credentials/username'):
-            rospy.logerr(self.node_name + ": Missing credentials/username parameter... cannot start")
+        if not nepi_ros.has_param(self,'~credentials/username'):
+            nepi_msg.publishMsgErr(self,"Missing credentials/username parameter... cannot start")
             return
-        if not rospy.has_param('~credentials/password'):
-            rospy.logerr(self.node_name + ": Missing credentials/password parameter... cannot start")
+        if not nepi_ros.has_param(self,'~credentials/password'):
+            nepi_msg.publishMsgErr(self,"Missing credentials/password parameter... cannot start")
             return
-        if not rospy.has_param('~network/host'):
-            rospy.logerr(self.node_name + ": Missing network/host parameter... cannot start")
+        if not nepi_ros.has_param(self,'~network/host'):
+            nepi_msg.publishMsgErr(self,"Missing network/host parameter... cannot start")
             return
-        if not rospy.has_param('~driver_id'):
-            rospy.logerr(self.node_name + ": Missing driver_id parameter... cannot start")
+        if not nepi_ros.has_param(self,'~driver_id'):
+            nepi_msg.publishMsgErr(self,"Missing driver_id parameter... cannot start")
             return
                 
-        username = str(rospy.get_param('~credentials/username'))
-        password = str(rospy.get_param('~credentials/password'))
-        host = str(rospy.get_param('~network/host'))
+        username = str(nepi_ros.get_param(self,'~credentials/username'))
+        password = str(nepi_ros.get_param(self,'~credentials/password'))
+        host = str(nepi_ros.get_param(self,'~network/host'))
         
         # Allow a default for the port, since it is part of onvif spec.
-        onvif_port = rospy.get_param('~network/port', 80)
-        rospy.set_param('~/network/port', onvif_port)
+        onvif_port = nepi_ros.get_param(self,'~network/port', 80)
+        nepi_ros.set_param(self,'~/network/port', onvif_port)
 
 
-        rospy.loginfo(self.node_name + ": Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
-        [success, msg, self.driver_class] = nepi_nex.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
+        nepi_msg.publishMsgInfo(self,"Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
+        [success, msg, self.driver_class] = nepi_drv.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
         
         if success:
             driver_constructed = False
             attempts = 0
-            while not rospy.is_shutdown() and driver_constructed == False and attempts < 5 and not rospy.is_shutdown():
+            while not nepi_ros.is_shutdown() and driver_constructed == False and attempts < 5:
                 try:
                     self.driver = self.driver_class(username, password, host, onvif_port)
                     driver_constructed = True
-                    rospy.loginfo("ONVIF_NODE: Driver constructed")
+                    nepi_msg.publishMsgInfo(self,"Driver constructed")
                 except Exception as e:
-                    rospy.loginfo("ONVIF_NODE: Failed to construct driver: " + self.driver_id + "with exception: " + str(e))
-                    rospy.sleep(1)
+                    nepi_msg.publishMsgInfo(self,"Failed to construct driver: " + self.driver_id + "with exception: " + str(e))
+                    time.sleep(1)
                 attempts += 1 
         if driver_constructed == False:
-            rospy.signal_shutdown("Shutting down Onvif node " + self.node_name + ", unable to connect to driver")
+            nepi_ros.signal_shutdown("Shutting down Onvif node " + self.node_name + ", unable to connect to driver")
         else:
             ################################################
-            rospy.loginfo(self.node_name + ": ... Connected!")
+            nepi_msg.publishMsgInfo(self,"... Connected!")
             self.dev_info = self.driver.getDeviceInfo()
             self.logDeviceInfo()
 
@@ -159,7 +148,6 @@ class OnvifPanTiltNode:
                 ptx_callback_names["GetCurrentPosition"] = None # Clear the method
                 
             if not self.driver.hasAbsolutePositioning():
-                rospy.logerr("Debug: Clearing GotoPosition")
                 ptx_callback_names["GotoPosition"] = None # Clear the method
             
             self.has_absolute_positioning_and_feedback = self.driver.hasAbsolutePositioning() and self.driver.reportsPosition()
@@ -191,26 +179,22 @@ class OnvifPanTiltNode:
             # many ONVIF devices report capabilities that they don't actually have, so need a user-override mechanism. In
             # that case, assign these to null in the config file
             # TODO: Not sure we actually need remappings for PTX: Makes sense for IDX because there are lots of controllable params.
-            ptx_remappings = rospy.get_param('~ptx_remappings', {})
-            rospy.loginfo(self.node_name + ': Establishing PTX remappings')
+            ptx_remappings = nepi_ros.get_param(self,'~ptx_remappings', {})
+            nepi_msg.publishMsgInfo(self,'Establishing PTX remappings')
             for from_name in ptx_remappings:
                 to_name = ptx_remappings[from_name]
                 if from_name not in ptx_callback_names or (to_name not in ptx_callback_names and to_name != None and to_name != 'None'):
-                    rospy.logwarn('\tInvalid PTX remapping: ' + from_name + '-->' + to_name)
+                    pass
                 elif to_name is None or to_name == 'None':
                     ptx_callback_names[from_name] = None
-                    rospy.loginfo('\tRemapping %s to non-existence to remove capability', from_name)
                 elif ptx_callback_names[to_name] is None:
-                    rospy.logwarn('\tRemapping ' + from_name + ' to an unavailable adjustment (' + to_name + ')')
+                    pass
                 else:
                     ptx_callback_names[from_name] = ptx_callback_names[to_name]
-                    rospy.loginfo('\t' + from_name + '-->' + to_name)
-
-
 
             # Launch the PTX interface --  this takes care of initializing all the ptx settings from config. file, subscribing and advertising topics and services, etc.
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-            rospy.loginfo(self.node_name + ": Launching NEPI PTX (ROS) interface...")
+            nepi_msg.publishMsgInfo(self,"Launching NEPI PTX (ROS) interface...")
             self.device_info_dict["node_name"] = self.node_name
             if self.node_name.find("_") != -1:
                 split_name = self.node_name.rsplit('_', 1)
@@ -258,13 +242,13 @@ class OnvifPanTiltNode:
 
             # Initialize settings
             self.cap_settings = self.getCapSettings()
-            rospy.loginfo(self.node_name + ": " +"CAPS SETTINGS")
+            nepi_msg.publishMsgInfo(self,"" +"CAPS SETTINGS")
             #for setting in self.cap_settings:
-                #rospy.loginfo(self.node_name + ": " +setting)
+                #nepi_msg.publishMsgInfo(self,"" +setting)
             self.factory_settings = self.getFactorySettings()
-            rospy.loginfo(self.node_name + ": " +"FACTORY SETTINGS")
+            nepi_msg.publishMsgInfo(self,"" +"FACTORY SETTINGS")
             #for setting in self.factory_settings:
-                #rospy.loginfo(self.node_name + ": " +setting)
+                #nepi_msg.publishMsgInfo(self,"" +setting)
 
             self.ptx_if = ROSPTXActuatorIF(device_info = self.device_info_dict, 
                                         capSettings = self.cap_settings,
@@ -287,14 +271,14 @@ class OnvifPanTiltNode:
                                         gotoWaypointCb = ptx_callback_names["GotoWaypoint"],
                                         setWaypointCb = ptx_callback_names["SetWaypoint"],
                                         setWaypointHereCb = ptx_callback_names["SetWaypointHere"])
-            rospy.loginfo(self.node_name + " ... PTX interface running")
+            nepi_msg.publishMsgInfo(self," ... PTX interface running")
 
             self.speed_ratio = 1.0
             self.home_yaw_deg = 0.0
             self.home_pitch_deg = 0.0
             self.waypoints = {} # Dictionary of dictionaries with numerical key and {waypoint_pitch, waypoint_yaw} dict value
 
-            rospy.spin()
+            nepi_ros.spin()
 
 
 
@@ -304,40 +288,21 @@ class OnvifPanTiltNode:
         dev_info_string += "Model: " + self.dev_info["Model"] + "\n"
         dev_info_string += "Firmware Version: " + self.dev_info["FirmwareVersion"] + "\n"
         dev_info_string += "Serial Number: " + self.dev_info["HardwareId"] + "\n"
-        rospy.loginfo(dev_info_string)
+        nepi_msg.publishMsgInfo(self,dev_info_string)
+
 
     #**********************
     # Device setting functions
 
-    def getSettingsOptionsDict(self):
-        settings_options_dict = dict()
-        return settings_options_dict
-
 
     def getCapSettings(self):
-        settings_cap_dict = self.getSettingsOptionsDict()
-        return nepi_ros.NONE_SETTINGS
+        return nepi_settings.NONE_CAP_SETTINGS
 
     def getFactorySettings(self):
-        settings_options_dict = self.getSettingsOptionsDict()
-        settings = nepi_ros.NONE_SETTINGS
-        #Apply factory setting overides
-        for setting in settings:
-            if setting[1] in self.FACTORY_SETTINGS_OVERRIDES:
-                setting[2] = self.FACTORY_SETTINGS_OVERRIDES[setting[1]]
-                settings = nepi_ros.update_setting_in_settings(setting,settings)
-        return settings
-
-
-    def getSettingsDict(self):
-        settings_dict = dict()
-        return settings_dict
-            
+        return nepi_settings.NONE_SETTINGS
 
     def getSettings(self):
-        settings_dict = self.getSettingsDict()
-        settings = nepi_ros.NONE_SETTINGS
-        return settings
+        return nepi_settings.NONE_SETTINGS
 
     def setSetting(self,setting_name,setting_data):
         return True
@@ -346,25 +311,20 @@ class OnvifPanTiltNode:
     def settingUpdateFunction(self,setting):
         success = False
         setting_str = str(setting)
-        if len(setting) == 3:
-            setting_type = setting[0]
-            setting_name = setting[1]
-            [s_name, s_type, data] = nepi_ros.get_data_from_setting(setting)
-            if data is not None:
-                setting_data = data
-                found_setting = False
-                for cap_setting in self.cap_settings:
-                    if setting_name in cap_setting:
-                        found_setting = True
-                        success, msg = self.setSetting(setting_name,setting_data)
-                        if success:
-                            msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-                if found_setting is False:
-                    msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                 
-            else:
-                msg = (self.node_name  + " Setting data" + setting_str + " is None")
+        [setting_name, s_type, data] = nepi_ros.get_data_from_setting(setting)
+        if data is not None:
+            setting_data = data
+            found_setting = False
+            for cap_setting in self.cap_settings:
+                if setting_name in cap_setting:
+                    found_setting = True
+                    success, msg = self.setSetting(setting_name,setting_data)
+                    if success:
+                        msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
+            if found_setting is False:
+                msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                 
         else:
-            msg = (self.node_name  + " Setting " + setting_str + " not correct length")
+            msg = (self.node_name  + " Setting data" + setting_str + " is None")
         return success, msg
 
 
@@ -395,7 +355,6 @@ class OnvifPanTiltNode:
         # Recenter the -1.0,1.0 ratio from Onvif to the 0.0,1.0 used throughout the rest of NEPI
         pan_ratio = (0.5 * pan_ratio_onvif) + 0.5
         tilt_ratio = (0.5 * tilt_ratio_onvif) + 0.5
-        #rospy.logwarn(f"Debug: Current position ratio = {pan_ratio},{tilt_ratio}")
         pan_deg = self.ptx_if.yawRatioToDeg(pan_ratio)
         tilt_deg = self.ptx_if.pitchRatioToDeg(tilt_ratio)
         return pan_deg, tilt_deg
@@ -417,8 +376,6 @@ class OnvifPanTiltNode:
             home_yaw_ratio_onvif = 2 * (home_yaw_ratio - 0.5)
             home_pitch_ratio_onvif = 2 * (home_pitch_ratio - 0.5)
             self.driver.moveToPosition(home_yaw_ratio_onvif, home_pitch_ratio_onvif, self.speed_ratio)
-        else:
-            rospy.logwarn("Homing not supported by this PTX device... ignoring")
 
     def setHomePosition(self, yaw_deg, pitch_deg):
         # Have to implement these fully in s/w since ONVIF doesn't support absolute home position setting
@@ -441,7 +398,6 @@ class OnvifPanTiltNode:
            self.driver.gotoPreset(waypoint_index, self.speed_ratio)
         elif self.driver.hasAbsolutePositioning() is True:
             if waypoint_index not in self.waypoints:
-                rospy.logwarn("Requested waypoint index %u is invalid/unset... ignoring", waypoint_index)
                 return
             
             waypoint_yaw_deg = self.waypoints[waypoint_index]['yaw_deg']
@@ -469,7 +425,7 @@ class OnvifPanTiltNode:
         if self.driver.hasWaypoints():
             self.driver.setPresetHere(waypoint_index)
 
-        rospy.loginfo("Waypoint set to current position")
+        nepi_msg.publishMsgInfo(self,"Waypoint set to current position")
 
     def setCurrentSettingsAsDefault(self):
         # Don't need to worry about any of our params in this class, just child interfaces' params

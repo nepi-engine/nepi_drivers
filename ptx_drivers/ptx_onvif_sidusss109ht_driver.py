@@ -17,7 +17,9 @@ from requests.auth import HTTPDigestAuth
 
 PKG_NAME = 'PTX_ONVIF_SIDUS_SS109HT' # Use in display menus
 FILE_TYPE = 'DRIVER'
-CLASS_NAME = 'SidusSS109HT_PTZ' # Should Match Class Name
+DRIVER_DICT = dict(
+class_name = 'SidusSS109HT_PTZ'
+)
 
 
 #### Generic ONVIF - Adapted from Vendor-provided code ####

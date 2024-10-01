@@ -12,11 +12,12 @@ import os
 import sys
 import time
 import math
-import rospy
 import ros_numpy
 import threading
 import cv2
 import copy
+
+import rospy
 
 
 import subprocess
@@ -27,10 +28,12 @@ import tf
 from nepi_edge_sdk_base.device_if_idx import ROSIDXSensorIF
 
 from nepi_edge_sdk_base import nepi_ros
+from nepi_edge_sdk_base import nepi_msg
 from nepi_edge_sdk_base import nepi_nav
 from nepi_edge_sdk_base import nepi_img
 from nepi_edge_sdk_base import nepi_pc
-from nepi_edge_sdk_base import nepi_nex
+from nepi_edge_sdk_base import nepi_drv
+from nepi_edge_sdk_base import nepi_settings
 
 from datetime import datetime
 from std_msgs.msg import UInt8, Empty, String, Bool, Float32
@@ -43,82 +46,79 @@ from dynamic_reconfigure.msg import Config
 from rospy.numpy_msg import numpy_msg
 
 PKG_NAME = 'IDX_ZED' # Use in display menus
-DESCRIPTION = 'Driver package for StereoLab Zed stereo camera devices'
 FILE_TYPE = 'NODE'
-CLASS_NAME = 'ZedCamNode' # Should Match Class Name
-GROUP ='IDX'
-GROUP_ID = 'ZED' 
-
-DRIVER_PKG_NAME = 'None' # 'Required Driver PKG_NAME or 'None'
-DRIVER_INTERFACES = ['USB'] # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
-DRIVER_OPTIONS_1_NAME = 'None'
-DRIVER_OPTIONS_1 = [] # List of string options. Selected option passed to driver
-DRIVER_DEFAULT_OPTION_1 = 'None'
-DRIVER_OPTIONS_2_NAME = 'None'
-DRIVER_OPTIONS_2 = [] # List of string options. Selected option passed to driver
-DRIVER_DEFAULT_OPTION_2 = 'None'
-
-DISCOVERY_PKG_NAME = 'IDX_ZED' # 'Required Discovery PKG_NAME or 'None'
-DISCOVERY_METHOD = 'AUTO'  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
-DISCOVERY_IDS = ['ZED 2','ZED 2i','ZED-M']  # List of string identifiers for discovery process
-DISCOVERY_IGNORE_IDS = [] # List of string identifiers for discovery process
+NODE_DICT = dict(
+description = 'Driver package for StereoLab Zed stereo camera devices',
+class_name = 'ZedCamNode', # Should Match Class Name,
+group ='IDX',
+group_id = 'ZED' ,
+driver_pkg_name = 'None', # 'Required Driver PKG_NAME or 'None'
+discovery_pkg_name = 'IDX_ZED' # 'Required Discovery PKG_NAME or 'None'
+)
 
 TEST_NEX_DICT = {
-    'group': 'IDX',
-    'group_id': 'ZED',
-    'node_file_name': 'idx_zed_node.py',
-    'node_file_path': '/opt/nepi/ros/lib/nep_drivers',
-    'node_module_name': 'idx_zed_node',
-    'node_class_name': 'ZedCamNode',
-    'driver_name': "None",
-    'driver_file_name': "None" ,
-    'driver_file_path':  "None",
-    'driver_module_name': "None" ,
-    'driver_class_name':  "None",
-    'driver_interfaces': [],
-    'driver_options_1': [],
-    'driver_default_option_1': 'None',
-    'driver_set_option_1': 'None',
-    'driver_options_2': [],
-    'driver_default_option_2': 'None',
-    'driver_set_option_2': 'None',
-    'discovery_name': 'IDX_ZED', 
-    'discovery_file_name': 'idx_zed_discovery.py',
-    'discovery_file_path': '/opt/nepi/ros/lib/nepi_drivers',
-    'discovery_module_name': 'idx_zed_discovery',
-    'discovery_class_name': 'ZedCamDiscovery',
-    'discovery_method': 'AUTO', 
-    'discovery_ids': ['ZED 2','ZED 2i','ZED-M'],
-    'discovery_ignore_ids': ['msm_vidc_vdec'],
-    'device_dict': {'zed_type': 'zed2'},
-    'order': 1,
-    'active': True,
-    'msg': ""
-    }
+'group': 'IDX',
+'group_id': 'ZED',
+'pkg_name': 'IDX_ZED',
+'NODE_DICT': {
+    'file_name': 'idx_zed_node.py',
+    'module_name': 'idx_zed_node',
+    'class_name': 'ZedCamNode',
+},
+'DRIVER_DICT': {
+    'file_name': '' ,
+    'module_name': '' ,
+    'class_name':  ''
+},
+'DISCOVERY_DICT': {
+    'file_name': 'idx_zed_discovery.py',
+    'module_name': 'idx_zed_discovery',
+    'class_name': 'ZEDCamDiscovery',
+    'interfaces': ['USB'],
+    'options_1_dict': {
+        'default_val': 'None',
+        'set_val': 'None'
+    },
+    'options_2_dict': {
+        'default_val': 'None',
+        'set_val': 'None'
+    },
+    'method': 'AUTO', 
+    'include_ids': ['ZED 2','ZED 2i','ZED-M'],
+    'exclude_ids': ['msm_vidc_vdec']
+},
+'DEVICE_DICT': {'zed_type': 'zed2'},
+'path': '/opt/nepi/ros/lib/nepi_drivers',
+'order': 1,
+'active': True,
+'msg': ""
+}
 
 
 
 class ZedCamNode(object):
-
+    CHECK_INTERVAL_S = 3.0
     CAL_SRC_PATH = "/usr/local/zed/settings"
     USER_CFG_PATH = "/mnt/nepi_storage/user_cfg"
     CAL_BACKUP_PATH = USER_CFG_PATH + "/zed_cals"
 
-    CAP_SETTINGS = [["Float","pub_frame_rate","0.1","100.0"],
-                    ["Int","depth_confidence","0","100"],
-                    ["depth_texture_conf","0","100"],
-                    ["Int","point_cloud_freq","0.1","100"],
-                    ["Int","brightness","0","8"],
-                    ["Int","contrast","0","8"],
-                    ["Int","hue","0","11"],
-                    ["Int","saturation","0","8"],
-                    ["Int","sharpness","0","8"],
-                    ["Int","gamma","1","9"],
-                    ["Bool","auto_exposure_gain"],
-                    ["Int","gain","0","100"],
-                    ["Int","exposure","0","100"],
-                    ["Bool","auto_whitebalance"],
-                    ["Int","whitebalance_temperature","1","100"]]
+    CAP_SETTINGS = dict(
+      pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","100.0"]},
+      depth_confidence = {"type":"Int","name":"depth_confidence","options":["0","100"]},
+      depth_texture_conf = {"type":"Int","name":"depth_texture_conf","options":["0","100"]},
+      point_cloud_freq = {"type":"Int","name":"point_cloud_freq","options":["0.1","100"]},
+      brightness = {"type":"Int","name":"brightness","options":["0","8"]},
+      contrast ={"type":"Int","name":"contrast","options":["0","8"]},
+      hue = {"type":"Int","name":"hue","options":["0","11"]},
+      saturation ={"type":"Int","name":"saturation","options":["0","8"]},
+      sharpness ={"type":"Int","name":"sharpness","options":["0","8"]},
+      gamma ={"type":"Int","name":"gamma","options":["1","9"]},
+      auto_exposure_gain = {"type":"Bool","name":"auto_exposure_gain"},
+      gain = {"type":"Int","name":"gain","options":["0","100"]},
+      exposure = {"type":"Int","name":"exposure","options":["0","100"]},
+      auto_whitebalance = {"type":"Bool","name":"auto_whitebalance"},
+      whitebalance_temperature = {"type":"Int","name":"whitebalance_temperature","options":["1","100"]}
+    )
 
     FACTORY_SETTINGS_OVERRIDES = dict( )
     
@@ -197,15 +197,18 @@ class ZedCamNode(object):
     
 
     ################################################
-    DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"                                   
+    DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"         
+    drv_dict = dict()                          
     def __init__(self):
-        # Launch the ROS node
-        rospy.loginfo("Starting " + self.DEFAULT_NODE_NAME)
-        rospy.init_node(name=self.DEFAULT_NODE_NAME) # Node name could be overridden via remapping
-        self.node_name = rospy.get_name().split('/')[-1]
-        # Get nex_dict from param servers
-        self.nex_dict = rospy.get_param('~nex_dict',TEST_NEX_DICT) 
-        #rospy.logwarn("ZED_NODE: " + str(self.nex_dict))
+        #### APP NODE INIT SETUP ####
+        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+        self.node_name = nepi_ros.get_node_name()
+        self.base_namespace = nepi_ros.get_base_namespace()
+        nepi_msg.createMsgPublishers(self)
+        nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+        ##############################
+        # Get required drv driver dict info
+        self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
 
         ################################################
         # Try to restore camera calibration files from
@@ -213,12 +216,11 @@ class ZedCamNode(object):
         if success:
           if len(files_copied) > 0:
             strList = str(files_copied)
-            rospy.loginfo(self.node_name + ": " +"Restored zed cal files: " + strList)
+            nepi_msg.publishMsgInfo(self,"Restored zed cal files: " + strList)
         else:
-          rospy.loginfo(self.node_name + ": " +"Failed to restore zed cal files")
+          nepi_msg.publishMsgInfo(self,"Failed to restore zed cal files")
         # This parameter should be automatically set by idx_sensor_mgr
-        self.zed_type = self.nex_dict['device_dict']['zed_type']
-        #rospy.logwarn(self.node_name + ": " + self.zed_type)
+        self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
 
         # Run the correct zed_ros_wrapper launch file
         zed_launchfile = self.zed_type + '.launch'
@@ -227,7 +229,7 @@ class ZedCamNode(object):
         self.zed_ros_wrapper_proc = subprocess.Popen(zed_ros_wrapper_run_cmd)
 
         # Connect to Zed node
-        self.zed_type = self.nex_dict['device_dict']['zed_type']
+        self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
         ZED_BASE_NAMESPACE = nepi_ros.get_base_namespace() + self.zed_type + "/zed_node/"
 
         # Now that Zed SDK is started, we can set up the reconfig client
@@ -237,23 +239,23 @@ class ZedCamNode(object):
         waittime = 1
         timer = 0
         self.zed_dynamic_reconfig_client = None
-        while success == False and timer < timeout and not rospy.is_shutdown():
+        while success == False and timer < timeout and not nepi_ros.is_shutdown():
           try:
             self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=3)
             success = True
           except Exception as e:
-            rospy.loginfo(self.node_name + ": " +str(e))
+            nepi_msg.publishMsgInfo(self,str(e))
             nepi_ros.sleep(waittime,10)
             timer += waittime
         if timer >= timeout or self.zed_dynamic_reconfig_client is None:
-          rospy.logwarn(self.node_name + ": Failed to connect to zed_node using launch process" + str(zed_ros_wrapper_run_cmd))
-          rospy.logwarn(self.node_name + ": Killing node named: " + ZED_BASE_NAMESPACE)
-          success = nepi_nex.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
+          nepi_msg.publishMsgWarn(self,"Failed to connect to zed_node using launch process" + str(zed_ros_wrapper_run_cmd))
+          nepi_msg.publishMsgWarn(self,"Killing node named: " + ZED_BASE_NAMESPACE)
+          success = nepi_drv.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
           if success:
             time.sleep(2)
-          rospy.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
+          nepi_ros.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
           return
-        rospy.logwarn(self.node_name + ": Zed DRC: " + str(self.zed_dynamic_reconfig_client))
+        nepi_msg.publishMsgWarn(self,"Zed DRC: " + str(self.zed_dynamic_reconfig_client))
         time.sleep(2)
 
 
@@ -273,20 +275,20 @@ class ZedCamNode(object):
 
 
         # Wait for zed camera topic to publish, then subscribeCAPS SETTINGS
-        rospy.loginfo(self.node_name + ": " +"Waiting for topic: " + self.color_img_topic)
+        nepi_msg.publishMsgInfo(self,"Waiting for topic: " + self.color_img_topic)
         nepi_ros.wait_for_topic(self.color_img_topic)
 
-        rospy.loginfo(self.node_name + ": " +"Starting Zed IDX subscribers and publishers")
+        nepi_msg.publishMsgInfo(self,"Starting Zed IDX subscribers and publishers")
         self.color_img_sub = None
         self.bw_img_sub = None
         self.depth_map_sub = None
         self.depth_img_sub = None
         self.pc_sub = None
         self.pc_img_sub = None
-        rospy.Subscriber(ZED_ODOM_TOPIC, Odometry, self.idx_odom_topic_callback)
+        odom_sub = rospy.Subscriber(ZED_ODOM_TOPIC, Odometry, self.idx_odom_topic_callback)
 
         # Launch the ROS node
-        rospy.loginfo(self.node_name + ": ... Connected!")
+        nepi_msg.publishMsgInfo(self,"... Connected!")
 
 
         idx_callback_names = {
@@ -336,17 +338,11 @@ class ZedCamNode(object):
 
         # Initialize settings
         self.cap_settings = self.getCapSettings()
-        rospy.loginfo(self.node_name + ": " +"CAPS SETTINGS")
-        #for setting in self.cap_settings:
-            #rospy.loginfo(self.node_name + ": " +setting)
         self.factory_settings = self.getFactorySettings()
-        rospy.loginfo(self.node_name + ": " +"FACTORY SETTINGS")
-        #for setting in self.factory_settings:
-            #rospy.loginfo(self.node_name + ": " +setting)
-             
+            
 
         # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-        rospy.loginfo(self.node_name + ": Launching NEPI IDX (ROS) interface...")
+        nepi_msg.publishMsgInfo(self,"Launching NEPI IDX (ROS) interface...")
         self.device_info_dict["node_name"] = self.node_name
         if self.node_name.find("_") != -1:
             split_name = self.node_name.rsplit('_', 1)
@@ -383,14 +379,10 @@ class ZedCamNode(object):
                                      getGPSMsg=idx_callback_names["Data"]["GPS"],
                                      getOdomMsg=idx_callback_names["Data"]["Odom"],
                                      getHeadingMsg=idx_callback_names["Data"]["Heading"])
-        rospy.loginfo(self.node_name + ": " + " ... IDX interface running")
+        nepi_msg.publishMsgInfo(self,"... IDX interface running")
 
         # Update available IDX callbacks based on capabilities that the driver reports
         self.logDeviceInfo()
-
-        # Configure pointcloud processing Verbosity
-        #pc_verbosity = nepi_pc.set_verbosity_level("Error")
-        #rospy.loginfo(self.node_name + ": " +pc_verbosity)
 
         # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
         self.idx_if.updateFromParamServer()
@@ -400,27 +392,26 @@ class ZedCamNode(object):
         if success:
            if len(files_copied) > 0:
             strList = str(files_copied)
-            rospy.loginfo(self.node_name + ": " +"Backed up zed cal files: " + strList)
+            nepi_msg.publishMsgInfo(self,"Backed up zed cal files: " + strList)
         else:
-          rospy.loginfo(self.node_name + ": " +"Failed to back up up zed cal files")
+          nepi_msg.publishMsgInfo(self,"Failed to back up up zed cal files")
 
         ## Initiation Complete
-        rospy.loginfo(self.node_name + ": " + "Initialization Complete")
+        nepi_msg.publishMsgInfo(self,"Initialization Complete")
         # Now start zed node check process
         self.attempts = 0
-        rospy.Timer(rospy.Duration(3), self.checkZedNodeCb)
-        rospy.spin()
+        nepi_ros.start_timer_process(nepi_ros.duration(1), self.checkZedNodeCb)
+        nepi_ros.spin()
 
     def checkZedNodeCb(self,timer):
       poll = self.zed_ros_wrapper_proc.poll()
-      #rospy.logwarn(self.node_name + ": " + "Zed_Node process poll returned " + str(poll))
       running = poll is None
       if running:
         self.attempts = 0
       else:
         self.attempts += 1
       if self.attempts > 2:
-        rospy.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
+        nepi_ros.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
 
       
 
@@ -434,47 +425,44 @@ class ZedCamNode(object):
     def getFactorySettings(self):
       settings = self.getSettings()
       #Apply factory setting overides
-      for setting in settings:
-        if setting[1] in self.FACTORY_SETTINGS_OVERRIDES:
-              setting[2] = self.FACTORY_SETTINGS_OVERRIDES[setting[1]]
-              settings = nepi_ros.update_setting_in_settings(setting,settings)
+      for setting_name in settings.keys():
+        if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
+              setting = settings[setting_name]
+              setting['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
+              settings[setting_name] = setting
       return settings
 
 
     def getSettings(self):
-      settings = []
+      settings = dict()
       config_dict = self.zed_dynamic_reconfig_client.get_configuration()
       if config_dict is not None:
-        for cap_setting in self.cap_settings:
-          setting_type = cap_setting[0]
-          setting_name = cap_setting[1]
+        for setting_name in self.cap_settings.keys():
+          cap_setting = self.cap_settings[setting_name]
+          setting = dict()
+          setting["name"] = cap_setting['name']
+          setting["type"] = cap_setting['type']
           if setting_name in config_dict.keys():
-            setting_value = config_dict[setting_name]
-            setting = [setting_type,setting_name,str(setting_value)]
-            settings.append(setting)
+            setting["value"] = str(config_dict[setting_name])
+            settings[setting_name] = setting
       return settings
 
     def settingUpdateFunction(self,setting):
       success = False
       setting_str = str(setting)
-      if len(setting) == 3:
-        setting_type = setting[0]
-        setting_name = setting[1]
-        [s_name, s_type, data] = nepi_ros.get_data_from_setting(setting)
-        #rospy.loginfo(self.node_name + ": " +type(data))
-        if data is not None:
-          setting_data = data
-          config_dict = self.zed_dynamic_reconfig_client.get_configuration()
-          if setting_name in config_dict.keys():
-            self.zed_dynamic_reconfig_client.update_configuration({setting_name:setting_data})
-            success = True
-            msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-          else:
-            msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                   
+      [s_name, s_type, data] = nepi_settings.get_data_from_setting(setting)
+      if data is not None:
+        setting_name = setting['name']
+        setting_data = data
+        config_dict = self.zed_dynamic_reconfig_client.get_configuration()
+        if setting_name in config_dict.keys():
+          self.zed_dynamic_reconfig_client.update_configuration({setting_name:setting_data})
+          success = True
+          msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
         else:
-          msg = (self.node_name  + " Setting data" + setting_str + " is None")
+          msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                   
       else:
-        msg = (self.node_name  + " Setting " + setting_str + " not correct length")
+        msg = (self.node_name  + " Setting data" + setting_str + " is None")
       return success, msg
 
 
@@ -496,14 +484,14 @@ class ZedCamNode(object):
 
     # callback to get depthmap
     def depth_map_callback(self, image_msg):
-      image_msg.header.stamp = rospy.Time.now()
+      image_msg.header.stamp = nepi_ros.time_now()
       self.depth_map_lock.acquire()
       self.depth_map_msg = image_msg
       self.depth_map_lock.release()
 
     # callback to get depthmap
     def depth_image_callback(self, image_msg):
-      image_msg.header.stamp = rospy.Time.now()
+      image_msg.header.stamp = nepi_ros.time_now()
       self.depth_img_lock.acquire()
       self.depth_img_msg = image_msg
       self.depth_img_lock.release()
@@ -532,8 +520,8 @@ class ZedCamNode(object):
 
     def logDeviceInfo(self):
         device_info_str = self.node_name + " info:\n"
-        rospy.loginfo(self.node_name + ": " + device_info_str)
-        rospy.loginfo(self.node_name + ": " + str(self.device_info_dict))
+        nepi_msg.publishMsgInfo(self,device_info_str)
+        nepi_msg.publishMsgInfo(self,str(self.device_info_dict))
 
     def setControlsEnable(self, enable):
         self.current_controls["controls_enable"] = enable
@@ -644,7 +632,7 @@ class ZedCamNode(object):
             ros_timestamp = img_msg.header.stamp
             if self.current_controls.get("controls_enable"):
               cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
-              cv2_img = nepi_nex.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+              cv2_img = nepi_drv.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
               #img_msg = nepi_img.cv2img_to_rosimg(cv2_img, encoding = encoding)
             self.color_img_last_stamp = ros_timestamp
           else:
@@ -696,7 +684,7 @@ class ZedCamNode(object):
             ros_timestamp = img_msg.header.stamp
             if self.current_controls.get("controls_enable"):
               cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
-              cv2_img = nepi_nex.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+              cv2_img = nepi_drv.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
               #img_msg = nepi_img.cv2img_to_rosimg(cv2_img, encoding = encoding)
             self.bw_img_last_stamp = ros_timestamp
           else:

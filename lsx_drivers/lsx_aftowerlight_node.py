@@ -11,10 +11,9 @@
 # NEPI LSX Driver Script for SeaLite LED Lights
 
 
-### Set the namespace before importing rospy
+### Set the namespace before importing nepi_ros
 import os
 #os.environ["ROS_NAMESPACE"] = "/nepi/s2x"
-import rospy
 import serial
 import serial.tools.list_ports
 import time
@@ -26,62 +25,60 @@ from nepi_edge_sdk_base.device_if_lsx import ROSLSXDeviceIF
 from nepi_ros_interfaces.msg import LSXStatus
 
 from nepi_edge_sdk_base import nepi_ros
-from nepi_edge_sdk_base import nepi_nex
+from nepi_edge_sdk_base import nepi_msg
+from nepi_edge_sdk_base import nepi_drv
+from nepi_edge_sdk_base import nepi_settings
 
 
 PKG_NAME = 'LSX_AFTOWER' # Use in display menus
-DESCRIPTION = 'Driver package for adafruit usb tower light'
 FILE_TYPE = 'NODE'
-CLASS_NAME = 'AfTowerLightNode' # Should Match Class Name
-GROUP ='LSX'
-GROUP_ID = 'AFTOWER' 
+NODE_DICT = dict(
+description = 'Driver package for adafruit usb tower light',
+class_name = 'AfTowerLightNode', # Should Match Class Name,
+group ='LSX',
+group_id = 'AFTOWER' ,
+driver_pkg_name = 'None', # 'Required Driver PKG_NAME or 'None'
+discovery_pkg_name = 'LSX_AFTOWER' # 'Required Discovery PKG_NAME or 'None'
+)
 
-DRIVER_PKG_NAME = 'None' # 'Required Driver PKG_NAME or 'None'
-DRIVER_INTERFACES = ['USBSERIAL'] # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
-DRIVER_OPTIONS_1_NAME = 'BaudRate'
-DRIVER_OPTIONS_1 = ['9600'] # List of string options. Selected option passed to driver
-DRIVER_DEFAULT_OPTION_1 = '9600'
-DRIVER_OPTIONS_2_NAME = 'None'
-DRIVER_OPTIONS_2 = [] # List of string options. Selected option passed to driver
-DRIVER_DEFAULT_OPTION_2 = 'None'
-
-DISCOVERY_PKG_NAME = 'LSX_AFTOWER' # 'Required Discovery PKG_NAME or 'None'
-DISCOVERY_METHOD = 'AUTO'  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
-DISCOVERY_IDS = ['29987']  # List of string identifiers for discovery process
-DISCOVERY_IGNORE_IDS = [] # List of string identifiers for discovery process
 
 TEST_NEX_DICT = {
-    'group': 'LSX',
-    'group_id': 'AFTOWER',
-    'node_file_name': 'lsx_aftowerlight_node.py',
-    'node_file_path': '/opt/nepi/ros/lib/nep_drivers',
-    'node_module_name': 'lsx_aftowerlight_node',
-    'node_class_name': 'AfTowerLightNode',
-    'driver_name': "None",
-    'driver_file_name': "None" ,
-    'driver_file_path':  "None",
-    'driver_module_name': "None" ,
-    'driver_class_name':  "None",
-    'driver_interfaces': ['USBSERIAL'],
-    'driver_options_1': ['9600'],
-    'driver_default_option_1': '9600',
-    'driver_set_option_1': '9600',
-    'driver_options_2': [],
-    'driver_default_option_2': 'None',
-    'driver_set_option_2': 'None',
-    'discovery_name': 'LSX_AFTOWER', 
-    'discovery_file_name': "lsx_aftowerlight_discovery.py",
-    'discovery_file_path': "/opt/nepi/ros/lib/nep_drivers",
-    'discovery_module_name': "lsx_aftowerlight_discovery",
-    'discovery_class_name': "AfTowerLightDiscovery",
-    'discovery_method': 'AUTO', 
-    'discovery_ids': ['29987'],
-    'discovery_ignore_ids': [],
-    'device_path': '/dev/ttyUSB0',
-    'order': 1,
-    'active': True,
-    'msg': ""
-    }
+'group': 'LSX',
+'group_id': 'AFTOWER',
+'pkg_name': 'LSX_AFTOWER',
+'NODE_DICT': {
+    'file_name': 'lsx_aftowerlight_node.py',
+    'module_name': 'lsx_aftowerlight_node',
+    'class_name': 'AfTowerLightNode',
+},
+'DRIVER_DICT': {
+    'file_name': '' ,
+    'module_name': '' ,
+    'class_name':  ''
+},
+'DISCOVERY_DICT': {
+    'file_name': 'lsx_aftowerlight_discovery.py',
+    'module_name': 'lsx_aftowerlight_discovery',
+    'class_name': 'AfTowerLightDiscovery',
+    'interfaces': ['USB'],
+    'options_1_dict': {
+        'default_val': '9600',
+        'set_val': '9600'
+    },
+    'options_2_dict': {
+        'default_val': 'None',
+        'set_val': 'None'
+    },
+    'method': 'AUTO', 
+    'include_ids': ['29987'],
+    'exclude_ids': []
+},
+'DEVICE_DICT': {'device_path': '/dev/ttyUSB0'},
+'path': '/opt/nepi/ros/lib/nepi_drivers',
+'order': 1,
+'active': True,
+'msg': ""
+}
 
 
 #########################################
@@ -147,43 +144,40 @@ class AfTowerLightNode(object):
 
 
   ################################################
-  DEFAULT_NODE_NAME='af_tower_light'
+  DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
+  drv_dict = dict()   
   ### LXS Driver NODE Initialization
   def __init__(self):
-      # Launch the ROS node
-      rospy.loginfo("Starting " + self.DEFAULT_NODE_NAME)
-      rospy.init_node(name=self.DEFAULT_NODE_NAME) # Node name could be overridden via remapping
-      self.node_name = rospy.get_name().split('/')[-1]
-      # Get nex_dict from param servers
-      self.nex_dict = rospy.get_param('~nex_dict',TEST_NEX_DICT) 
-      #rospy.logwarn(self.node_name + ": ZED_NODE: " + str(self.nex_dict))
-      self.ser_port_str = self.nex_dict['device_path'] #rospy.get_param('~port_str') # Crash if none provided
-      self.ser_buad_int = self.nex_dict[ 'driver_set_option_1'] #rospy.get_param('~baud_int') # Crash if none provided
-      rospy.loginfo(self.node_name + ": Connecting to Device on port %s with buad %s",self.ser_port_str,self.ser_buad_int)
+      nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+      self.node_name = nepi_ros.get_node_name()
+      self.base_namespace = nepi_ros.get_base_namespace()
+      nepi_msg.createMsgPublishers(self)
+      nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+      ##############################
+      # Get required drv driver dict info
+      self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
+      #nepi_msg.publishMsgWarn(self,"AFTOWER_NODE: " + str(self.drv_dict))
+      self.ser_port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
+      self.ser_buad_int = self.drv_dict['DISCOVERY_DICT']['option_1_dict']['set_val'] 
+      nepi_msg.publishMsgInfo(self,"Connecting to Device on port " + self.ser_port_str + " with buad " + self.ser_buad_int)
       ################################################
       ### Try and connect to device
       self.connected = self.connect()
       if self.connected:
         # Create LSX ROS node
-        rospy.loginfo(self.node_name + ': Connected')
+        nepi_msg.publishMsgInfo(self,'Connected')
       else:
-        rospy.loginfo(self.node_name + ": Shutting down node")
-        rospy.loginfo(self.node_name + ": Specified serial port not available")
-        rospy.signal_shutdown("Serial port not available")  
+        nepi_msg.publishMsgInfo(self,"Shutting down node")
+        nepi_msg.publishMsgInfo(self,"Specified serial port not available")
+        nepi_ros.signal_shutdown("Serial port not available")  
 
 
       # Initialize settings
       self.cap_settings = self.getCapSettings()
-      #rospy.loginfo("CAPS SETTINGS")
-      #for setting in self.cap_settings:
-          #rospy.loginfo(setting)
       self.factory_settings = self.getFactorySettings()
-      #rospy.loginfo("FACTORY SETTINGS")
-      #for setting in self.factory_settings:
-          #rospy.loginfo(setting)
 
-      # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-      rospy.loginfo(self.node_name + ": Launching NEPI LSX (ROS) interface...")
+      # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
+      nepi_msg.publishMsgInfo(self,"Launching NEPI LSX (ROS) interface...")
       self.device_info_dict["node_name"] = self.node_name
       if self.node_name.find("_") != -1:
           split_name = self.node_name.rsplit('_', 1)
@@ -221,45 +215,25 @@ class AfTowerLightNode(object):
                  )
     
       # Initialization Complete
-      rospy.loginfo(self.node_name + ": Initialization Complete")
+      nepi_msg.publishMsgInfo(self,"Initialization Complete")
       #Set up node shutdown
-      rospy.on_shutdown(self.cleanup_actions)
+      nepi_ros.on_shutdown(self.cleanup_actions)
       # Spin forever (until object is detected)
-      rospy.spin() 
+      nepi_ros.spin() 
 
 
   #**********************
   # Device setting functions
 
-  def getSettingsOptionsDict(self):
-    settings_options_dict = dict()
-    return settings_options_dict
-
 
   def getCapSettings(self):
-      settings_cap_dict = self.getSettingsOptionsDict()
-      return nepi_ros.NONE_SETTINGS
+      return nepi_settings.NONE_CAP_SETTINGS
 
   def getFactorySettings(self):
-      settings_options_dict = self.getSettingsOptionsDict()
-      settings = nepi_ros.NONE_SETTINGS
-      #Apply factory setting overides
-      for setting in settings:
-          if setting[1] in self.FACTORY_SETTINGS_OVERRIDES:
-              setting[2] = self.FACTORY_SETTINGS_OVERRIDES[setting[1]]
-              settings = nepi_ros.update_setting_in_settings(setting,settings)
-      return settings
-
-
-  def getSettingsDict(self):
-    settings_dict = dict()
-    return settings_dict
-          
+      return nepi_settings.NONE_SETTINGS
 
   def getSettings(self):
-      settings_dict = self.getSettingsDict()
-      settings = nepi_ros.NONE_SETTINGS
-      return settings
+      return nepi_settings.NONE_SETTINGS
 
   def setSetting(self,setting_name,setting_data):
     return True
@@ -268,25 +242,20 @@ class AfTowerLightNode(object):
   def settingUpdateFunction(self,setting):
       success = False
       setting_str = str(setting)
-      if len(setting) == 3:
-          setting_type = setting[0]
-          setting_name = setting[1]
-          [s_name, s_type, data] = nepi_ros.get_data_from_setting(setting)
-          if data is not None:
-              setting_data = data
-              found_setting = False
-              for cap_setting in self.cap_settings:
-                  if setting_name in cap_setting:
-                      found_setting = True
-                      success, msg = self.setSetting(setting_name,setting_data)
-                      if success:
-                          msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-              if found_setting is False:
-                  msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                 
-          else:
-              msg = (self.node_name  + " Setting data" + setting_str + " is None")
+      [setting_name, s_type, data] = nepi_ros.get_data_from_setting(setting)
+      if data is not None:
+          setting_data = data
+          found_setting = False
+          for cap_setting in self.cap_settings:
+              if setting_name in cap_setting:
+                  found_setting = True
+                  success, msg = self.setSetting(setting_name,setting_data)
+                  if success:
+                      msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
+          if found_setting is False:
+              msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                 
       else:
-          msg = (self.node_name  + " Setting " + setting_str + " not correct length")
+          msg = (self.node_name  + " Setting data" + setting_str + " is None")
       return success, msg
 
 
@@ -335,7 +304,7 @@ class AfTowerLightNode(object):
     self.on_off_state = turn_on_off
 
   def blinkOnOff(self,blink_on_off):
-    #rospy.logwarn(self.node_name + ": setting blink state to " + str(blink_on_off) )
+    #nepi_msg.publishMsgWarn(self,"setting blink state to " + str(blink_on_off) )
     ON = self.on_off_dict[self.current_color][0]
     OFF = self.on_off_dict[self.current_color][1]
     new_state = blink_on_off
@@ -407,34 +376,33 @@ class AfTowerLightNode(object):
     if check_ser_port == True:
       try: 
         self.serial_port = serial.Serial(self.ser_port_str,self.ser_buad_int,timeout = 0.1)
-        #rospy.logwarn(self.node_name + ": Serial port open")
+        #nepi_msg.publishMsgWarn(self,"Serial port open")
         success = True
       except:
-        rospy.logwarn(self.node_name + ": Failed to open serial port")
+        nepi_msg.publishMsgWarn(self,"Failed to open serial port")
       self.serial_port
     else: 
-      rospy.logwarn(self.node_name + ": Failed to find serial port")
+      nepi_msg.publishMsgWarn(self,"Failed to find serial port")
     return success
 
 
   def send_msg(self,ser_msg):
     response = None
-    if self.serial_port is not None and not rospy.is_shutdown():
+    if self.serial_port is not None and not nepi_ros.is_shutdown():
       sleep_time = .1
       timeout = 2
       timer = 0
-      while self.serial_busy == True and timer < timeout and not rospy.is_shutdown():
+      while self.serial_busy == True and timer < timeout and not nepi_ros.is_shutdown():
           time.sleep(sleep_time ) # Wait for serial port to be available
           timer += sleep_time 
       self.serial_busy = True
-      #rospy.loginfo(self.node_name + ":Sending " + str(ser_msg) + " message")
       try:
         
         self.serial_port.write(bytes([ser_msg]))
       except Exception as e:
-        rospy.loginfo(self.node_name + ":Failed to send message")
+        nepi_msg.publishMsgInfo(self,"Failed to send message")
     else:
-      rospy.loginfo(self.node_name + ":serial port not defined, returning empty string")
+      nepi_msg.publishMsgInfo(self,"serial port not defined, returning empty string")
     self.serial_busy = False
     return response
 
@@ -443,8 +411,8 @@ class AfTowerLightNode(object):
     success = False
     ports = serial.tools.list_ports.comports()
     for loc, desc, hwid in sorted(ports):
-      rospy.loginfo(self.node_name + ": Checking port: " + loc)
-      rospy.loginfo(self.node_name + ": For port: " + port_str)
+      nepi_msg.publishMsgInfo(self,"Checking port: " + loc)
+      nepi_msg.publishMsgInfo(self,"For port: " + port_str)
       if loc == port_str:
         success = True
     return success
@@ -452,7 +420,7 @@ class AfTowerLightNode(object):
   #######################
   ### Cleanup processes on node shutdown
   def cleanup_actions(self):
-    rospy.loginfo(self.node_name + ": Shutting down: Executing script cleanup actions")
+    nepi_msg.publishMsgInfo(self,"Shutting down: Executing script cleanup actions")
     if self.serial_port is not None:
       self.serial_port.close()
       

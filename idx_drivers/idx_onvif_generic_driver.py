@@ -9,18 +9,20 @@
 #
 
 import time
-import rospy
 import cv2
 import threading
 import os
 import copy
 from onvif import ONVIFCamera # python-onvif
 
+from nepi_edge_sdk_base import nepi_msg
+
 
 PKG_NAME = 'IDX_ONVIF_GENERIC' # Use in display menus
 FILE_TYPE = 'DRIVER'
-CLASS_NAME = 'GenericONVIF_NVT' # Should Match Class Name
-
+DRIVER_DICT = dict(
+class_name = 'GenericONVIF_NVT'
+)
 
 CONTROL_NAME_OVERRIDES = dict(IrCutFilterModes = "IrCutFilter",
                               WhiteBalance_YrGain = "WhiteBalance_CrGain",
@@ -35,7 +37,7 @@ class GenericONVIF_NVT(object):
     MAX_CONSEC_FRAME_FAIL_COUNT = 3
 
     def __init__(self, username, password, ip_addr, port=80):
-        rospy.loginfo("Starting ONVIF Cam Driver Setup")
+        nepi_msg.publishMsgInfo("Starting ONVIF Cam Driver Setup")
         self.username = username
         self.password = password
         # Connect to the camera
@@ -45,7 +47,7 @@ class GenericONVIF_NVT(object):
         # COMMENTING THIS OUT: Seems to MAYBE be causing a problem with an ONWOTE Camera we have and we aren't using the return value and
         # ONVIF docs say this function is deprecated anyway: https://www.onvif.org/ver10/device/wsdl/devicemgmt.wsdl
         self.device_capabilities = self.cam.devicemgmt.GetCapabilities()
-        #rospy.loginfo("Device Provided Capabilities " + str(self.device_capabilities))
+        #nepi_msg.publishMsgInfo("Device Provided Capabilities " + str(self.device_capabilities))
         
         # Other services require manual setup
         # TODO: Are all of these services guaranteed to exist, or should we use self.cam.devicemgmt.GetServices() to check?
@@ -59,15 +61,15 @@ class GenericONVIF_NVT(object):
         video_src_token_param = {"VideoSourceToken":self.video_source.token}
         #self.imaging_settings = self.imaging_service.GetImagingSettings(video_src_token_param)
         self.imaging_options = self.imaging_service.GetOptions(video_src_token_param)
-        #rospy.loginfo("Imaging Device Options = " + str(self.imaging_options))
+        #nepi_msg.publishMsgInfo("Imaging Device Options = " + str(self.imaging_options))
         
-        rospy.loginfo("*************************")
-        rospy.loginfo("Building Controls Dict")
+        nepi_msg.publishMsgInfo("*************************")
+        nepi_msg.publishMsgInfo("Building Controls Dict")
         self.camera_controls = dict()
         for name in self.imaging_options:
-            #rospy.loginfo(name)
+            #nepi_msg.publishMsgInfo(name)
             option_type = type(self.imaging_options[name]).__name__
-            #rospy.loginfo("option type: " + option_type)
+            #nepi_msg.publishMsgInfo("option type: " + option_type)
             if option_type.find('Options20') != -1:
                 for sub_name in self.imaging_options[name]:
                     if len(self.imaging_options[name]) > 1:
@@ -77,49 +79,49 @@ class GenericONVIF_NVT(object):
                     if ctrl_name in CONTROL_NAME_OVERRIDES: # Apply Name overide
                         ctrl_name = CONTROL_NAME_OVERRIDES[ctrl_name]
                     sub_option_type = type(self.imaging_options[name][sub_name]).__name__
-                    #rospy.loginfo(ctrl_name)
-                    #rospy.loginfo("sub_option type: " + sub_option_type)
+                    #nepi_msg.publishMsgInfo(ctrl_name)
+                    #nepi_msg.publishMsgInfo("sub_option type: " + sub_option_type)
                     sub_option_str = str(self.imaging_options[name][sub_name])
-                    #rospy.loginfo("sub_option data: " + sub_option_str)
+                    #nepi_msg.publishMsgInfo("sub_option data: " + sub_option_str)
                     entry = self.create_ctrl_entry(sub_name,sub_option_type,self.imaging_options[name][sub_name])
                     if len(entry) != 0:
                         self.camera_controls[ctrl_name] = entry
                         #entry_str = str(entry)
-                        #rospy.loginfo(" New control added: " + ctrl_name + " : " + entry_str)
+                        #nepi_msg.publishMsgInfo(" New control added: " + ctrl_name + " : " + entry_str)
             else: 
                 ctrl_name = name
                 if ctrl_name in CONTROL_NAME_OVERRIDES: # Apply Name overide
                     ctrl_name = CONTROL_NAME_OVERRIDES[ctrl_name]
-                #rospy.loginfo(ctrl_name)
-                #rospy.loginfo("option type: " + option_type)
+                #nepi_msg.publishMsgInfo(ctrl_name)
+                #nepi_msg.publishMsgInfo("option type: " + option_type)
                 entry = self.create_ctrl_entry(name,option_type,self.imaging_options[name])
                 if len(entry) != 0:
                     self.camera_controls[ctrl_name] = entry
                     #entry_str = str(entry)
-                    #rospy.loginfo(" New control added: " + ctrl_name + " : " + entry_str)
+                    #nepi_msg.publishMsgInfo(" New control added: " + ctrl_name + " : " + entry_str)
         
   
         # Update controls with current values
         self.camera_controls = self.getCameraControls()
 
-        #rospy.loginfo("Updating Controls Dict with current values")
+        #nepi_msg.publishMsgInfo("Updating Controls Dict with current values")
         #for ctrl_name in self.camera_controls.keys():
             #ctrl_str = str(self.camera_controls[ctrl_name])
-            #rospy.loginfo(ctrl_name + " : " + ctrl_str)
+            #nepi_msg.publishMsgInfo(ctrl_name + " : " + ctrl_str)
         
         '''
         # Test updating a few settings
-        rospy.loginfo("Test updating values")
+        nepi_msg.publishMsgInfo("Test updating values")
         print(self.setCameraControl("Brightness",150))
         print(self.setCameraControl("Exposure_ExposureTime",150))
         print(self.setCameraControl("IrCutFilter","AUTO"))
         print(self.setCameraControl("WhiteBalance_Mode","MANUAL"))
         # Update controls with current values
         self.camera_controls = self.getCameraControls()
-        rospy.loginfo("Controls Dict after test updates")
+        nepi_msg.publishMsgInfo("Controls Dict after test updates")
         for ctrl_name in self.camera_controls.keys():
             ctrl_str = str(self.camera_controls[ctrl_name])
-            rospy.loginfo(ctrl_name + " : " + ctrl_str)
+            nepi_msg.publishMsgInfo(ctrl_name + " : " + ctrl_str)
         '''
 
  
@@ -174,7 +176,7 @@ class GenericONVIF_NVT(object):
         if ret is False:
             raise RuntimeError("Failed to prime image acquisition: " + msg)
         self.stopImageAcquisition(0)
-        rospy.loginfo("Onvif Cam Driver setup complete")
+        nepi_msg.publishMsgInfo("Onvif Cam Driver setup complete")
 
     def create_ctrl_entry(self,ctrl_name,ctrl_type,ctrl,num_value=-999,str_value="UnKnown"):
         entry = dict()
@@ -221,10 +223,8 @@ class GenericONVIF_NVT(object):
         video_src_token_param = {"VideoSourceToken":self.video_source.token}
         imaging_settings = self.imaging_service.GetImagingSettings(video_src_token_param)
         if not hasattr(imaging_settings, name):
-            #rospy.loginfo(imaging_settings)
             return "Not Supported1"
         val = imaging_settings[name]
-        #rospy.loginfo(str(val))
         if sub_name != None and hasattr(val,sub_name):
             val = val[sub_name]
         if val == None:
@@ -232,9 +232,7 @@ class GenericONVIF_NVT(object):
         return val
     
     def setCameraControl(self, ctrl_name, val, readback_check=True, force_integer=True):        
-        #rospy.loginfo("******Driver Update Function******")
-        #rospy.loginfo(ctrl_name)
-        #rospy.loginfo(val)
+        #nepi_msg.publishMsgInfo("******Driver Update Function******")
         
         if ctrl_name.find("_") != -1:
             [name,sub_name] = ctrl_name.split("_")
@@ -242,8 +240,8 @@ class GenericONVIF_NVT(object):
             name = ctrl_name
             sub_name = None
 
-        #rospy.loginfo(name)
-        #rospy.loginfo(sub_name)
+        #nepi_msg.publishMsgInfo(name)
+        #nepi_msg.publishMsgInfo(sub_name)
 
         # Bounds checking:
         # Make sure to query the system first
@@ -251,11 +249,11 @@ class GenericONVIF_NVT(object):
         imaging_settings = self.imaging_service.GetImagingSettings(video_src_token_param)
 
         if not hasattr(imaging_settings, name):
-            rospy.loginfo("1")
+            nepi_msg.publishMsgInfo("1")
             return False, "Unavailable setting: " + name
         elif sub_name != None:
             if sub_name not in imaging_settings[name]:
-                rospy.loginfo("2")
+                nepi_msg.publishMsgInfo("2")
                 return False, "Unavailable sub setting: " + sub_name
         
         setting = imaging_settings[name] 
@@ -267,10 +265,10 @@ class GenericONVIF_NVT(object):
 
         #setting_str = str(setting)
         #new_setting_str = str(new_setting)
-        #rospy.loginfo("Will try setting " + name + " from " + setting_str + " to " + new_setting_str)
+        #nepi_msg.publishMsgInfo("Will try setting " + name + " from " + setting_str + " to " + new_setting_str)
                 
         if new_setting == setting:
-            rospy.loginfo("3")
+            nepi_msg.publishMsgInfo("3")
             return True, "Success: Desired " + name + " already set"
 
         
@@ -278,7 +276,7 @@ class GenericONVIF_NVT(object):
         try:
             self.imaging_service.SetImagingSettings(new_imaging_settings)
         except Exception as e:
-            rospy.loginfo("4")
+            nepi_msg.publishMsgInfo("4")
             return False, "Onvif error: Failed to update " + name + " to " + new_setting_str + " - " + str(e)()
         
         if readback_check is True:

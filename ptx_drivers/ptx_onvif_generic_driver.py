@@ -16,8 +16,9 @@ from onvif import ONVIFCamera # python-onvif
 
 PKG_NAME = 'PTX_ONVIF_GENERIC' # Use in display menus
 FILE_TYPE = 'DRIVER'
-CLASS_NAME = 'GenericONVIF_PTZ' # Should Match Class Name
-
+DRIVER_DICT = dict(
+class_name = 'GenericONVIF_PTZ'
+)
 
 class GenericONVIF_PTZ(object):
     WSDL_FOLDER = "/opt/nepi/ros/etc/onvif/wsdl/"
@@ -142,10 +143,10 @@ class GenericONVIF_PTZ(object):
         # Query existing presets
         unindexed_presets = self.ptz_service.GetPresets({'ProfileToken': self.profile_token})
         self.presets = {}
-        next_index = 0
+        drvt_index = 0
         for preset in unindexed_presets:
-            self.presets[next_index] = preset
-            next_index += 1
+            self.presets[drvt_index] = preset
+            drvt_index += 1
                 
         #print('Debug: PTZStatus = ')
         #print(self.ptz_service.GetStatus({'ProfileToken': self.profile_token}))

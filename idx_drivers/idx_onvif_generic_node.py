@@ -11,36 +11,28 @@ import os
 import sys
 import time
 import math
-import rospy
 import threading
 import cv2
 
 from nepi_edge_sdk_base.device_if_idx import ROSIDXSensorIF
 
 from nepi_edge_sdk_base import nepi_ros
+from nepi_edge_sdk_base import nepi_msg
 from nepi_edge_sdk_base import nepi_img
-from nepi_edge_sdk_base import nepi_nex
+from nepi_edge_sdk_base import nepi_drv
+from nepi_edge_sdk_base import nepi_settings
 
 PKG_NAME = 'IDX_ONVIF_GENERIC' # Use in display menus
-DESCRIPTION = 'Driver package for generic ONVIF camera devices'
 FILE_TYPE = 'NODE'
-CLASS_NAME = 'OnvifCamNode' # Should Match Class Name
-GROUP ='IDX'
-GROUP_ID = 'ONVIF' 
+NODE_DICT = dict(
+description = 'Driver package for generic ONVIF camera devices',
+class_name = 'OnvifCamNode', # Should Match Class Name,
+group ='IDX',
+group_id = 'ONVIF' ,
+driver_pkg_name = 'IDX_ONVIF_GENERIC', # 'Required Driver PKG_NAME or 'None'
+discovery_pkg_name = 'None' # 'Required Discovery PKG_NAME or 'None'
+)
 
-DRIVER_PKG_NAME = 'IDX_ONVIF_GENERIC' # 'Required Driver PKG_NAME or 'None'
-DRIVER_INTERFACES = ['IP'] # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
-DRIVER_OPTIONS_1_NAME = 'None'
-DRIVER_OPTIONS_1 = [] # List of string options. Selected option passed to driver
-DRIVER_DEFAULT_OPTION_1 = 'None'
-DRIVER_OPTIONS_2_NAME = 'None'
-DRIVER_OPTIONS_2 = [] # List of string options. Selected option passed to driver
-DRIVER_DEFAULT_OPTION_2 = 'None'
-
-DISCOVERY_PKG_NAME = 'None' # ONVIF nodes managed by onvif manager
-DISCOVERY_METHOD = 'OTHER'  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
-DISCOVERY_IDS = []  # List of string identifiers for discovery process
-DISCOVERY_IGNORE_IDS = [] # List of string identifiers for discovery process
 
 class OnvifCamNode:
 
@@ -75,71 +67,69 @@ class OnvifCamNode:
 
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
-    nex_dict = dict()                             
+    drv_dict = dict()                                                    
     def __init__(self):
-        # Launch the ROS node
-        rospy.init_node(name=self.DEFAULT_NODE_NAME) # Node name could be overridden via remapping
-        self.node_name = rospy.get_name().split('/')[-1]
-        # Get nex_dict from param servers
-        rospy.loginfo("Starting " + self.node_name)
+        #### APP NODE INIT SETUP ####
+        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+        self.node_name = nepi_ros.get_node_name()
+        self.base_namespace = nepi_ros.get_base_namespace()
+        nepi_msg.createMsgPublishers(self)
+        nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+        ##############################
+        # Get required drv driver dict info
         try:
-            self.nex_dict = rospy.get_param('~nex_dict') # Crash if not provide
+            self.drv_dict = nepi_ros.get_param(self,'~drv_dict') # Crash if not provide
         except Exception as e:
-            rospy.signal_shutdown("Failed to read nex_dict from param server for node " + self.node_name + " with exception: " + str(e))
-        self.driver_name = self.nex_dict['driver_name']
-        self.driver_file = self.nex_dict['driver_file_name']
-        self.driver_path = self.nex_dict['driver_file_path']
-        self.driver_module = self.nex_dict['driver_module_name']
-        self.driver_class_name = self.nex_dict['driver_class_name']
-        self.driver_interfaces = self.nex_dict['driver_interfaces']
-        self.driver_options_1 = self.nex_dict['driver_options_1']
-        self.driver_option_1 = self.nex_dict['driver_set_option_1']
-        # import driver class fromn driver module
+            nepi_ros.signal_shutdown("Failed to read drv_dict from param server for node " + self.node_name + " with exception: " + str(e))
+        self.driver_path = self.drv_dict['path']
+        self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
+        self.driver_module = self.drv_dict['DRIVER_DICT']['module_name']
+        self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
 
 
         # Require the camera connection parameters to have been set
-        if not rospy.has_param('~credentials/username'):
-            rospy.logerr(self.node_name + ": Missing credentials/username parameter... cannot start")
+        if not nepi_ros.has_param(self,'~credentials/username'):
+            nepi_msg.publishMsgErr(self,"Missing credentials/username parameter... cannot start")
             return
-        if not rospy.has_param('~credentials/password'):
-            rospy.logerr(self.node_name + ": Missing credentials/password parameter... cannot start")
+        if not nepi_ros.has_param(self,'~credentials/password'):
+            nepi_msg.publishMsgErr(self,"Missing credentials/password parameter... cannot start")
             return
-        if not rospy.has_param('~network/host'):
-            rospy.logerr(self.node_name + ": Missing network/host parameter... cannot start")
+        if not nepi_ros.has_param(self,'~network/host'):
+            nepi_msg.publishMsgErr(self,"Missing network/host parameter... cannot start")
             return
-        if not rospy.has_param('~driver_id'):
-            rospy.logerr(self.node_name + ": Missing driver_id parameter... cannot start")
+        if not nepi_ros.has_param(self,'~driver_id'):
+            nepi_msg.publishMsgErr(self,"Missing driver_id parameter... cannot start")
             return
                 
-        username = str(rospy.get_param('~credentials/username'))
-        password = str(rospy.get_param('~credentials/password'))
-        host = str(rospy.get_param('~network/host'))
+        username = str(nepi_ros.get_param(self,'~credentials/username'))
+        password = str(nepi_ros.get_param(self,'~credentials/password'))
+        host = str(nepi_ros.get_param(self,'~network/host'))
         
         # Allow a default for the port, since it is part of onvif spec.
-        onvif_port = rospy.get_param('~network/port', 80)
-        rospy.set_param('~/network/port', onvif_port)
+        onvif_port = nepi_ros.get_param(self,'~network/port', 80)
+        nepi_ros.set_param(self,'~/network/port', onvif_port)
 
 
-        rospy.loginfo(self.node_name + ": Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
-        [success, msg, self.driver_class] = nepi_nex.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
+        nepi_msg.publishMsgInfo(self,"Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
+        [success, msg, self.driver_class] = nepi_drv.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
         
         if success:
             driver_constructed = False
             attempts = 0
-            while not rospy.is_shutdown() and driver_constructed == False and attempts < 5 and not rospy.is_shutdown():
+            while not nepi_ros.is_shutdown() and driver_constructed == False and attempts < 5 and not nepi_ros.is_shutdown():
                 try:
                     self.driver = self.driver_class(username, password, host, onvif_port)
                     driver_constructed = True
-                    rospy.loginfo("ONVIF_NODE: Driver constructed")
+                    nepi_msg.publishMsgInfo(self,"ONVIF_NODE: Driver constructed")
                 except Exception as e:
-                    rospy.loginfo("ONVIF_NODE: Failed to construct driver: " + self.driver_id + "with exception: " + str(e))
-                    rospy.sleep(1)
+                    nepi_msg.publishMsgInfo(self,"ONVIF_NODE: Failed to construct driver: " + self.driver_id + "with exception: " + str(e))
+                    time.sleep(1)
                 attempts += 1 
         if driver_constructed == False:
-            rospy.signal_shutdown("Shutting down Onvif node " + self.node_name + ", unable to connect to driver")
+            nepi_ros.signal_shutdown("Shutting down Onvif node " + self.node_name + ", unable to connect to driver")
         else:
             ################################################
-            rospy.loginfo(self.node_name + ": ... Connected!")
+            nepi_msg.publishMsgInfo(self,"... Connected!")
             self.dev_info = self.driver.getDeviceInfo()
             self.logDeviceInfo()        
             # Configurable IDX parameter and data output remapping to support specific camera needs/capabilities
@@ -181,10 +171,10 @@ class OnvifCamNode:
             # will only affect the first one.... so
             # TODO: Consider a scheme for adjusting parameters for separate streams independently
             # or in lock-step. Not sure if the uri_index and encoder_index have the same meaning
-            self.img_uri_index = rospy.get_param('~/img_uri_index', 0)
-            rospy.set_param('~/img_uri_index', self.img_uri_index)
-            #self.bw_2d_img_uri_index = rospy.get_param('~/image_uris/bw_2d_img_uri_index', 0)
-            #rospy.set_param('~/image_uris/bw_2d_img_uri_index', self.bw_2d_img_uri_index)
+            self.img_uri_index = nepi_ros.get_param(self,'~/img_uri_index', 0)
+            nepi_ros.set_param(self,'~/img_uri_index', self.img_uri_index)
+            #self.bw_2d_img_uri_index = nepi_ros.get_param(self,'~/image_uris/bw_2d_img_uri_index', 0)
+            #nepi_ros.set_param(self,'~/image_uris/bw_2d_img_uri_index', self.bw_2d_img_uri_index)
 
             # Create threading locks for each URI index (currently just 1) to provide threadsafety
             self.img_uri_lock = threading.Lock()
@@ -201,16 +191,10 @@ class OnvifCamNode:
 
             # Initialize settings
             self.cap_settings = self.getCapSettings()
-            rospy.loginfo("ONVIF_NODE: CAPS SETTINGS")
-            #for setting in self.cap_settings:
-                #rospy.loginfo(setting)
             self.factory_settings = self.getFactorySettings()
-            rospy.loginfo("ONVIF_NODE: FACTORY SETTINGS")
-            #for setting in self.factory_settings:
-                #rospy.loginfo(setting)
 
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-            rospy.loginfo(self.node_name + ": Launching NEPI IDX (ROS) interface...")
+            nepi_msg.publishMsgInfo(self,"Launching NEPI IDX (ROS) interface...")
             self.device_info_dict["node_name"] = self.node_name
             if self.node_name.find("_") != -1:
                 split_name = self.node_name.rsplit('_', 1)
@@ -247,147 +231,173 @@ class OnvifCamNode:
                                         getGPSMsg=idx_callback_names["Data"]["GPS"],
                                         getOdomMsg=idx_callback_names["Data"]["Odom"],
                                         getHeadingMsg=idx_callback_names["Data"]["Heading"])
-            rospy.loginfo(self.node_name + " ... IDX interface running")
+            nepi_msg.publishMsgInfo(self," ... IDX interface running")
             # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
             self.idx_if.updateFromParamServer()
 
             # Now start the node
-            rospy.spin()
+            nepi_ros.spin()
 
 
     #**********************
     # Sensor setting functions
 
+
     def getCapSettings(self):
-        settings = []
+        cap_settings = dict()
         controls_dict = self.driver.getCameraControls()
-        for setting_name in controls_dict.keys():
-            if 'type' in controls_dict[setting_name]:
-                info = controls_dict[setting_name]
-                setting_type = info['type']
-                if setting_type == 'int':
-                    setting_type = 'Int'
-                elif setting_type == 'float':
-                    setting_type = 'Float'
-                elif setting_type == 'bool':
-                    setting_type = 'Bool'
-                elif setting_type == 'discrete':
-                    setting_type = 'Discrete'
-                setting = [setting_type,setting_name]
-                if setting_type == 'Float' or setting_type == 'Int':
-                    setting_min = str(info['min'])
-                    setting_max = str(info['max'])
-                    setting.append(setting_min)
-                    setting.append(setting_max)
-                elif setting_type == 'Discrete':
-                    options = info['options']
-                    for option in options:
-                        setting.append(option)
-                settings.append(setting)
+        for cap_setting_name in controls_dict.keys():
+            if 'type' in controls_dict[cap_setting_name]:
+                cap_setting = dict()
+                cap_setting['name'] = cap_setting_name
+                info = controls_dict[cap_setting_name]
+                cap_setting_type = info['type']
+                if cap_setting_type == 'int':
+                    cap_setting_type = 'Int'
+                elif cap_setting_type == 'float':
+                    cap_setting_type = 'Float'
+                elif cap_setting_type == 'bool':
+                    cap_setting_type = 'Bool'
+                elif cap_setting_type == 'discrete':
+                    cap_setting_type = 'Discrete'
+                cap_setting['type'] = cap_setting_type
+                if cap_setting_type == 'Float' or cap_setting_type == 'Int':
+                    cap_setting_min = str(info['min'])
+                    cap_setting_max = str(info['max'])
+                    cap_setting['options'] = [cap_setting_min,cap_setting_max]
+                elif cap_setting_type == 'Discrete':
+                    cap_setting['options'] = info['options']
+                cap_settings[cap_setting_name] = cap_setting
+        # Add Resolution Cap Settting
         [success,available_resolutions,encoder_cfg] = self.driver.getAvailableResolutions()
-        #rospy.loginfo(type(available_resolutions))
-        #rospy.loginfo(available_resolutions)
-        setting_type = 'Discrete'
-        setting_name = 'resolution'
-        setting=[setting_type,setting_name]
-        #rospy.logwarn(available_resolutions)
+        cap_setting = dict()
+        cap_setting['type'] = 'Discrete'
+        options = []
         for res_dict in available_resolutions:
-            #rospy.logwarn(res_dict)
-            if isinstance(res_dict,dict):
-                width = str(res_dict['Width'])
-                height = str(res_dict['Height'])
-                setting_option = (width + ":" + height)
-                setting.append(setting_option)
-        settings.append(setting)
-        return settings
-
-    def getFactorySettings(self):
-        settings = []
-        current_settings = self.getSettings()
-        for setting in current_settings:
-            if setting[2] != "Not Supported":
-                settings.append(setting)
-        #Apply factory setting overides
-        for setting in settings:
-            if setting[1] in self.FACTORY_SETTINGS_OVERRIDES:
-                setting[2] = self.FACTORY_SETTINGS_OVERRIDES[setting[1]]
-                settings = nepi_ros.update_setting_in_settings(setting,settings)
-        return settings
-            
-
-    def getSettings(self):
-        settings = []
-        controls_dict = self.driver.getCameraControls()
-        for setting_name in controls_dict.keys():
-            if 'type' in controls_dict[setting_name]:
-                info = controls_dict[setting_name]
-                setting_type = info['type']
-                if setting_type == 'int':
-                    setting_type = 'Int'
-                elif setting_type == 'float':
-                    setting_type = 'Float'
-                elif setting_type == 'bool':
-                    setting_type = 'Bool'
-                elif setting_type == 'discrete':
-                    setting_type = 'Discrete'
-                # Create Current Setting
-                if setting_type == 'Discrete':
-                    setting_value = info['value']
-                else: 
-                    setting_value = str(info['value'])
-                setting = [setting_type,setting_name,setting_value]
-                settings.append(setting)
-            elif 'value' in controls_dict[setting_name]:
-                setting_value = controls_dict[setting_name]['value']
-                if setting_value == "Not Supported":
-                    setting_type = "String"
-                    setting = [setting_type,setting_name,setting_value]
-                    settings.append(setting)
-        [success,res_dict] = self.driver.getResolution()
-        if success:
-            setting_type = 'Discrete'
-            setting_name = 'resolution'
-            setting=[setting_type,setting_name]
             width = str(res_dict['Width'])
             height = str(res_dict['Height'])
-            setting_option = (width + ":" + height)
-            setting.append(setting_option)
-            settings.append(setting)
+            cap_setting_option = (width + ":" + height)
+            options.append(cap_setting_option)
+        cap_setting['options'] = options
+        cap_setting['name'] = 'Resolution'
+        cap_settings['Resolution'] = cap_setting
+        # Add Framerate Cap cap_setting
+        '''
+        [success,framerates] = self.driver.getFramerateRange()
+        cap_setting = dict()
+        cap_setting['type'] = 'Float'
+        options = []
+        cap_setting_option = (str(round(framerates[0],0)))
+        options.append(cap_setting_option)
+        cap_setting_option = (str(round(framerates[1],0)))
+        options.append(cap_setting_option)
+        cap_setting['options'] = options
+        cap_setting['name'] = 'Framerate'
+        cap_settings['Framerate'] = cap_setting
+        '''
+        return cap_settings
+
+
+    def getFactorySettings(self):
+        settings = self.getSettings()
+        #Apply factory setting overides
+        purge_list = []
+        for setting_name in settings.keys():
+            setting = settings[setting_name]
+            if setting['value'] == 'Not Supported':
+                purge_list.append(setting_name)
+        for setting_name in purge_list:
+            del setting[setting_name]
+        for setting_name in settings.keys():
+            if setting_name in self.FACTORY_SETTINGS_OVERRIDES.keys():
+                settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
         return settings
+
+
+    def getSettings(self):
+        settings = dict()
+        controls_dict = self.driver.getCameraControls()
+        for setting_name in controls_dict.keys():
+            if 'type' in controls_dict[setting_name]:
+                setting = dict()
+                setting['name'] = setting_name
+                info = controls_dict[setting_name]
+                setting_type = info['type']
+                if setting_type == 'int':
+                    setting_type = 'Int'
+                elif setting_type == 'float':
+                    setting_type = 'Float'
+                elif setting_type == 'bool':
+                    setting_type = 'Bool'
+                elif setting_type == 'discrete':
+                    setting_type = 'Discrete'
+                setting['type'] = setting_type
+                setting['value'] = str(info['value'])
+                settings[setting_name] = setting
+            elif 'value' in controls_dict[setting_name]:
+                setting_value = controls_dict[setting_name]['value']
+                if setting_value != "Not Supported":
+                    setting['value'] = setting_value
+                    setting['type'] = "String"
+                    settings[setting_name] = setting
+        # Add Resolution Cap Settting
+        [success,res_dict] = self.driver.getResolution()
+        #nepi_msg.publishMsgInfo(self,str(res_dict))
+        setting = dict()
+        setting['type'] = 'Discrete'
+        width = str(res_dict['Width'])
+        height = str(res_dict['Height'])
+        setting_value = (width + ":" + height)
+        setting['value'] = setting_value
+        setting['name'] = 'Resolution'
+        settings['Resolution'] = setting
+        '''
+        # Add Framerate Cap Setting
+        [success,framerate] = self.driver.getFramerate()
+        setting['type'] = 'Float'
+        setting_value = (str(round(framerate,2)))
+        setting['value'] = setting_value
+        setting['name'] = 'Framerate'
+        settings['Framerate'] = setting
+        '''
+        return settings
+
 
     def settingUpdateFunction(self,setting):
         success = False
         setting_str = str(setting)
-        if len(setting) == 3:
-            setting_type = setting[0]
-            setting_name = setting[1]
-            [s_name, s_type, data] = nepi_ros.get_data_from_setting(setting)
-            if data is not None:
-                setting_data = data
-                found_setting = False
-                for cap_setting in self.cap_settings:
-                    if setting_name in cap_setting:
-                        found_setting = True
-                        if setting_name != "resolution":
-                            success, msg = self.driver.setCameraControl(setting_name,setting_data)
-                            if success:
-                                msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-                        else:
-                            if data.find("(") == -1 and data.find(")") == -1: # Make sure not a function call
-                                data = data.split(":")
-                                width = int(eval(data[0]))
-                                height = int(eval(data[1]))
-                                res_dict = {'Width': width, 'Height': height}
-                                success, msg = self.driver.setResolution(res_dict)
-                            else:
-                                msg = (self.node_name  + " Setting value" + setting_str + " contained () chars")    
-                        break  
-                if found_setting is False:
-                    msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                   
-            else:
-                msg = (self.node_name  + " Setting data" + setting_str + " is None")
+        [setting_name, setting_type, data] = nepi_settings.get_data_from_setting(setting)
+        if data is not None:
+            setting_data = data
+            found_setting = False
+            for cap_setting in self.cap_settings.keys():
+                if setting_name in cap_setting:
+                    found_setting = True
+                    if setting_name != "Resolution" and setting_name != "Framerate":
+                        success, msg = self.driver.setCameraControl(setting_name,setting_data)
+                        if success:
+                            msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
+                    elif setting_name == "Resolution":
+                        data = data.split(":")
+                        try:
+                            width = int(data[0])
+                            height = int(data[1])
+                            res_dict = {'width': width, 'height': height}
+                            success, msg = self.driver.setResolution(res_dict)
+                        except Exception as e:
+                            nepi_msg.publishMsgInfo(self,"Resoluton setting: " + data + " could not be parsed to float " + str(e))                            
+                        break     
+                    elif setting_name == "Framerate":
+                        try:
+                            framerate = float(data)
+                            success, msg = self.driver.setFramerate(framerate)
+                        except Exception as e:
+                            nepi_msg.publishMsgInfo(self,"Framerate setting: " + data + " could not be parsed to float " + str(e))
+                        break    
+            if found_setting is False:
+                msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                   
         else:
-            msg = (self.node_name  + " Setting " + setting_str + " not correct length")
+            msg = (self.node_name  + " Setting data" + setting_str + " is None")
         return success, msg
 
     #**********************
@@ -399,12 +409,12 @@ class OnvifCamNode:
         dev_info_string += "Model: " + self.dev_info["Model"] + "\n"
         dev_info_string += "Firmware Version: " + self.dev_info["FirmwareVersion"] + "\n"
         dev_info_string += "Serial Number: " + self.dev_info["HardwareId"] + "\n"
-        rospy.loginfo(dev_info_string)
+        nepi_msg.publishMsgInfo(self,dev_info_string)
     
         controls_dict = self.driver.getCameraControls()
         for key in controls_dict.keys():
             string = str(controls_dict[key])
-            rospy.loginfo(key + " " + string)
+            nepi_msg.publishMsgInfo(self,key + " " + string)
                 
     
     def setControlsEnable(self, enable):
@@ -487,13 +497,13 @@ class OnvifCamNode:
             return ret, msg, None, None, None
         
         if timestamp is not None:
-            ros_timestamp = rospy.Time.from_sec(timestamp)
+            ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
         else:
-            ros_timestamp = rospy.Time.now()
+            ros_timestamp = nepi_ros.time_now()
 
         # Apply controls
         if self.current_controls.get("controls_enable") and cv2_img is not None:
-          cv2_img = nepi_nex.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)        
+          cv2_img = nepi_drv.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)        
         
         # Make a copy for the bw thread to use rather than grabbing a new cv2_img
         if self.bw_image_acquisition_running:
@@ -533,17 +543,15 @@ class OnvifCamNode:
         # Only grab a frame if we don't already have a cached color frame... avoids cutting the update rate in half when
         # both image streams are running
         if self.color_image_acquisition_running is False or self.cached_2d_color_frame is None:
-            #rospy.logwarn("Debugging: getBWImg acquiring")
             cv2_img, timestamp, ret, msg = self.driver.getImage(uri_index = self.img_uri_index)
             if timestamp is not None:
-                ros_timestamp = rospy.Time.from_sec(timestamp)
+                ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
             else:
-                ros_timestamp = rospy.Time.now()
+                ros_timestamp = nepi_ros.time_now()
             # Apply controls
             if self.current_controls.get("controls_enable") and cv2_img is not None:
-                cv2_img = nepi_nex.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+                cv2_img = nepi_drv.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
         else:
-            #rospy.logwarn("Debugging: getBWImg reusing")
             cv2_img = self.cached_2d_color_frame.copy()
             ros_timestamp = self.cached_2d_color_frame_timestamp
             self.cached_2d_color_frame = None # Clear it to avoid using it multiple times in the event that threads are running at different rates

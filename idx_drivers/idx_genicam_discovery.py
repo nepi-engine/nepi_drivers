@@ -13,9 +13,10 @@ import os
 #os.environ["ROS_NAMESPACE"] = NEPI_BASE_NAMESPACE[0:-1]
 import subprocess
 import time
-import rospy
 
-from nepi_edge_sdk_base import nepi_nex
+from nepi_edge_sdk_base import nepi_ros
+from nepi_edge_sdk_base import nepi_msg
+from nepi_edge_sdk_base import nepi_drv
 
 # Needed for GenICam auto-detect
 from harvesters.core import Harvester
@@ -23,41 +24,62 @@ from harvesters.core import Harvester
 
 PKG_NAME = 'IDX_GENICAM' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
-CLASS_NAME = 'GenicamCamDiscovery'
-PROCESS = 'LAUNCH' # 'LAUNCH', 'RUN', or 'CALL'
+DISCOVERY_DICT = dict(
+  class_name = 'GenicamCamDiscovery',
+  process = 'LAUNCH', # 'LAUNCH', 'RUN', or 'CALL'
+  method = 'AUTO',  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
+  include_ids = [],  # List of string identifiers for discovery process
+  exclude_ids = [], # List of string identifiers for discovery process
+  interfaces = ['USB','IP'], # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
+  option_1_dict = dict(
+    name = 'None',
+    options = [], # List of string options. Selected option passed to driver
+    default_val = 'None'
+  ),
+  option_2_dict = dict(
+    name = 'None',
+    options = [], # List of string options. Selected option passed to driver
+    default_val = 'None'
+  )
+)
 
 TEST_NEX_DICT = {
-  'group': 'IDX',
-  'group_id': 'GENICAM',
-  'node_file_name': 'idx_genicam_node.py',
-  'node_file_path': '/opt/nepi/ros/lib/nepi_drivers',
-  'node_module_name': 'idx_genicam_node',
-  'node_class_name': 'GenicamCamNode',
-  'driver_name': 'IDX_GENICAM',
-  'driver_file_name': 'idx_genicam_driver.py' ,
-  'driver_file_path':  '/opt/nepi/ros/lib/nepi_drivers',
-  'driver_module_name': 'idx_genicam_driver' ,
-  'driver_class_name':  'GenicamCamDriver',
-  'driver_interfaces': ['USB'],
-  'driver_options_1': [],
-  'driver_default_option_1': 'None',
-  'driver_set_option_1': 'None',
-  'driver_options_2': [],
-  'driver_default_option_2': 'None',
-  'driver_set_option_2': 'None',
-  'discovery_name': 'IDX_GENICAM', 
-  'discovery_file_name': 'idx_genicam_discovery.py',
-  'discovery_file_path': '/opt/nepi/ros/lib/nepi_drivers',
-  'discovery_module_name': 'idx_genicam_discovery',
-  'discovery_class_name': 'GenicamCamDiscovery',
-  'discovery_method': 'AUTO', 
-  'discovery_ids': [],
-  'discovery_ignore_ids': [],
-  'device_dict': {},
-  'order': 1,
-  'active': True,
-  'msg': ""
-  }
+'group': 'IDX',
+'group_id': 'GENICAM',
+'pkg_name': 'IDX_GENICAM',
+'NODE_DICT': {
+    'file_name': 'idx_genicam_node.py',
+    'module_name': 'idx_genicam_node',
+    'class_name': 'GenicamCamNode',
+},
+'DRIVER_DICT': {
+    'file_name': 'idx_genicam_driver.py' ,
+    'module_name': 'idx_genicam_driver' ,
+    'class_name':  'GenicamCamDriver'
+},
+'DISCOVERY_DICT': {
+    'file_name': 'idx_genicam_discovery.py',
+    'module_name': 'idx_genicam_discovery',
+    'class_name': 'GenicamCamDiscovery',
+    'interfaces': ['USB','IP'],
+    'options_1_dict': {
+        'default_option': 'None',
+        'set_option': 'None'
+    },
+    'options_2_dict': {
+        'default_option': 'None',
+        'set_option': 'None'
+    },
+    'method': 'AUTO', 
+    'include_ids': [],
+    'exclude_ids': []
+},
+'DEVICE_DICT': {'model':'0','serial_number': '1'},
+'path': '/opt/nepi/ros/lib/nepi_drivers',
+'order': 1,
+'active': True,
+'msg': ""
+}
 
 class GenicamCamDiscovery:
 
@@ -72,19 +94,21 @@ class GenicamCamDiscovery:
 
    ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
-  nex_dict = dict()
-                               
+  drv_dict = dict()
+  deviceList = []                
   def __init__(self):
-    # Launch the ROS node
-    rospy.init_node(name=self.DEFAULT_NODE_NAME) # Node name could be overridden via remapping
-    self.node_name = rospy.get_name().split('/')[-1]
-    # Get nex_dict from param servers
-    rospy.loginfo("Starting " + self.node_name)
-    self.nex_dict = rospy.get_param('~nex_dict',TEST_NEX_DICT) 
-    ################################################
-    self.deviceList = []
-    self.includeDevices = rospy.get_param('~included_devices', self.nex_dict['discovery_ids'])
-    self.excludedDevices = rospy.get_param('~excluded_devices', self.nex_dict['discovery_ignore_ids'])
+    #### APP NODE INIT SETUP ####
+    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+    self.node_name = nepi_ros.get_node_name()
+    self.base_namespace = nepi_ros.get_base_namespace()
+    nepi_msg.createMsgPublishers(self)
+    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+    ##############################
+    # Get required drv driver dict info
+    self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
+    #nepi_msg.publishMsgWarn(self,"Nex_Dict: " + str(self.drv_dict))
+    self.includeDevices = self.drv_dict['DISCOVERY_DICT']['include_ids']
+    self.excludedDevices = self.drv_dict['DISCOVERY_DICT']['exclude_ids']
 
     self.genicam_harvester = Harvester()
     
@@ -92,14 +116,15 @@ class GenicamCamDiscovery:
     self.genicam_harvester.add_file(self.DEFAULT_GENTL_PRODUCER_GIGE)
 
 
-    rospy.Timer(rospy.Duration(self.CHECK_INTERVAL_S), self.detectAndManageDevices)
+    nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
     
-    rospy.spin()
+    nepi_ros.spin()
 
   def detectAndManageDevices(self, timer):
+    #nepi_msg.publishMsgWarn(self,"Starting detection process")
     # Make sure our genicam harvesters context is up to date.
     self.genicam_harvester.update()
-    #rospy.loginfo(self.genicam_harvester.device_info_list)
+    #nepi_msg.publishMsgInfo(self,str(genicam_harvester.device_info_list))
     # Take note of any genicam nodes currently running. If they are not found
     # in the current genicam harvesters context, we must assume that they have
     # been disconnected and stop the corresponding node(s).
@@ -110,7 +135,7 @@ class GenicamCamDiscovery:
        
     
     for device in self.genicam_harvester.device_info_list:
-      #rospy.loginfo(device)
+      #nepi_msg.publishMsgInfo(self,device)
       model = device.model
       sn = device.serial_number
       vendor = device.vendor
@@ -126,9 +151,6 @@ class GenicamCamDiscovery:
           # If the node has exited, we log the corresponding stdout and stderr
           # and allow it to be restarted.
           stdo, stde = known_device["node_subprocess"].communicate(timeout=0.1)
-          rospy.logerr(f'{known_device["node_name"]} exited')
-          rospy.logerr(f"stdout: {stdo}")
-          rospy.logerr(f"stderr: {stde}")
           self.stopAndPurgeDeviceNode(known_device["node_namespace"])
           continue
         except subprocess.TimeoutExpired:
@@ -144,8 +166,10 @@ class GenicamCamDiscovery:
     # Stop any nodes associated with devices that have disappeared.
     for node_namespace, running in active_devices.items():
       if not running:
-        rospy.logwarn(f'{node_namespace} is no longer responding to discovery')
+        nepi_msg.publishMsgWarn(self,node_namespace + ' is no longer responding to discovery')
         self.stopAndPurgeDeviceNode(node_namespace)
+    nepi_ros.sleep(self.CHECK_INTERVAL_S,100)
+    nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
 
   def startDeviceNode(self, vendor, model, serial_number):
     # TODO: fair to assume uniqueness of device serial numbers?
@@ -162,25 +186,25 @@ class GenicamCamDiscovery:
         node_needs_serial_number = True
         break
     device_node_name = root_name if not node_needs_serial_number else unique_root_name
-    device_node_namespace = rospy.get_namespace() + device_node_name
-    rospy.loginfo(f"{self.node_name}: Initiating new Genicam node {device_node_namespace}")
+    device_node_namespace = nepi_ros.get_base_namespace() + device_node_name
+    nepi_msg.publishMsgWarn(self,"Initiating new Genicam node " + device_node_namespace)
 
     self.checkLoadConfigFile(node_name=device_node_name)
 
-    rospy.loginfo(f"{self.node_name}: Starting {device_node_name} via rosrun")
+    nepi_msg.publishMsgWarn(self,"Starting node " + device_node_name + " via rosrun")
 
     # NOTE: have to make serial_number look like a string by prefixing with "sn", otherwise ROS
     #       treats it as an int param and it causes an overflow. Better way to handle this?
-    #Setup required param server nex_dict for discovery node
-    self.nex_dict['device_dict']={'model': model}
-    self.nex_dict['device_dict']['serial_number'] = serial_number
-    dict_param_name = device_node_name + "/nex_dict"
-    rospy.set_param(dict_param_name,self.nex_dict)
-    file_name = self.nex_dict['node_file_name']
+    #Setup required param server drv_dict for discovery node
+    self.drv_dict['DEVICE_DICT']={'model': model}
+    self.drv_dict['DEVICE_DICT']['serial_number'] = serial_number
+    dict_param_name = device_node_name + "/drv_dict"
+    nepi_ros.set_param(self,dict_param_name,self.drv_dict)
+    file_name = self.drv_dict['NODE_DICT']['file_name']
     #Try and launch node
-    [success, msg, sub_process] = nepi_nex.launchDriverNode(file_name, device_node_name)
+    [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, device_node_name)
     if sub_process.poll() is not None:
-      rospy.logerr(f'Failed to start {device_node_name} via {" ".join(x for x in device_node_run_cmd)} (rc = {sub_process.returncode})')
+      nepi_msg.publishMsgErr(self, 'Failed to start ' + device_node_name)
     else:
       self.deviceList.append({"device_class": "genicam",
                               "model": model,
@@ -191,16 +215,16 @@ class GenicamCamDiscovery:
                               "node_subprocess": sub_process})
 
   def stopAndPurgeDeviceNode(self, node_namespace):
-    rospy.loginfo(self.node_name + ": stopping " + node_namespace)
+    nepi_msg.publishMsgInfo(self,"stopping " + node_namespace)
     for i, device in enumerate(self.deviceList):
       if device['node_namespace'] == node_namespace:
         node_name = device['node_namespace'].split("/")[-1]
         sub_process = device['node_subprocess']
-        success = nepi_nex.killDriverNode(node_name,sub_process)
+        success = nepi_drv.killDriverNode(node_name,sub_process)
         # And remove it from the list
         self.deviceList.pop(i)  
     if success == False:
-      rospy.logwarn(self.node_name + ": Unable to stop unknown node " + node_namespace)
+      nepi_msg.publishMsgWarn(self,"Unable to stop unknown node " + node_namespace)
 
   def deviceNodeIsRunning(self, node_namespace):
     for device in self.deviceList:
@@ -210,28 +234,28 @@ class GenicamCamDiscovery:
         else:
           return True
     # If we get here, didn't find the node in our list    
-    rospy.logwarn(self.node_name + ": cannot check run status of unknown node " + node_namespace)
+    nepi_msg.publishMsgWarn(self,"cannot check run status of unknown node " + node_namespace)
     return False
   
   def checkLoadConfigFile(self, node_name):
     folder_name = "drivers/" + node_name 
     config_folder = os.path.join(self.NEPI_DEFAULT_CFG_PATH, folder_name)
     if not os.path.isdir(config_folder):
-      rospy.logwarn(self.node_name + ': No config folder found for %s... creating one at %s', node_name, config_folder)
+      nepi_msg.publishMsgWarn(self,'No config folder found for %s... creating one at %s', node_name, config_folder)
       os.makedirs(name = config_folder, mode = 0o775)
       return
     
     config_file = os.path.join(config_folder, node_name + ".yaml")
-    node_namespace = rospy.get_namespace() + node_name
+    node_namespace = nepi_ros.get_base_namespace() + node_name
     if os.path.exists(config_file):
-      rospy.loginfo(self.node_name + ": Loading parameters from " + config_file + " to " + node_namespace)
+      nepi_msg.publishMsgInfo(self,"Loading parameters from " + config_file + " to " + node_namespace)
       #rosparam.load_file(filename = config_file, default_namespace = node_namespace)
       #rosparam.load_file(filename = config_file, default_namespace = node_name)
       # Seems programmatic rosparam.load_file is not working at all, so use the command-line version instead
       rosparam_load_cmd = ['rosparam', 'load', config_file, node_namespace]
       subprocess.run(rosparam_load_cmd)
     else:
-      rospy.logwarn(self.node_name + ": No config file found for " + node_name + " in " + self.NEPI_DEFAULT_CFG_PATH)
+      nepi_msg.publishMsgWarn(self,"No config file found for " + node_name + " in " + self.NEPI_DEFAULT_CFG_PATH)
 
   def short_name(self,name):
     split = name.split("_")

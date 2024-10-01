@@ -7,7 +7,6 @@
 #
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
-import rospy
 import sys, subprocess
 import cv2
 import threading, time
@@ -16,7 +15,9 @@ import threading, time
 
 PKG_NAME = 'IDX_V4L2' # Use in display menus
 FILE_TYPE = 'DRIVER'
-CLASS_NAME = 'V4l2CamDriver' # Should Match Class Name
+DRIVER_DICT = dict(
+class_name = 'V4l2CamDriver'
+)
 
 
 
@@ -408,9 +409,7 @@ class V4l2CamDriver(object):
     status, curr_fps = self.getFramerate()
     if status is False:
       return False, "Unable to check current framerate during update"
-    
-    #rospy.loginfo("V4l2_Driver: Get Initial in Set framerate value: " + str(curr_fps))
-    
+     
     if curr_fps == max_fps:
       return True, "Current framerate is already as desired"
     
@@ -436,11 +435,8 @@ class V4l2CamDriver(object):
     status, curr_fps = self.getFramerate()
     if status is False:
       return False, "Unable to check current framerate during update"
-    
     #if max_fps != curr_fps:
       #return False, "Framerate did not update"
-    
-    #rospy.loginfo("V4l2_Driver: Get Check in Set framerate value: " + str(curr_fps))
     return True, ""
 
   def getFramerate(self):
@@ -459,15 +455,11 @@ class V4l2CamDriver(object):
       key, value = line.split(':')
       value = value.strip()
       if key == 'Frames per second':
-        #rospy.loginfo(key)
-        #rospy.loginfo(value)
         if value.find(" ") != -1:
           value = value.split(" ")[0]
-        #rospy.loginfo("V4l2_Driver: Got framerate value: " + value)
         try:
           fps = float(value)
         except:
-          rospy.loginfo("Failed to read camera fps from " + value)
           fps = 0.0
         return True, fps
     
