@@ -16,6 +16,7 @@ import time
 
 from nepi_edge_sdk_base import nepi_ros
 from nepi_edge_sdk_base import nepi_msg
+from nepi_edge_sdk_base import nepi_drv
 
 PKG_NAME = 'IDX_V4L2' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
@@ -236,7 +237,7 @@ class V4L2CamDiscovery:
             nepi_ros.set_param(self,dict_param_name,self.nex_dict)
             file_name = self.nex_dict['NODE_DICT']['file_name']
             #Try and launch node
-            [success, msg, sub_process] = nepi_nex.launchDriverNode(file_name, device_node_name)
+            [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, device_node_name)
             if success:
               self.deviceList.append({'device_class': 'v4l2', 'device_path': path, 'device_type': dtype, 
                                       'node_name': device_node_name, 'node_namespace': device_node_namespace,
@@ -250,7 +251,7 @@ class V4L2CamDiscovery:
       if device['node_namespace'] == node_namespace:
         node_name = device['node_namespace'].split("/")[-1]
         sub_process = device['node_subprocess']
-        success = nepi_nex.killDriverNode(node_name,sub_process)
+        success = nepi_drv.killDriverNode(node_name,sub_process)
         # And remove it from the list
         self.deviceList.pop(i)  
     if success == False:
