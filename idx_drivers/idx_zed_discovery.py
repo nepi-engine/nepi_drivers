@@ -268,7 +268,7 @@ class ZedCamDiscovery:
     folder_name = "drivers/" + node_name 
     config_folder = os.path.join(self.NEPI_DEFAULT_CFG_PATH, folder_name)
     if not os.path.isdir(config_folder):
-      nepi_msg.publishMsgWarn(self,'No config folder found for %s... creating one at %s', node_name, config_folder)
+      nepi_msg.publishMsgWarn(self,'No config folder found for ' + node_name + '... creating one at ' + config_folder)
       os.makedirs(name = config_folder, mode = 0o775)
       return
     
