@@ -20,7 +20,7 @@ driver_pkg_name = 'None', # 'Required Driver PKG_NAME or 'None'
 discovery_pkg_name = 'PTX_IQR' # 'Required Discovery PKG_NAME or 'None'
 )
 
-TEST_NEX_DICT = {
+TEST_DRV_DICT = {
 'group': 'PTX',
 'group_id': 'IQR',
 'pkg_name': 'PTX_IQR',

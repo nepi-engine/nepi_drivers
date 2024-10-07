@@ -94,7 +94,7 @@ class ZedCamDiscovery:
     ##############################
     # Get required drv driver dict info
     self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
-    #nepi_msg.publishMsgWarn(self,"Nex_Dict: " + str(self.drv_dict))
+    #nepi_msg.publishMsgWarn(self,"Drv_Dict: " + str(self.drv_dict))
     self.includeDevices = self.drv_dict['DISCOVERY_DICT']['include_ids']
     self.excludedDevices = self.drv_dict['DISCOVERY_DICT']['exclude_ids']
 

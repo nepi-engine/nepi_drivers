@@ -339,8 +339,8 @@ class GenicamCamDriver(object):
     def getCurrentResolutionAvailableFramerates(self):
         NUM_OPTIONS = 20
         available_framerates = [self.camera_settings["AcquisitionFrameRate"]["min"],self.camera_settings["AcquisitionFrameRate"]["max"]]
-        framerates = [math.ceil(available_framerates[0]), math.floor(available_framerates[1])]
-        return True, framerates
+        #framerates = [math.ceil(available_framerates[0]), math.floor(available_framerates[1])]
+        return True, available_framerates
 
     def setFramerate(self, max_fps):
         if not self.hasAdjustableFramerate():

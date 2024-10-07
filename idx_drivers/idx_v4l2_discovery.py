@@ -40,7 +40,7 @@ DISCOVERY_DICT = dict(
 )
 
 
-TEST_NEX_DICT = {
+TEST_DRV_DICT = {
 'group': 'IDX',
 'group_id': 'V4L2',
 'pkg_name': 'IDX_V4L2',
@@ -87,7 +87,7 @@ class V4L2CamDiscovery:
 
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
-  nex_dict = dict()                        
+  drv_dict = dict()                        
   deviceList = []                
   def __init__(self):
     #### APP NODE INIT SETUP ####
@@ -98,10 +98,10 @@ class V4L2CamDiscovery:
     nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
     ##############################
     # Get required nex driver dict info
-    self.nex_dict = nepi_ros.get_param(self,'~nex_dict',TEST_NEX_DICT) 
-    #nepi_msg.publishMsgWarn(self,"Nex_Dict: " + str(self.nex_dict))
-    self.includeDevices = self.nex_dict['DISCOVERY_DICT']['include_ids']
-    self.excludedDevices = self.nex_dict['DISCOVERY_DICT']['exclude_ids']
+    self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_DRV_DICT) 
+    #nepi_msg.publishMsgWarn(self,"Drv_Dict: " + str(self.drv_dict))
+    self.includeDevices = self.drv_dict['DISCOVERY_DICT']['include_ids']
+    self.excludedDevices = self.drv_dict['DISCOVERY_DICT']['exclude_ids']
 
     nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
 
@@ -164,7 +164,9 @@ class V4L2CamDiscovery:
         active_paths.append(device_path) # To check later that the device list has no entries for paths that have disappeared
         known_device = False
         # Check if this device is already known and launched
+       
         for device in self.deviceList:
+          #nepi_msg.publishMsgWarn(self,"Found device: " + str(device))
           if device['device_class'] != 'v4l2':
             continue
 
@@ -176,10 +178,12 @@ class V4L2CamDiscovery:
               nepi_msg.publishMsgWarn(self,"detected V4L2 device type change (" + device['device_type'] + "-->" + 
                             device_type + ") for device at " + device_path)
               self.stopAndPurgeDeviceNode(device['node_namespace'])
+              time.sleep(1)
               self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
             elif not self.deviceNodeIsRunning(device['node_namespace']):
               nepi_msg.publishMsgWarn(self,"node " + device['node_name'] + " is not running. Restarting")
               self.stopAndPurgeDeviceNode(device['node_namespace'])
+              time.sleep(1)
               self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
             break
 
@@ -231,11 +235,12 @@ class V4L2CamDiscovery:
           # rosrun nepi_drivers_idx v4l2_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
           nepi_msg.publishMsgInfo(self,"" + "Launching node " + device_node_name)
           if dtype not in self.excludedDevices:
-            #Setup required param server nex_dict for discovery node
-            self.nex_dict['DEVICE_DICT'] = {'device_path': path}
-            dict_param_name = device_node_name + "/nex_dict"
-            nepi_ros.set_param(self,dict_param_name,self.nex_dict)
-            file_name = self.nex_dict['NODE_DICT']['file_name']
+            #Setup required param server drv_dict for discovery node
+            self.drv_dict['DEVICE_DICT'] = {'device_path': path}
+            dict_param_name = device_node_name + "/drv_dict"
+            nepi_ros.set_param(self,dict_param_name,self.drv_dict)
+            file_name = self.drv_dict['NODE_DICT']['file_name']
+            #nepi_msg.publishMsgInfo(self,"Starting new V4L2 node with drv_dict " +str(self.drv_dict))
             #Try and launch node
             [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, device_node_name)
             if success:
@@ -272,7 +277,7 @@ class V4L2CamDiscovery:
     folder_name = "drivers/" + node_name 
     config_folder = os.path.join(self.NEPI_DEFAULT_CFG_PATH, folder_name)
     if not os.path.isdir(config_folder):
-      nepi_msg.publishMsgWarn(self,'No config folder found for %s... creating one at %s', node_name, config_folder)
+      nepi_msg.publishMsgWarn(self,'No config folder found for ' + node_name + '... creating one at ' + config_folder)
       os.makedirs(name = config_folder, mode = 0o775)
       return
     

@@ -269,31 +269,37 @@ class OnvifCamNode:
                     cap_setting['options'] = info['options']
                 cap_settings[cap_setting_name] = cap_setting
         # Add Resolution Cap Settting
-        [success,available_resolutions,encoder_cfg] = self.driver.getAvailableResolutions()
-        cap_setting = dict()
-        cap_setting['type'] = 'Discrete'
-        options = []
-        for res_dict in available_resolutions:
-            width = str(res_dict['Width'])
-            height = str(res_dict['Height'])
-            cap_setting_option = (width + ":" + height)
-            options.append(cap_setting_option)
-        cap_setting['options'] = options
-        cap_setting['name'] = 'Resolution'
-        cap_settings['Resolution'] = cap_setting
+        try:
+            [success,available_resolutions,encoder_cfg] = self.driver.getAvailableResolutions()
+            cap_setting = dict()
+            cap_setting['type'] = 'Discrete'
+            options = []
+            for res_dict in available_resolutions:
+                width = str(res_dict['Width'])
+                height = str(res_dict['Height'])
+                cap_setting_option = (width + ":" + height)
+                options.append(cap_setting_option)
+            cap_setting['options'] = options
+            cap_setting['name'] = 'Resolution'
+            cap_settings['Resolution'] = cap_setting
+        except Exception as e:
+            nepi_msg.publishMsgInfo(self," " + "Driver returned invalid resolution options: " + str(available_resolutions))
         # Add Framerate Cap cap_setting
         '''
-        [success,framerates] = self.driver.getFramerateRange()
-        cap_setting = dict()
-        cap_setting['type'] = 'Float'
-        options = []
-        cap_setting_option = (str(round(framerates[0],0)))
-        options.append(cap_setting_option)
-        cap_setting_option = (str(round(framerates[1],0)))
-        options.append(cap_setting_option)
-        cap_setting['options'] = options
-        cap_setting['name'] = 'Framerate'
-        cap_settings['Framerate'] = cap_setting
+        try:
+            [success,framerates] = self.driver.getFramerateRange()
+            cap_setting = dict()
+            cap_setting['type'] = 'Descrete'
+            options = []
+            if len(framerates) > 0:
+                for rate in framerates:
+                    cap_setting_option = (str(round(framerate,2)))
+                    options.append(cap_setting_option)
+                cap_setting['options'] = options
+                cap_setting['name'] = 'framerate'
+                cap_settings['framerate'] = cap_setting
+        except Exception as e:
+            nepi_msg.publishMsgInfo(self," " + "Driver returned invalid framerate options: " + str(framerates))
         '''
         return cap_settings
 

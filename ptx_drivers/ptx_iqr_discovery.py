@@ -35,7 +35,7 @@ DISCOVERY_DICT = dict(
   )
 )
 
-TEST_NEX_DICT = {
+TEST_DRV_DICT = {
 'group': 'PTX',
 'group_id': 'IQR',
 'pkg_name': 'PTX_IQR',
@@ -81,9 +81,9 @@ class IqrPanTiltDiscovery:
   def __init__(self):
     pass 
 
-  ##########  Nex Standard Discovery Function
+  ##########  DRV Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
-  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict = TEST_NEX_DICT):
+  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict = TEST_DRV_DICT):
     self.drv_dict = drv_dict
     #nepi_msg.printMsg(self.log_name + "Got drv_dict : " + str(self.drv_dict))
     self.available_paths_list = available_paths_list

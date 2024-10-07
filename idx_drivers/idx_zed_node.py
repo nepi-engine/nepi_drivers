@@ -56,7 +56,7 @@ driver_pkg_name = 'None', # 'Required Driver PKG_NAME or 'None'
 discovery_pkg_name = 'IDX_ZED' # 'Required Discovery PKG_NAME or 'None'
 )
 
-TEST_NEX_DICT = {
+TEST_DRV_DICT = {
 'group': 'IDX',
 'group_id': 'ZED',
 'pkg_name': 'IDX_ZED',
@@ -208,7 +208,7 @@ class ZedCamNode(object):
         nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
         ##############################
         # Get required drv driver dict info
-        self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
+        self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_DRV_DICT) 
 
         ################################################
         # Try to restore camera calibration files from
