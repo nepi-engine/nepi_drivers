@@ -25,7 +25,7 @@ DISCOVERY_DICT = dict(
   process = 'LAUNCH', # 'LAUNCH', 'RUN', or 'CALL'
   method = 'AUTO',  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
   include_ids = ['ZED 2','ZED 2i','ZED-M'],  # List of string identifiers for discovery process
-  exclude_ids = ['msm_vidc_vdec'], # List of string identifiers for discovery process
+  exclude_ids = [], # List of string identifiers for discovery process
   interfaces = ['USB'], # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
   option_1_dict = dict(
     name = 'None',
@@ -68,7 +68,7 @@ TEST_NEX_DICT = {
     },
     'method': 'AUTO', 
     'include_ids': ['ZED 2','ZED 2i','ZED-M'],
-    'exclude_ids': ['msm_vidc_vdec']
+    'exclude_ids': []
 },
 'DEVICE_DICT': {'zed_type': 'zed2'},
 'path': '/opt/nepi/ros/lib/nepi_drivers',
@@ -123,72 +123,77 @@ class ZedCamDiscovery:
         # Some v4l2-ctl outputs have an additional ':'
         device_type = device_type.split(':')[0]
         
-      # Honor the exclusion list
-      if device_type not in self.includeDevices:
-        continue
-      elif line.startswith('/dev/video'):
+      # Honor the inclusion list
+      if line.startswith('/dev/video'):
         device_path = line
-        
+        if device_type in self.includeDevices:
+          # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
+          is_video_cap_device = False
+          sub_process = subprocess.Popen(['v4l2-ctl', '-d', device_path, '--all'],
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+          stdout,_ = sub_process.communicate()
+          all_out = stdout.splitlines()
+          in_device_caps = False
+          usbBus = None
+          for all_line in all_out:
+            if ('Bus info' in all_line):
+              usbBus = all_line.rsplit("-",1)[1].replace(".","")
+            if ('Device Caps' in all_line):
+              in_device_caps = True
+            elif in_device_caps:
+              if ('Video Capture' in all_line):
+                is_video_cap_device = True
+            elif ':' in all_line:
+              in_device_caps = False
+          
+          if is_video_cap_device:
+            active_paths.append(device_path) # To check later that the device list has no entries for paths that have disappeared
+            known_device = False
+            # Check if this device is already known and launched
+            for path in self.DEVICE_DICT.keys():
+              device = self.DEVICE_DICT[path]
+              if device['device_path'] == device_path:
+                known_device = True
+                if device['device_type'] != device_type:
+                  # Uh oh -- device has switched on us!
+                  # Kill previous and start new?
+                  nepi_msg.publishMsgWarn(self,"detected Zed device type change (" + device['device_type'] + "-->" + 
+                                device_type + ") for device at " + device_path)
+                  self.stopAndPurgeDeviceNode(device['node_namespace'])
+                  break
+                '''
+                elif not self.deviceNodeIsRunning(device['node_namespace']):
+                  nepi_msg.publishMsgWarn(self,"node " + device['node_name'] + " is not running. Restarting")
+                  self.stopAndPurgeDeviceNode(device['node_namespace'])
+                  self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
+                break
+                '''
 
-        # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
-        is_video_cap_device = False
-        sub_process = subprocess.Popen(['v4l2-ctl', '-d', device_path, '--all'],
-                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        stdout,_ = sub_process.communicate()
-        all_out = stdout.splitlines()
-        in_device_caps = False
-        usbBus = None
-        for all_line in all_out:
-          if ('Bus info' in all_line):
-            usbBus = all_line.rsplit("-",1)[1].replace(".","")
-          if ('Device Caps' in all_line):
-            in_device_caps = True
-          elif in_device_caps:
-            if ('Video Capture' in all_line):
-              is_video_cap_device = True
-          elif ':' in all_line:
-            in_device_caps = False
-        
-        if not is_video_cap_device:
-          continue
+            if known_device == False:
+              nepi_msg.publishMsgWarn(self,"Starting zed on path" + device_path)
+              success = self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
+              if success:
+                nepi_msg.publishMsgInfo(self,"Started new node for path: " + device_path)
+              else:
+                nepi_msg.publishMsgInfo(self,"Failed to start new node for path: " + device_path)
 
-        active_paths.append(device_path) # To check later that the device list has no entries for paths that have disappeared
-        known_device = False
-        # Check if this device is already known and launched
-        for path in self.DEVICE_DICT.keys():
-          device = self.DEVICE_DICT[path]
-          if device['device_path'] == device_path:
-            known_device = True
-            if device['device_type'] != device_type:
-              # Uh oh -- device has switched on us!
-              # Kill previous and start new?
-              nepi_msg.publishMsgWarn(self,"detected Zed device type change (" + device['device_type'] + "-->" + 
-                            device_type + ") for device at " + device_path)
-              self.stopAndPurgeDeviceNode(device['node_namespace'])
-              self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
-            elif not self.deviceNodeIsRunning(device['node_namespace']):
-              nepi_msg.publishMsgWarn(self,"node " + device['node_name'] + " is not running. Restarting")
-              self.stopAndPurgeDeviceNode(device['node_namespace'])
-              self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
-            break
-
-        if known_device == False:
-          nepi_msg.publishMsgWarn(self,"Starting zed on path" + device_path)
-          self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
-
-    # Handle devices which no longer have a valid active V4L2 device path
+    # Check that device path still active
+    #nepi_msg.publishMsgWarn(self,"Active paths " + str(active_paths))
+    purge_list = []
     for path in self.DEVICE_DICT.keys():
-      device = self.DEVICE_DICT[path]
-      if device['device_class'] != 'v4l2':
-        continue
-
-        if device['device_path'] not in active_paths:
-          nepi_msg.publishMsgWarn(self,device['node_namespace'] + ' path ' + device['device_path'] + ' no longer exists... device disconnected?')
-          self.stopAndPurgeDeviceNode(device['node_namespace'])
+      if path not in active_paths:
+        purge_list.append(path)
+    for path in purge_list:
+        device_dict = self.DEVICE_DICT[path]
+        node_name = device_dict['node_namespace']
+        nepi_msg.publishMsgInfo(self,"Device no longer present. Stopping node " + node_name)
+        self.stopAndPurgeDeviceNode(node_name)           
+        
     nepi_ros.sleep(self.CHECK_INTERVAL_S,100)
     nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
 
   def startDeviceNode(self, dtype, path, bus):
+    success = False
     # First, get a unique name
     if dtype is not None:
       if dtype in self.includeDevices:
@@ -234,6 +239,7 @@ class ZedCamDiscovery:
             [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, device_node_name)
             self.DEVICE_DICT[path]['node_subprocess'] = sub_process
             nepi_msg.publishMsgInfo(self,msg)
+      return success
 
   def stopAndPurgeDeviceNode(self, node_namespace):
     nepi_msg.publishMsgWarn(self,"stopping " + node_namespace)

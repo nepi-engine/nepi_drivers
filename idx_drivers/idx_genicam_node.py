@@ -113,7 +113,7 @@ class GenicamCamNode:
         # Get required drv driver dict info
         self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_DRV_DICT) 
         #nepi_msg.publishMsgWarn(self,"Drv_Dict: " + str(self.drv_dict))
-        self.driver_path = self.drv_dict['DEVICE_DICT']['path']
+        self.driver_path = self.drv_dict['path']
         self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
         self.driver_module = self.drv_dict['DRIVER_DICT']['module_name']
         self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']

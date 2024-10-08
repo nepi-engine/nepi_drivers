@@ -245,7 +245,7 @@ class V4l2CamNode:
         self.idx_if.publishStatus()
 
         ## Initiation Complete
-        nepi_msg.publishMsgInfo(self," " + "Initialization Complete")
+        nepi_msg.publishMsgInfo(self,"Initialization Complete")
         # Now start the node
         nepi_ros.spin()
 

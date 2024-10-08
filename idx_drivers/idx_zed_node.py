@@ -222,16 +222,32 @@ class ZedCamNode(object):
         # This parameter should be automatically set by idx_sensor_mgr
         self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
 
-        # Run the correct zed_ros_wrapper launch file
-        zed_launchfile = self.zed_type + '.launch'
-        zed_ros_wrapper_run_cmd = ['roslaunch', 'zed_wrapper', zed_launchfile]
-        # TODO: Some process management for the Zed ROS wrapper
-        self.zed_ros_wrapper_proc = subprocess.Popen(zed_ros_wrapper_run_cmd)
 
         # Connect to Zed node
         self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
         ZED_BASE_NAMESPACE = nepi_ros.get_base_namespace() + self.zed_type + "/zed_node/"
 
+
+        '''
+        # First check if zed wrapper already running
+        zed_wrapper_not_running = True
+        try:
+          self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=3)
+          zed_wrapper_not_running = nepi_drv.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
+          nepi_ros.sleep(2,20)
+        except Exception as e:
+          pass #nepi_msg.publishMsgInfo(self,str(e))
+
+        if zed_wrapper_not_running == False:
+          rospy.signal_shutdown("Zed ROS Wrapper still running, Shutting Down")
+        else:
+        '''
+
+        # Run the correct zed_ros_wrapper launch file
+        zed_launchfile = self.zed_type + '.launch'
+        zed_ros_wrapper_run_cmd = ['roslaunch', 'zed_wrapper', zed_launchfile]
+        # TODO: Some process management for the Zed ROS wrapper
+        self.zed_ros_wrapper_proc = subprocess.Popen(zed_ros_wrapper_run_cmd)
         # Now that Zed SDK is started, we can set up the reconfig client
         nepi_ros.sleep(5,10)
         success = False
@@ -351,34 +367,34 @@ class ZedCamNode(object):
         else:
             self.device_info_dict["sensor_name"] = self.node_name
         self.idx_if = ROSIDXSensorIF(device_info = self.device_info_dict,
-                                     capSettings = self.cap_settings,
-                                     factorySettings = self.factory_settings,
-                                     settingUpdateFunction=self.settingUpdateFunction,
-                                     getSettingsFunction=self.getSettings,
-                                     factoryControls = self.FACTORY_CONTROLS,
-                                     setControlsEnable = idx_callback_names["Controls"]["Controls_Enable"],
-                                     setAutoAdjust= idx_callback_names["Controls"]["Auto_Adjust"],
-                                     setResolutionMode=idx_callback_names["Controls"]["Resolution"], 
-                                     setFramerateMode=idx_callback_names["Controls"]["Framerate"], 
-                                     setContrast=idx_callback_names["Controls"]["Contrast"], 
-                                     setBrightness=idx_callback_names["Controls"]["Brightness"], 
-                                     setThresholding=idx_callback_names["Controls"]["Thresholding"], 
-                                     setRange=idx_callback_names["Controls"]["Range"], 
-                                     getColor2DImg=idx_callback_names["Data"]["Color2DImg"], 
-                                     stopColor2DImgAcquisition=idx_callback_names["Data"]["StopColor2DImg"],
-                                     getBW2DImg=idx_callback_names["Data"]["BW2DImg"], 
-                                     stopBW2DImgAcquisition=idx_callback_names["Data"]["StopBW2DImg"],
-                                     getDepthMap=idx_callback_names["Data"]["DepthMap"], 
-                                     stopDepthMapAcquisition=idx_callback_names["Data"]["StopDepthMap"],
-                                     getDepthImg=idx_callback_names["Data"]["DepthImg"], 
-                                     stopDepthImgAcquisition=idx_callback_names["Data"]["StopDepthImg"],
-                                     getPointcloud=idx_callback_names["Data"]["Pointcloud"], 
-                                     stopPointcloudAcquisition=idx_callback_names["Data"]["StopPointcloud"],
-                                     getPointcloudImg=idx_callback_names["Data"]["PointcloudImg"], 
-                                     stopPointcloudImgAcquisition=idx_callback_names["Data"]["StopPointcloudImg"],
-                                     getGPSMsg=idx_callback_names["Data"]["GPS"],
-                                     getOdomMsg=idx_callback_names["Data"]["Odom"],
-                                     getHeadingMsg=idx_callback_names["Data"]["Heading"])
+                                    capSettings = self.cap_settings,
+                                    factorySettings = self.factory_settings,
+                                    settingUpdateFunction=self.settingUpdateFunction,
+                                    getSettingsFunction=self.getSettings,
+                                    factoryControls = self.FACTORY_CONTROLS,
+                                    setControlsEnable = idx_callback_names["Controls"]["Controls_Enable"],
+                                    setAutoAdjust= idx_callback_names["Controls"]["Auto_Adjust"],
+                                    setResolutionMode=idx_callback_names["Controls"]["Resolution"], 
+                                    setFramerateMode=idx_callback_names["Controls"]["Framerate"], 
+                                    setContrast=idx_callback_names["Controls"]["Contrast"], 
+                                    setBrightness=idx_callback_names["Controls"]["Brightness"], 
+                                    setThresholding=idx_callback_names["Controls"]["Thresholding"], 
+                                    setRange=idx_callback_names["Controls"]["Range"], 
+                                    getColor2DImg=idx_callback_names["Data"]["Color2DImg"], 
+                                    stopColor2DImgAcquisition=idx_callback_names["Data"]["StopColor2DImg"],
+                                    getBW2DImg=idx_callback_names["Data"]["BW2DImg"], 
+                                    stopBW2DImgAcquisition=idx_callback_names["Data"]["StopBW2DImg"],
+                                    getDepthMap=idx_callback_names["Data"]["DepthMap"], 
+                                    stopDepthMapAcquisition=idx_callback_names["Data"]["StopDepthMap"],
+                                    getDepthImg=idx_callback_names["Data"]["DepthImg"], 
+                                    stopDepthImgAcquisition=idx_callback_names["Data"]["StopDepthImg"],
+                                    getPointcloud=idx_callback_names["Data"]["Pointcloud"], 
+                                    stopPointcloudAcquisition=idx_callback_names["Data"]["StopPointcloud"],
+                                    getPointcloudImg=idx_callback_names["Data"]["PointcloudImg"], 
+                                    stopPointcloudImgAcquisition=idx_callback_names["Data"]["StopPointcloudImg"],
+                                    getGPSMsg=idx_callback_names["Data"]["GPS"],
+                                    getOdomMsg=idx_callback_names["Data"]["Odom"],
+                                    getHeadingMsg=idx_callback_names["Data"]["Heading"])
         nepi_msg.publishMsgInfo(self,"... IDX interface running")
 
         # Update available IDX callbacks based on capabilities that the driver reports
@@ -390,7 +406,7 @@ class ZedCamNode(object):
         # Try to backup camera calibration files
         [success,files_copied,files_not_copied] = nepi_ros.copy_files_from_folder(self.CAL_SRC_PATH,self.CAL_BACKUP_PATH)
         if success:
-           if len(files_copied) > 0:
+          if len(files_copied) > 0:
             strList = str(files_copied)
             nepi_msg.publishMsgInfo(self,"Backed up zed cal files: " + strList)
         else:

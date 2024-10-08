@@ -130,80 +130,75 @@ class V4L2CamDiscovery:
         # Some v4l2-ctl outputs have an additional ':'
         device_type = device_type.split(':')[0]
         
-        # Honor the exclusion list
-        if device_type in self.excludedDevices:
-          device_type = None
-          #continue
-
-      elif line.startswith('/dev/video'):
+      # Honor the exclusion list
+      if line.startswith('/dev/video'):
         device_path = line
-        
+        # Check if this device is already known and launched  
+        if device_type not in self.excludedDevices:    
 
-        # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
-        is_video_cap_device = False
-        sub_process = subprocess.Popen(['v4l2-ctl', '-d', device_path, '--all'],
-                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        stdout,_ = sub_process.communicate()
-        all_out = stdout.splitlines()
-        in_device_caps = False
-        usbBus = None
-        for all_line in all_out:
-          if ('Bus info' in all_line):
-            usbBus = all_line.rsplit("-",1)[1].replace(".","")
-          if ('Device Caps' in all_line):
-            in_device_caps = True
-          elif in_device_caps:
-            if ('Video Capture' in all_line):
-              is_video_cap_device = True
-          elif ':' in all_line:
-            in_device_caps = False
-        
-        if not is_video_cap_device:
-          continue
-
-        active_paths.append(device_path) # To check later that the device list has no entries for paths that have disappeared
-        known_device = False
-        # Check if this device is already known and launched
-       
-        for device in self.deviceList:
-          #nepi_msg.publishMsgWarn(self,"Found device: " + str(device))
-          if device['device_class'] != 'v4l2':
-            continue
-
-          if device['device_path'] == device_path:
-            known_device = True
-            if device['device_type'] != device_type:
-              # Uh oh -- device has switched on us!
-              # Kill previous and start new?
-              nepi_msg.publishMsgWarn(self,"detected V4L2 device type change (" + device['device_type'] + "-->" + 
-                            device_type + ") for device at " + device_path)
-              self.stopAndPurgeDeviceNode(device['node_namespace'])
-              time.sleep(1)
-              self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
+          # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
+          is_video_cap_device = False
+          sub_process = subprocess.Popen(['v4l2-ctl', '-d', device_path, '--all'],
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+          stdout,_ = sub_process.communicate()
+          all_out = stdout.splitlines()
+          in_device_caps = False
+          usbBus = None
+          for all_line in all_out:
+            if ('Bus info' in all_line):
+              usbBus = all_line.rsplit("-",1)[1].replace(".","")
+            if ('Device Caps' in all_line):
+              in_device_caps = True
+            elif in_device_caps:
+              if ('Video Capture' in all_line):
+                is_video_cap_device = True
+            elif ':' in all_line:
+              in_device_caps = False
+          
+          if is_video_cap_device:
+            active_paths.append(device_path) # To check later that the device list has no entries for paths that have disappeared
+            known_device = False
+            for device in self.deviceList:
+              if device['device_path'] == device_path:
+                known_device = True
+                if device['device_type'] != device_type:
+                  # Uh oh -- device has switched on us!
+                  # Kill previous and start new?
+                  nepi_msg.publishMsgWarn(self,"detected V4L2 device type change (" + device['device_type'] + "-->" + 
+                                device_type + ") for device at " + device_path)
+                  self.stopAndPurgeDeviceNode(device['node_namespace'])
+                break
+            '''
             elif not self.deviceNodeIsRunning(device['node_namespace']):
               nepi_msg.publishMsgWarn(self,"node " + device['node_name'] + " is not running. Restarting")
               self.stopAndPurgeDeviceNode(device['node_namespace'])
               time.sleep(1)
               self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
-            break
+            '''
+            if known_device == False:
+              nepi_msg.publishMsgInfo(self,"Found new V4L2 device on path: " + device_path)
+              success = self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
+              if success:
+                nepi_msg.publishMsgInfo(self,"Started new node for path: " + device_path)
+              else:
+                nepi_msg.publishMsgInfo(self,"Failed to start new node for path: " + device_path)
 
-        if not known_device:
-          self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
-
-    # Handle devices which no longer have a valid active V4L2 device path
-
+    # Check that device path still active
+    #nepi_msg.publishMsgWarn(self,"Active paths " + str(active_paths))
+    purge_list = []
     for device in self.deviceList:
-      if device['device_class'] != 'v4l2':
-        continue
-
       if device['device_path'] not in active_paths:
-        nepi_msg.publishMsgWarn(self,device['node_namespace'] + ' path ' + device['device_path'] + ' no longer exists... device disconnected?')
-        self.stopAndPurgeDeviceNode(device['node_namespace'])
+        purge_list.append(device['node_namespace'])
+    for node_name in purge_list:
+        nepi_msg.publishMsgInfo(self,"Device no longer present. Stopping node " + device['node_name'])
+        self.stopAndPurgeDeviceNode(node_name)  
+
     nepi_ros.sleep(self.CHECK_INTERVAL_S,100)
     nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
 
   def startDeviceNode(self, dtype, path, bus):
     # First, get a unique name
+    success = False
     if dtype is not None:
       if dtype not in self.excludedDevices:
         root_name = dtype.replace(' ','_').lower()
@@ -240,7 +235,7 @@ class V4L2CamDiscovery:
             dict_param_name = device_node_name + "/drv_dict"
             nepi_ros.set_param(self,dict_param_name,self.drv_dict)
             file_name = self.drv_dict['NODE_DICT']['file_name']
-            #nepi_msg.publishMsgInfo(self,"Starting new V4L2 node with drv_dict " +str(self.drv_dict))
+            nepi_msg.publishMsgInfo(self,"Starting new V4L2 node with drv_dict " +str(self.drv_dict))
             #Try and launch node
             [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, device_node_name)
             if success:
@@ -249,6 +244,7 @@ class V4L2CamDiscovery:
                                       'node_subprocess': sub_process})
             else:
               nepi_msg.publishMsgInfo(self,msg)
+    return success    
 
   def stopAndPurgeDeviceNode(self, node_namespace):
     nepi_msg.publishMsgInfo(self,"stopping " + node_namespace)
