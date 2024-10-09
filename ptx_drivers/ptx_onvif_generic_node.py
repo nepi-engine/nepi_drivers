@@ -79,9 +79,6 @@ class OnvifPanTiltNode:
         if not nepi_ros.has_param(self,'~network/host'):
             nepi_msg.publishMsgErr(self,"Missing network/host parameter... cannot start")
             return
-        if not nepi_ros.has_param(self,'~driver_id'):
-            nepi_msg.publishMsgErr(self,"Missing driver_id parameter... cannot start")
-            return
                 
         username = str(nepi_ros.get_param(self,'~credentials/username'))
         password = str(nepi_ros.get_param(self,'~credentials/password'))
@@ -104,7 +101,7 @@ class OnvifPanTiltNode:
                     driver_constructed = True
                     nepi_msg.publishMsgInfo(self,"Driver constructed")
                 except Exception as e:
-                    nepi_msg.publishMsgInfo(self,"Failed to construct driver: " + self.driver_id + "with exception: " + str(e))
+                    nepi_msg.publishMsgInfo(self,"Failed to construct driver: " + self.driver_module + "with exception: " + str(e))
                     time.sleep(1)
                 attempts += 1 
         if driver_constructed == False:
