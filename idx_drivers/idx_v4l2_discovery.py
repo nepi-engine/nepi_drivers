@@ -90,7 +90,7 @@ class V4L2CamDiscovery:
   drv_dict = dict()                        
   deviceList = []                
   def __init__(self):
-    #### APP NODE INIT SETUP ####
+    #### NODE INIT SETUP ####
     nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
     self.node_name = nepi_ros.get_node_name()
     self.base_namespace = nepi_ros.get_base_namespace()
@@ -134,8 +134,8 @@ class V4L2CamDiscovery:
       if line.startswith('/dev/video'):
         device_path = line
         # Check if this device is already known and launched  
-        if device_type not in self.excludedDevices:    
-
+        if device_type not in self.excludedDevices:  
+          # nepi_msg.publishMsgWarn(self,"Found device type: " + device_type + " on path " + device_path) 
           # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
           is_video_cap_device = False
           sub_process = subprocess.Popen(['v4l2-ctl', '-d', device_path, '--all'],
@@ -176,12 +176,13 @@ class V4L2CamDiscovery:
               self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
             '''
             if known_device == False:
-              nepi_msg.publishMsgInfo(self,"Found new V4L2 device on path: " + device_path)
+              #nepi_msg.publishMsgInfo(self,"Found new V4L2 device on path: " + device_path)
               success = self.startDeviceNode(dtype = device_type, path = device_path, bus = usbBus)
               if success:
                 nepi_msg.publishMsgInfo(self,"Started new node for path: " + device_path)
               else:
-                nepi_msg.publishMsgInfo(self,"Failed to start new node for path: " + device_path)
+                pass
+                #nepi_msg.publishMsgInfo(self,"Failed to start new node for path: " + device_path)
 
     # Check that device path still active
     #nepi_msg.publishMsgWarn(self,"Active paths " + str(active_paths))
