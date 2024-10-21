@@ -125,6 +125,8 @@ class AfTowerLightDiscovery:
     # Clean up the active_devices_dict
     for path_str in path_purge_list:
       del  self.active_devices_dict[path_str]
+      if path_str in self.active_paths_list:
+        self.active_paths_list.remove(paht_str)
 
     ### Checking for devices on available paths
     for path_str in self.path_list:

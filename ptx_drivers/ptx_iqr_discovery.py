@@ -98,11 +98,13 @@ class IqrPanTiltDiscovery:
     path_purge_list = []
     for path_str in self.active_devices_dict.keys():
         success = self.checkOnDevice(path_str)
-        if success:
+        if success == False:
           path_purge_list.append(path_str) 
     # Clean up the active_devices_dict
     for path_str in path_purge_list:
       del  self.active_devices_dict[path_str]
+      if path_str in self.active_paths_list:
+        self.active_paths_list.remove(path_str)
 
     ### Checking for devices on available paths
     for path_str in self.available_paths_list:
@@ -133,8 +135,7 @@ class IqrPanTiltDiscovery:
       node_launch_namespace = path_entry['node_launch_namespace']
       sub_process = path_entry['sub_process']
       success = nepi_drv.killDriverNode(node_launch_namespace,sub_process)
-      if success:
-        active = False
+      active = False
     return active
 
 
