@@ -83,13 +83,14 @@ class AfTowerLightDiscovery:
   ################################################          
   def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
+    nepi_msg.createMsgPublishers(self)
 
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
   def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict = TEST_NEX_DICT):
     self.drv_dict = drv_dict
-    #nepi_msg.printMsg(self.log_name + "Got drv_dict : " + str(self.drv_dict))
+    #nepi_msg.publishMsgInfo(self, ":  " + self.log_name + "Got drv_dict : " + str(self.drv_dict))
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
@@ -157,22 +158,33 @@ class AfTowerLightDiscovery:
 
 
   def checkOnDevice(self,path_str):
-    active = self.checkForDevice(path_str)
+    active = True
+    if path_str not in self.available_paths_list:
+      active = False
+    elif self.checkForDevice(path_str) == False:
+      active = False
+    if active == False:
+      nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "No longer detecting device on : " + path_str)
+      if path_str in self.active_devices_dict.keys():
+        path_entry = self.active_devices_dict[path_str]
+        node_name = path_entry['node_name']
+        sub_process = path_entry['sub_process']
+        success = nepi_drv.killDriverNode(node_name,sub_process)
     return active
 
 
   def launchDeviceNode(self, path_str):
     file_name = self.drv_dict['NODE_DICT']['file_name']
-    ros_node_launch_name = self.node_launch_name + "_" + path_str.split('/')[-1]
-    nepi_msg.printMsgInfo(self.log_name + "launching node: " + ros_node_launch_name)
+    node_name = self.node_launch_name + "_" + path_str.split('/')[-1]
+    nepi_msg.printMsgInfo(self.log_name + "launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
-    dict_param_name = self.base_namespace + ros_node_launch_name + "/drv_dict"
-    #nepi_msg.printMsgWarn(self.log_name + "launching node: " + str(self.drv_dict))
+    dict_param_name = self.base_namespace + node_name + "/drv_dict"
+    nepi_msg.publishMsgInfo(self, ":  " + self.log_name + "launching node: " + str(self.drv_dict))
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
     nepi_ros.set_param(self,dict_param_name,self.drv_dict)
-    [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, ros_node_launch_name, device_path = path_str)
+    [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, node_name, device_path = path_str)
     if success:
-      self.active_devices_dict[path_str] = {'ros_node_launch_name': ros_node_launch_name, 'sub_process': sub_process}
+      self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
     return success
 
 

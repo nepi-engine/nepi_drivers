@@ -19,8 +19,8 @@
 #define DEFAULT_PITCH_JOINT_NAME        "iqr_pan_tilt_pitch_joint"
 #define DEFAULT_SPEED_RATIO             0.5f
 
-#define DEFAULT_REVERSE_YAW_CONTROL     true
-#define DEFAULT_REVERSE_PITCH_CONTROL   true
+#define DEFAULT_REVERSE_YAW_CONTROL     false
+#define DEFAULT_REVERSE_PITCH_CONTROL   false
 
 // Fixed values per driver/documentation
 #define MIN_YAW_HARDSTOP_DEG            -60.0f

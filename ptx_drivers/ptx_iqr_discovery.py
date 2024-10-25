@@ -74,12 +74,12 @@ TEST_DRV_DICT = {
 }
 
 class IqrPanTiltDiscovery:
-  log_name = PKG_NAME.lower() + "_discovery" + " : "
   active_devices_dict = dict()
   node_launch_name = "iqr_pan_tilt"
   ################################################          
   def __init__(self):
-    pass 
+    self.log_name = PKG_NAME.lower() + "_discovery" 
+    nepi_msg.createMsgPublishers(self) 
 
   ##########  DRV Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
@@ -111,7 +111,7 @@ class IqrPanTiltDiscovery:
       if path_str not in self.active_paths_list:
         found_device = self.checkForDevice(path_str)
         if found_device == True:
-          nepi_msg.printMsg(self.log_name + "Found device on path: " + path_str)
+          nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "Found device on path: " + path_str)
           success = self.launchDeviceNode(path_str)
           if success == True:
             self.active_paths_list.append(path_str)
@@ -131,21 +131,26 @@ class IqrPanTiltDiscovery:
   def checkOnDevice(self,path_str):
     active = True
     if path_str not in self.available_paths_list:
-      path_entry = self.active_devices_dict[path_str]
-      node_launch_namespace = path_entry['node_launch_namespace']
-      sub_process = path_entry['sub_process']
-      success = nepi_drv.killDriverNode(node_launch_namespace,sub_process)
       active = False
+    elif self.checkForDevice(path_str) == False:
+      active = False
+    if active == False:
+      nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "No longer detecting device on : " + path_str)
+      if path_str in self.active_devices_dict.keys():
+        path_entry = self.active_devices_dict[path_str]
+        node_name = path_entry['node_name']
+        sub_process = path_entry['sub_process']
+        success = nepi_drv.killDriverNode(node_name,sub_process)
     return active
 
 
   def launchDeviceNode(self, path_str):
     file_name = 'iqr_ros_pan_tilt_node'
-    ros_node_launch_name = self.node_launch_name + "_" + path_str.split('/')[-1]
-    nepi_msg.printMsg(self.log_name + "***Launching node with name: " + ros_node_launch_name)
-    [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, ros_node_launch_name, device_path = path_str)
+    node_name = path_str.split('/')[-1]
+    nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "***Launching node with name: " + node_name)
+    [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, node_name, device_path = path_str)
     if success:
-      self.active_devices_dict[path_str] = {'ros_node_launch_name': ros_node_launch_name, 'sub_process': sub_process}
+      self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
     return success
     
 

@@ -153,6 +153,7 @@ void PTXInterface::initServices()
 
 bool PTXInterface::positionIsValid(float yaw_deg, float pitch_deg) const
 {
+
     const float min_yaw = min_yaw_softstop_deg;
     const float max_yaw = max_yaw_softstop_deg;
     const float min_pitch = min_pitch_softstop_deg;
@@ -171,14 +172,17 @@ void PTXInterface::publishJointStateAndStatus()
     PTXStatus status;
     static_cast<PTXNode*>(_parent_node)->getStatus(status);
   
+    const float reverse_yaw_int = (reverse_yaw_control)? -1 : 1;  
+    const float reverse_pitch_int = (reverse_pitch_control)? -1 : 1;
+
     if (ptx_caps_query_response.absolute_positioning == true)
     {
         const double yawRad = 0.01745329 * status.yaw_now;
         const double pitchRad = 0.01745329 * status.pitch_now;
 
         joint_state.header.stamp = ros::Time::now();
-        joint_state.position[0] = yawRad;
-        joint_state.position[1] = pitchRad;
+        joint_state.position[0] = yawRad * reverse_yaw_control;
+        joint_state.position[1] = pitchRad * reverse_pitch_control;
         jointPub.publish(joint_state);
 
         odometry.header.stamp = ros::Time::now();
@@ -204,24 +208,38 @@ void PTXInterface::publishJointStateAndStatus()
     status_msg.speed_ratio = (float)(status.speed_driver_units - min_speed_driver_units) / (max_speed_driver_units - min_speed_driver_units);
 
     status_msg.reverse_yaw_control = reverse_yaw_control;
-    status_msg.reverse_pitch_control = reverse_pitch_control;
+    status_msg.yaw_home_pos_deg = yaw_home_pos_deg * reverse_yaw_int;
+    status_msg.yaw_goal_deg = status.yaw_goal * reverse_yaw_int;
+    status_msg.yaw_now_deg = status.yaw_now * reverse_yaw_int;
 
-    status_msg.yaw_home_pos_deg = yaw_home_pos_deg;
-    status_msg.yaw_goal_deg = status.yaw_goal;
-    status_msg.yaw_now_deg = status.yaw_now;
-    status_msg.yaw_min_hardstop_deg = min_yaw_hardstop_deg;
-    status_msg.yaw_max_hardstop_deg = max_yaw_hardstop_deg;
-    status_msg.yaw_min_softstop_deg = min_yaw_softstop_deg;
-    status_msg.yaw_max_softstop_deg = max_yaw_softstop_deg;
-    
-    status_msg.pitch_home_pos_deg = pitch_home_pos_deg;
-    status_msg.pitch_goal_deg = status.pitch_goal;
-    status_msg.pitch_now_deg = status.pitch_now;
-    status_msg.pitch_min_hardstop_deg = min_pitch_hardstop_deg;
-    status_msg.pitch_max_hardstop_deg = max_pitch_hardstop_deg;
-    status_msg.pitch_min_softstop_deg = min_pitch_softstop_deg;
-    status_msg.pitch_max_softstop_deg = max_pitch_softstop_deg;
-    
+    if (reverse_yaw_control){
+        status_msg.yaw_min_hardstop_deg = -1 * max_yaw_hardstop_deg;
+        status_msg.yaw_max_hardstop_deg = -1 * min_yaw_hardstop_deg;
+        status_msg.yaw_min_softstop_deg = -1 * max_yaw_softstop_deg;
+        status_msg.yaw_max_softstop_deg = -1 * min_yaw_softstop_deg;
+    }
+    else{
+        status_msg.yaw_min_hardstop_deg = min_yaw_hardstop_deg;
+        status_msg.yaw_max_hardstop_deg = max_yaw_hardstop_deg;
+        status_msg.yaw_min_softstop_deg = min_yaw_softstop_deg;
+        status_msg.yaw_max_softstop_deg = max_yaw_softstop_deg;
+    }
+    status_msg.reverse_pitch_control = reverse_pitch_control; 
+    status_msg.pitch_home_pos_deg = pitch_home_pos_deg * reverse_pitch_int;
+    status_msg.pitch_goal_deg = status.pitch_goal  * reverse_pitch_int;
+    status_msg.pitch_now_deg = status.pitch_now  * reverse_pitch_int;
+    if (reverse_pitch_control){
+        status_msg.pitch_min_hardstop_deg = -1 * max_pitch_hardstop_deg;
+        status_msg.pitch_max_hardstop_deg = -1 * min_pitch_hardstop_deg;
+        status_msg.pitch_min_softstop_deg = -1 * max_pitch_softstop_deg;
+        status_msg.pitch_max_softstop_deg = -1 * min_pitch_softstop_deg;
+    }
+    else{
+        status_msg.pitch_min_hardstop_deg = min_pitch_hardstop_deg;
+        status_msg.pitch_max_hardstop_deg = max_pitch_hardstop_deg;
+        status_msg.pitch_min_softstop_deg = min_pitch_softstop_deg;
+        status_msg.pitch_max_softstop_deg = max_pitch_softstop_deg;
+    }
     status_msg.error_msgs = status.driver_errors;
 
     statusPub.publish(status_msg);
@@ -257,8 +275,12 @@ void PTXInterface::setSpeedRatioHandler(const std_msgs::Float32::ConstPtr &msg)
 
 void PTXInterface::setHomePositionHandler(const nepi_ros_interfaces::PanTiltPosition::ConstPtr &msg)
 {
-    const float yaw_deg = msg->yaw_deg;
-    const float pitch_deg = msg->pitch_deg;
+
+    const float reverse_yaw_int = (reverse_yaw_control)? -1 : 1;  
+    const float reverse_pitch_int = (reverse_pitch_control)? -1 : 1;
+
+    const float yaw_deg = msg->yaw_deg * reverse_yaw_int ;
+    const float pitch_deg = msg->pitch_deg * reverse_pitch_int;
 
     if (false == positionIsValid(yaw_deg, pitch_deg))
     {
@@ -273,10 +295,12 @@ void PTXInterface::setHomePositionHandler(const nepi_ros_interfaces::PanTiltPosi
 
 void PTXInterface::setSoftLimitsHandler(const nepi_ros_interfaces::PanTiltLimits::ConstPtr &msg)
 {
+
     const float hard_yaw_min = min_yaw_hardstop_deg;
     const float hard_yaw_max = max_yaw_hardstop_deg;
     const float hard_pitch_min = min_pitch_hardstop_deg;
     const float hard_pitch_max = max_pitch_hardstop_deg;
+
     
     if ((msg->min_yaw_softstop_deg < hard_yaw_min) ||
         (msg->max_yaw_softstop_deg > hard_yaw_max) ||
@@ -300,10 +324,13 @@ void PTXInterface::setSoftLimitsHandler(const nepi_ros_interfaces::PanTiltLimits
 }
 
 void PTXInterface::goHomeHandler(const std_msgs::Empty::ConstPtr &msg)
-{
+{   
+    const float reverse_yaw_int = (reverse_yaw_control)? -1 : 1;  
+    const float reverse_pitch_int = (reverse_pitch_control)? -1 : 1;
+
     ROS_INFO("Returning home by request");
-    const float yaw_deg = yaw_home_pos_deg;
-    const float pitch_deg = pitch_home_pos_deg;
+    const float yaw_deg = yaw_home_pos_deg * reverse_yaw_int;
+    const float pitch_deg = pitch_home_pos_deg * reverse_pitch_int;
     const uint16_t speed = currentSpeedRatioToDriverUnits();
     
     static_cast<PTXNode*>(_parent_node)->gotoPosition(yaw_deg, pitch_deg, speed);
@@ -311,15 +338,19 @@ void PTXInterface::goHomeHandler(const std_msgs::Empty::ConstPtr &msg)
 
 void PTXInterface::jogToPositionHandler(const nepi_ros_interfaces::PanTiltPosition::ConstPtr &msg)
 {
+
+
     const bool can_position = has_absolute_positioning;
     if (false == can_position)
     {
         ROS_ERROR("This pan/tilt unit does not support absolute positioning... ignoring");
         return;
     }
+    const float reverse_yaw_int = (reverse_yaw_control)? -1 : 1;  
+    const float reverse_pitch_int = (reverse_pitch_control)? -1 : 1;
 
-    const float yaw_deg = msg->yaw_deg;
-    const float pitch_deg = msg->pitch_deg;
+    const float yaw_deg = msg->yaw_deg * reverse_yaw_int;
+    const float pitch_deg = msg->pitch_deg * reverse_pitch_int;
     const uint16_t speed = currentSpeedRatioToDriverUnits();
 
     if (false == positionIsValid(yaw_deg, pitch_deg))
@@ -338,7 +369,6 @@ void PTXInterface::jogToYawRatioHandler(const std_msgs::Float32::ConstPtr &msg)
         ROS_ERROR("Invalid yaw ratio %0.2f... ignoring", msg->data);
         return;
     }
-
     const bool can_position = has_absolute_positioning;
     if (false == can_position)
     {
@@ -347,11 +377,16 @@ void PTXInterface::jogToYawRatioHandler(const std_msgs::Float32::ConstPtr &msg)
     }
 
     const bool reverse = reverse_yaw_control;
-    const float ratio = (reverse == false)? 
-        msg->data : (1.0f - msg->data);
+    const float ratio = msg->data;
     const float min_yaw = min_yaw_softstop_deg;
     const float max_yaw = max_yaw_softstop_deg;
-    const float yaw_goal = (ratio * max_yaw) + (( 1.0f - ratio ) *  min_yaw);
+    float yaw_goal = 0;
+    if (reverse_yaw_control == false){
+        yaw_goal =  min_yaw + (1-ratio) * (max_yaw - min_yaw);
+    }
+    else {
+        yaw_goal =  (max_yaw) - (1-ratio) * (max_yaw - min_yaw);
+    }
     const float speed = currentSpeedRatioToDriverUnits();
     
     float dummy, pitch_goal;
@@ -375,12 +410,17 @@ void PTXInterface::jogToPitchRatioHandler(const std_msgs::Float32::ConstPtr &msg
     }
 
     const bool reverse = reverse_pitch_control;
-    const float ratio = (reverse == false)? 
-        msg->data : (1.0f - msg->data);
+    const float ratio = msg->data;
 
     const float min_pitch = min_pitch_softstop_deg;
     const float max_pitch = max_pitch_softstop_deg;
-    const float pitch_goal = (ratio * max_pitch) + (( 1.0f - ratio ) *  min_pitch);
+    float pitch_goal = 0;
+    if (reverse_pitch_control == false){
+        pitch_goal =  min_pitch + (1-ratio) * (max_pitch - min_pitch);
+    }
+    else {
+        pitch_goal =  (max_pitch) - (1-ratio) * (max_pitch - min_pitch);
+    }
     const float speed = currentSpeedRatioToDriverUnits();
     
     float dummy, yaw_goal;
@@ -401,13 +441,16 @@ void PTXInterface::jogTimedYaw(const nepi_ros_interfaces::SingleAxisTimedMove::C
         return;
     }
 
+    float current_yaw_deg, current_pitch_deg;
+    static_cast<PTXNode*>(_parent_node)->getCurrentPosition(current_yaw_deg, current_pitch_deg);
+
     const bool reverse = reverse_yaw_control;
     const PTXNode::PTX_DIRECTION direction = (reverse == true)? msg->direction : (-1 * msg->direction);
 
     const float speed = currentSpeedRatioToDriverUnits();
     const float duration_s = (msg->duration_s < 0.0)? 1000000.0f : msg->duration_s;
-
     static_cast<PTXNode*>(_parent_node)->moveYaw(direction, speed, duration_s);
+    
 }
 
 void PTXInterface::jogTimedPitch(const nepi_ros_interfaces::SingleAxisTimedMove::ConstPtr &msg)
@@ -418,6 +461,9 @@ void PTXInterface::jogTimedPitch(const nepi_ros_interfaces::SingleAxisTimedMove:
         return;
     }
 
+    float current_yaw_deg, current_pitch_deg;
+    static_cast<PTXNode*>(_parent_node)->getCurrentPosition(current_yaw_deg, current_pitch_deg);
+
     const bool reverse = reverse_pitch_control;
     const PTXNode::PTX_DIRECTION direction = (reverse == true)? msg->direction : (-1 * msg->direction);
 
@@ -425,6 +471,8 @@ void PTXInterface::jogTimedPitch(const nepi_ros_interfaces::SingleAxisTimedMove:
     const float duration_s = (msg->duration_s < 0.0)? 1000000.0f : msg->duration_s;
 
     static_cast<PTXNode*>(_parent_node)->movePitch(direction, speed, duration_s);
+
+
 }
 
 void PTXInterface::reverseYawControlHandler(const std_msgs::Bool::ConstPtr &msg)
@@ -444,15 +492,22 @@ void PTXInterface::setHomePositionHere(const std_msgs::Empty::ConstPtr &msg)
     float current_yaw_deg, current_pitch_deg;
     static_cast<PTXNode*>(_parent_node)->getCurrentPosition(current_yaw_deg, current_pitch_deg);
 
-    ROS_INFO("Updating home position: [%0.2f, %0.2f]", current_yaw_deg, current_pitch_deg);
-    yaw_home_pos_deg = current_yaw_deg;
-    pitch_home_pos_deg = current_pitch_deg;
+    const float reverse_yaw_int = (reverse_yaw_control)? -1 : 1;  
+    const float reverse_pitch_int = (reverse_pitch_control)? -1 : 1;
+
+    ROS_INFO("Updating home position: [%0.2f, %0.2f]", current_yaw_deg * reverse_yaw_int, current_pitch_deg * reverse_pitch_int);
+    yaw_home_pos_deg = current_yaw_deg * reverse_yaw_int;
+    pitch_home_pos_deg = current_pitch_deg * reverse_pitch_int;
 }
 
 void PTXInterface::setWaypoint(const nepi_ros_interfaces::AbsolutePanTiltWaypoint::ConstPtr &msg)
 {
-    const float yaw_deg = msg->yaw_deg;
-    const float pitch_deg = msg->pitch_deg;
+
+    const float reverse_yaw_int = (reverse_yaw_control)? -1 : 1;  
+    const float reverse_pitch_int = (reverse_pitch_control)? -1 : 1;
+
+    const float yaw_deg = msg->yaw_deg * reverse_yaw_int;
+    const float pitch_deg = msg->pitch_deg * reverse_pitch_int;
     
     if (false == positionIsValid(yaw_deg, pitch_deg))
     {
@@ -484,9 +539,12 @@ void PTXInterface::setWaypointHere(const std_msgs::UInt8::ConstPtr &msg)
     float current_yaw_deg, current_pitch_deg;
     static_cast<PTXNode*>(_parent_node)->getCurrentPosition(current_yaw_deg, current_pitch_deg);
 
-    ROS_INFO("Setting waypoint %u to [%f,%f]", waypoint_index, current_yaw_deg, current_pitch_deg);
-    waypoints[waypoint_index].yaw_deg = current_yaw_deg;
-    waypoints[waypoint_index].pitch_deg = current_pitch_deg;
+    const float reverse_yaw_int = (reverse_yaw_control)? -1 : 1;  
+    const float reverse_pitch_int = (reverse_pitch_control)? -1 : 1;
+
+    ROS_INFO("Setting waypoint %u to [%f,%f]", waypoint_index, current_yaw_deg * reverse_yaw_int, current_pitch_deg * reverse_pitch_int);
+    waypoints[waypoint_index].yaw_deg = current_yaw_deg * reverse_yaw_int;
+    waypoints[waypoint_index].pitch_deg = current_pitch_deg * reverse_pitch_int;
 }
 
 void PTXInterface::gotoWaypoint(const std_msgs::UInt8::ConstPtr &msg)
@@ -505,14 +563,17 @@ void PTXInterface::gotoWaypoint(const std_msgs::UInt8::ConstPtr &msg)
         return;
     }
 
-    if (false == positionIsValid(waypoint.yaw_deg, waypoint.pitch_deg))
+    const float reverse_yaw_int = (reverse_yaw_control)? -1 : 1;  
+    const float reverse_pitch_int = (reverse_pitch_control)? -1 : 1;
+
+    if (false == positionIsValid(waypoint.yaw_deg * reverse_yaw_int, waypoint.pitch_deg * reverse_pitch_int))
     {
         ROS_ERROR("Invalid waypoint position [%0.2f, %0.2f]... ignoring", waypoint.yaw_deg, waypoint.pitch_deg);
         return;
     }
 
     const float speed = currentSpeedRatioToDriverUnits();
-    static_cast<PTXNode*>(_parent_node)->gotoPosition(waypoint.yaw_deg, waypoint.pitch_deg, speed);    
+    static_cast<PTXNode*>(_parent_node)->gotoPosition(waypoint.yaw_deg * reverse_yaw_int, waypoint.pitch_deg * reverse_pitch_int, speed);    
 }
 
 bool PTXInterface::capabilitiesQueryHandler(nepi_ros_interfaces::PTXCapabilitiesQuery::Request &req, 
