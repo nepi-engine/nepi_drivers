@@ -90,7 +90,7 @@ class ZedCamDiscovery:
     self.node_name = nepi_ros.get_node_name()
     self.base_namespace = nepi_ros.get_base_namespace()
     nepi_msg.createMsgPublishers(self)
-    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+    nepi_msg.publishMsgWarn(self,"Starting Initialization Processes")
     ##############################
     # Get required drv driver dict info
     self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
@@ -238,6 +238,7 @@ class ZedCamDiscovery:
                                       'node_name': device_node_name, 'node_namespace': device_node_namespace}
             [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, device_node_name)
             self.DEVICE_DICT[path]['node_subprocess'] = sub_process
+            self.DEVICE_DICT[path]['zed_type'] = root_name
             nepi_msg.publishMsgInfo(self,msg)
       return success
 
@@ -254,8 +255,24 @@ class ZedCamDiscovery:
           purge_path = path
         else:
           nepi_msg.publishMsgWarn(self,"Unable to stop unknown node " + node_namespace)
+
     if purge_path is not None:
+      # Try and kill the zed_node
+      try:
+        zed_type = self.DEVICE_DICT[purge_path]['zed_type']
+        zed_node_namespace = os.path.join(self.base_namespace,zed_type,'zed_node')
+        nepi_ros.kill_node_namespace(zed_node_namespace)
+      except Exception as e:
+        nepi_msg.publishMsgWarn(self,"Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
+      try:
+        zed_type = self.DEVICE_DICT[purge_path]['zed_type']
+        zed_node_namespace = os.path.join(self.base_namespace,zed_type,zed_type + '_state_publisher')
+        nepi_ros.kill_node_namespace(zed_node_namespace)
+      except Exception as e:
+        nepi_msg.publishMsgWarn(self,"Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
+      # delete device dict entry
       del self.DEVICE_DICT[purge_path]
+
 
 
   def deviceNodeIsRunning(self, node_namespace):
