@@ -257,7 +257,7 @@ class ZedCamNode(object):
         self.zed_dynamic_reconfig_client = None
         while success == False and timer < timeout and not nepi_ros.is_shutdown():
           try:
-            self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=15)
+            self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=3)
             success = True
           except Exception as e:
             nepi_msg.publishMsgInfo(self,str(e))
