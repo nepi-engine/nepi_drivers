@@ -220,7 +220,7 @@ class ZedCamDiscovery:
 
         if device_exists is False:
           device_node_namespace = nepi_ros.get_base_namespace() + device_node_name
-          nepi_msg.publishMsgInfo(self,"Initiating new V4L2 node " + device_node_namespace)
+          nepi_msg.publishMsgInfo(self,"Initiating new Zed node " + device_node_namespace)
 
           self.checkLoadConfigFile(node_name = device_node_name)
 
@@ -234,7 +234,7 @@ class ZedCamDiscovery:
             nepi_ros.set_param(self,dict_param_name,self.drv_dict)
             file_name = self.drv_dict['NODE_DICT']['file_name']
             #Try and launch node
-            self.DEVICE_DICT[path] = {'device_class': 'v4l2', 'device_path': path, 'device_type': dtype, 
+            self.DEVICE_DICT[path] = {'device_class': root_name, 'device_path': path, 'device_type': dtype, 
                                       'node_name': device_node_name, 'node_namespace': device_node_namespace}
             [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, device_node_name)
             self.DEVICE_DICT[path]['node_subprocess'] = sub_process

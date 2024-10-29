@@ -257,7 +257,7 @@ class ZedCamNode(object):
         self.zed_dynamic_reconfig_client = None
         while success == False and timer < timeout and not nepi_ros.is_shutdown():
           try:
-            self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=3)
+            self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=15)
             success = True
           except Exception as e:
             nepi_msg.publishMsgInfo(self,str(e))
@@ -417,6 +417,7 @@ class ZedCamNode(object):
         # Now start zed node check process
         self.attempts = 0
         nepi_ros.start_timer_process(nepi_ros.duration(1), self.checkZedNodeCb)
+        rospy.on_shutdown(self.cleanup_actions)
         nepi_ros.spin()
 
     def checkZedNodeCb(self,timer):
@@ -1014,6 +1015,22 @@ class ZedCamNode(object):
 
     def getOdom(self):
         return self.odom_msg
+
+
+    def cleanup_actions(self):
+      nepi_msg.publishMsgInfo(self,"Shutting down: Executing script cleanup actions")
+      try:
+        zed_type = self.zed_type
+        zed_node_namespace = os.path.join(self.base_namespace,zed_type,'zed_node')
+        nepi_ros.kill_node_namespace(zed_node_namespace)
+      except Exception as e:
+        nepi_msg.publishMsgWarn(self,"Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
+      try:
+        zed_type = self.zed_type
+        zed_node_namespace = os.path.join(self.base_namespace,zed_type,zed_type + '_state_publisher')
+        nepi_ros.kill_node_namespace(zed_node_namespace)
+      except Exception as e:
+        nepi_msg.publishMsgWarn(self,"Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
         
 if __name__ == '__main__':
     node = ZedCamNode()
