@@ -45,14 +45,6 @@ from nepi_ros_interfaces.msg import AxisControls
 
 PKG_NAME = 'RBX_ARDUPILOT' # Use in display menus
 FILE_TYPE = 'NODE'
-NODE_DICT = dict(
-description = 'Driver package for ardupilot autopilot systems',
-class_name = 'ArdupilotNode', # Should Match Class Name,
-group ='RBX',
-group_id = 'ARDUPILOT' ,
-driver_pkg_name = 'None', # 'Required Driver PKG_NAME or 'None'
-discovery_pkg_name = 'RBX_ARDUPILOT' # 'Required Discovery PKG_NAME or 'None'
-)
 
 
 

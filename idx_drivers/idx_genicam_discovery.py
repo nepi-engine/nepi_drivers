@@ -24,24 +24,6 @@ from harvesters.core import Harvester
 
 PKG_NAME = 'IDX_GENICAM' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
-DISCOVERY_DICT = dict(
-  class_name = 'GenicamCamDiscovery',
-  process = 'LAUNCH', # 'LAUNCH', 'RUN', or 'CALL'
-  method = 'AUTO',  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
-  include_ids = [],  # List of string identifiers for discovery process
-  exclude_ids = [], # List of string identifiers for discovery process
-  interfaces = ['USB','IP'], # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
-  option_1_dict = dict(
-    name = 'None',
-    options = [], # List of string options. Selected option passed to driver
-    default_val = 'None'
-  ),
-  option_2_dict = dict(
-    name = 'None',
-    options = [], # List of string options. Selected option passed to driver
-    default_val = 'None'
-  )
-)
 
 TEST_NEX_DICT = {
 'group': 'IDX',

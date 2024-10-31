@@ -11,14 +11,7 @@
 
 PKG_NAME = 'PTX_IQR' # Use in display menus
 FILE_TYPE = 'NODE'
-NODE_DICT = dict(
-description = 'Driver package for IQR USB pan tilt devices',
-class_name = 'IqrPanTiltNode', # Should Match Class Name,
-group ='PTX',
-group_id = 'IQR' ,
-driver_pkg_name = 'None', # 'Required Driver PKG_NAME or 'None'
-discovery_pkg_name = 'PTX_IQR' # 'Required Discovery PKG_NAME or 'None'
-)
+
 
 TEST_DRV_DICT = {
 'group': 'PTX',

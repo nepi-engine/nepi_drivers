@@ -16,9 +16,7 @@ from idx_onvif_generic_driver import GenericONVIF_NVT
 
 PKG_NAME = 'IDX_ONVIF_EconRoute' # Use in display menus
 FILE_TYPE = 'DRIVER'
-DRIVER_DICT = dict(
-class_name = 'EConRouteCam_NVT'
-)
+
 
 class EConRouteCam_NVT(GenericONVIF_NVT):
     SOCKET_SERVER_PORT = 8080

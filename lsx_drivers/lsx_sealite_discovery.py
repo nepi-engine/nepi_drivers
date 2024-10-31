@@ -24,24 +24,6 @@ from nepi_edge_sdk_base import nepi_msg
 
 PKG_NAME = 'LSX_SEALITE' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
-DISCOVERY_DICT = dict(
-  class_name = 'SealiteDiscovery',
-  process = 'CALL', # 'LAUNCH', 'RUN', or 'CALL'
-  method = 'AUTO',  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
-  include_ids = [],  # List of string identifiers for discovery process
-  exclude_ids = ['ttyACM'], # List of string identifiers for discovery process
-  interfaces = ['USBSERIAL'], # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
-  option_1_dict = dict(
-    name = 'BaudRate',
-    options = ['All','9600','19200','57600'], # List of string options. Selected option passed to driver
-    default_val = '57600'
-  ),
-  option_2_dict = dict(
-    name = 'Address Search Range',
-    options = ['1','10','100','255'], # List of string options. Selected option passed to driver
-    default_val = '10'
-  )
-)
 
 
 TEST_NEX_DICT = {

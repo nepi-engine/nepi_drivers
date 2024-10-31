@@ -1,0 +1,35 @@
+description: Driver package for IQR USB pan tilt devices
+group: PTX
+group_id: IQR
+NODE_DICT:
+  description: Driver package for IQR USB pan tilt devices
+  class_name: IqrPanTiltNode
+  group: PTX
+  group_id: IQR
+  driver_pkg_name: None
+  discovery_pkg_name: PTX_IQR
+  pkg_name: PTX_IQR
+  file_name: ptx_iqr_node.py
+  module_name: ptx_iqr_node
+DRIVER_DICT:
+  pkg_name: None
+DISCOVERY_DICT:
+  class_name: IqrPanTiltDiscovery
+  process: CALL
+  method: AUTO
+  include_ids:
+  - iqr_pan_tilt
+  exclude_ids: []
+  interfaces:
+  - USB
+  option_1_dict:
+    name: None
+    options: []
+    default_val: None
+  option_2_dict:
+    name: None
+    options: []
+    default_val: None
+  pkg_name: PTX_IQR
+  file_name: ptx_iqr_discovery.py
+  module_name: ptx_iqr_discovery

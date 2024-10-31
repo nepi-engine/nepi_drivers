@@ -14,14 +14,6 @@ from ptx_onvif_generic_node import OnvifPanTiltNode
 
 PKG_NAME = 'PTX_ONVIF_SIDUS_SS109HT' # Use in display menus
 FILE_TYPE = 'NODE'
-NODE_DICT = dict(
-description = 'Driver package for Sidus SS109 ONVIF pan tilt devices',
-class_name = 'OnvifSidusSsPanTiltNode', # Should Match Class Name,
-group ='PTX',
-group_id = 'ONVIF' ,
-driver_pkg_name = 'PTX_ONVIF_SIDUS_SS109HT', # 'Required Driver PKG_NAME or 'None'
-discovery_pkg_name = 'None' # 'Required Discovery PKG_NAME or 'None'
-)
 
 
 class OnvifSidusSsPanTiltNode(OnvifPanTiltNode):

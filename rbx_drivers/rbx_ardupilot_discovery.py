@@ -30,24 +30,6 @@ from nepi_edge_sdk_base import nepi_drv
 
 PKG_NAME = 'RBX_ARDUPILOT' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
-DISCOVERY_DICT = dict(
-  class_name = 'ArdupilotDiscovery',
-  process = 'CALL', # 'LAUNCH', 'RUN', or 'CALL'
-  method = 'AUTO',  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
-  include_ids = [],  # List of string identifiers for discovery process
-  exclude_ids = ['ttyACM'], # List of string identifiers for discovery process
-  interfaces = ['IP','USBSERIAL','SERIAL'], # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
-  option_1_dict = dict(
-    name = 'Connection',
-    options = ['Serial'], # 'TCP','UDP'], # List of string options. Selected option passed to driver
-    default_val = 'Serial'
-  ),
-  option_2_dict = dict(
-    name = 'Enable Fake GPS',
-    options = ['True','False'], # List of string options. Selected option passed to driver
-    default_val = 'True'
-  )
-)
 
 
 TEST_DRV_DICT = {

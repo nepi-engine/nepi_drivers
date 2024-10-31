@@ -20,24 +20,6 @@ from nepi_edge_sdk_base import nepi_drv
 
 PKG_NAME = 'IDX_V4L2' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
-DISCOVERY_DICT = dict(
-  class_name = 'V4L2CamDiscovery',
-  process = 'LAUNCH', # 'LAUNCH', 'RUN', or 'CALL'
-  method = 'AUTO',  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
-  include_ids = [],  # List of string identifiers for discovery process
-  exclude_ids = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M'], # List of string identifiers for discovery process
-  interfaces = ['USB'], # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
-  option_1_dict = dict(
-    name = 'None',
-    options = [], # List of string options. Selected option passed to driver
-    default_val = 'None'
-  ),
-  option_2_dict = dict(
-    name = 'None',
-    options = [], # List of string options. Selected option passed to driver
-    default_val = 'None'
-  )
-)
 
 
 TEST_DRV_DICT = {

@@ -48,14 +48,6 @@ from rospy.numpy_msg import numpy_msg
 
 PKG_NAME = 'IDX_ZED' # Use in display menus
 FILE_TYPE = 'NODE'
-NODE_DICT = dict(
-description = 'Driver package for StereoLab Zed stereo camera devices',
-class_name = 'ZedCamNode', # Should Match Class Name,
-group ='IDX',
-group_id = 'ZED' ,
-driver_pkg_name = 'None', # 'Required Driver PKG_NAME or 'None'
-discovery_pkg_name = 'IDX_ZED' # 'Required Discovery PKG_NAME or 'None'
-)
 
 TEST_DRV_DICT = {
 'group': 'IDX',
@@ -667,7 +659,7 @@ class ZedCamNode(object):
             ros_timestamp = img_msg.header.stamp
             if self.current_controls.get("controls_enable"):
               cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
-              cv2_img = nepi_drv.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+              cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
               #img_msg = nepi_img.cv2img_to_rosimg(cv2_img, encoding = encoding)
             self.color_img_last_stamp = ros_timestamp
           else:
@@ -719,7 +711,7 @@ class ZedCamNode(object):
             ros_timestamp = img_msg.header.stamp
             if self.current_controls.get("controls_enable"):
               cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
-              cv2_img = nepi_drv.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+              cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
               #img_msg = nepi_img.cv2img_to_rosimg(cv2_img, encoding = encoding)
             self.bw_img_last_stamp = ros_timestamp
           else:

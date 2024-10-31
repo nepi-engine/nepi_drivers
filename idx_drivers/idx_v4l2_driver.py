@@ -15,9 +15,6 @@ import threading, time
 
 PKG_NAME = 'IDX_V4L2' # Use in display menus
 FILE_TYPE = 'DRIVER'
-DRIVER_DICT = dict(
-class_name = 'V4l2CamDriver'
-)
 
 
 

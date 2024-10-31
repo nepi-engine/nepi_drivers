@@ -1,0 +1,40 @@
+description: Driver package for ardupilot autopilot systems
+group: RBX
+group_id: ARDUPILOT
+NODE_DICT:
+  description: Driver package for ardupilot autopilot systems
+  class_name: ArdupilotNode
+  group: RBX
+  group_id: ARDUPILOT
+  driver_pkg_name: None
+  discovery_pkg_name: RBX_ARDUPILOT
+  pkg_name: RBX_ARDUPILOT
+  file_name: rbx_ardupilot_node.py
+  module_name: rbx_ardupilot_node
+DRIVER_DICT:
+  pkg_name: None
+DISCOVERY_DICT:
+  class_name: ArdupilotDiscovery
+  process: CALL
+  method: AUTO
+  include_ids: []
+  exclude_ids:
+  - ttyACM
+  interfaces:
+  - IP
+  - USBSERIAL
+  - SERIAL
+  option_1_dict:
+    name: Connection
+    options:
+    - Serial
+    default_val: Serial
+  option_2_dict:
+    name: Enable Fake GPS
+    options:
+    - 'True'
+    - 'False'
+    default_val: 'True'
+  pkg_name: RBX_ARDUPILOT
+  file_name: rbx_ardupilot_discovery.py
+  module_name: rbx_ardupilot_discovery

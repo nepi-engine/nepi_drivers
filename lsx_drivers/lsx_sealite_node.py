@@ -31,14 +31,6 @@ from nepi_edge_sdk_base import nepi_settings
 
 PKG_NAME = 'LSX_SEALITE' # Use in display menus
 FILE_TYPE = 'NODE'
-NODE_DICT = dict(
-description = 'Driver package for sealite light devices',
-class_name = 'SealiteNode', # Should Match Class Name,
-group ='LSX',
-group_id = 'SEALITE' ,
-driver_pkg_name = 'None', # 'Required Driver PKG_NAME or 'None'
-discovery_pkg_name = 'LSX_SEALITE' # 'Required Discovery PKG_NAME or 'None'
-)
 
 
 

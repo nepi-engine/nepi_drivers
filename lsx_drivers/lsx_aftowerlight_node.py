@@ -32,14 +32,6 @@ from nepi_edge_sdk_base import nepi_settings
 
 PKG_NAME = 'LSX_AFTOWER' # Use in display menus
 FILE_TYPE = 'NODE'
-NODE_DICT = dict(
-description = 'Driver package for adafruit usb tower light',
-class_name = 'AfTowerLightNode', # Should Match Class Name,
-group ='LSX',
-group_id = 'AFTOWER' ,
-driver_pkg_name = 'None', # 'Required Driver PKG_NAME or 'None'
-discovery_pkg_name = 'LSX_AFTOWER' # 'Required Discovery PKG_NAME or 'None'
-)
 
 
 TEST_NEX_DICT = {

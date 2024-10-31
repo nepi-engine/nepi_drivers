@@ -20,9 +20,7 @@ from nepi_edge_sdk_base import nepi_msg
 
 PKG_NAME = 'IDX_ONVIF_GENERIC' # Use in display menus
 FILE_TYPE = 'DRIVER'
-DRIVER_DICT = dict(
-class_name = 'GenericONVIF_NVT'
-)
+
 
 CONTROL_NAME_OVERRIDES = dict(IrCutFilterModes = "IrCutFilter",
                               WhiteBalance_YrGain = "WhiteBalance_CrGain",

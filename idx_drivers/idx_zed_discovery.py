@@ -20,24 +20,7 @@ from nepi_edge_sdk_base import nepi_drv
 
 PKG_NAME = 'IDX_ZED' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
-DISCOVERY_DICT = dict(
-  class_name = 'ZedCamDiscovery',
-  process = 'LAUNCH', # 'LAUNCH', 'RUN', or 'CALL'
-  method = 'AUTO',  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
-  include_ids = ['ZED 2','ZED 2i','ZED-M'],  # List of string identifiers for discovery process
-  exclude_ids = [], # List of string identifiers for discovery process
-  interfaces = ['USB'], # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
-  option_1_dict = dict(
-    name = 'Resolution (Req Reboot)',
-    options = ['HD2K','HD1080','HD720','VGA'], # List of string options. Selected option passed to driver
-    default_val = 'HD720'
-  ),
-  option_2_dict = dict(
-    name = 'None',
-    options = [], # List of string options. Selected option passed to driver
-    default_val = 'None'
-  )
-)
+
 
 TEST_NEX_DICT = {
 'group': 'IDX',

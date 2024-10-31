@@ -16,9 +16,7 @@ from onvif import ONVIFCamera # python-onvif
 
 PKG_NAME = 'PTX_ONVIF_GENERIC' # Use in display menus
 FILE_TYPE = 'DRIVER'
-DRIVER_DICT = dict(
-class_name = 'GenericONVIF_PTZ'
-)
+
 
 class GenericONVIF_PTZ(object):
     WSDL_FOLDER = "/opt/nepi/ros/etc/onvif/wsdl/"

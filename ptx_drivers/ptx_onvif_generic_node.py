@@ -18,14 +18,7 @@ from nepi_edge_sdk_base.device_if_ptx import ROSPTXActuatorIF
 
 PKG_NAME = 'PTX_ONVIF_GENERIC' # Use in display menus
 FILE_TYPE = 'NODE'
-NODE_DICT = dict(
-description = 'Driver package for generic ONVIF pan tilt devices',
-class_name = 'OnvifPanTiltNode', # Should Match Class Name,
-group ='PTX',
-group_id = 'ONVIF' ,
-driver_pkg_name = 'PTX_ONVIF_GENERIC', # 'Required Driver PKG_NAME or 'None'
-discovery_pkg_name = 'None' # 'Required Discovery PKG_NAME or 'None'
-)
+
 
 
 class OnvifPanTiltNode:

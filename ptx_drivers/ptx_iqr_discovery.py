@@ -16,24 +16,6 @@ from nepi_edge_sdk_base import nepi_msg
 
 PKG_NAME = 'PTX_IQR' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
-DISCOVERY_DICT = dict(
-  class_name = 'IqrPanTiltDiscovery',
-  process = 'CALL', # 'LAUNCH', 'RUN', or 'CALL'
-  method = 'AUTO',  # 'AUTO', 'MANUAL', or 'OTHER' if managed by seperate application
-  include_ids =  ['iqr_pan_tilt'],  # List of string identifiers for discovery process
-  exclude_ids = [], # List of string identifiers for discovery process
-  interfaces = ['USB'], # 'USB','IP','SERIALUSB','SERIAL','CANBUS'
-  option_1_dict = dict(
-    name = 'None',
-    options = [], # List of string options. Selected option passed to driver
-    default_val = 'None'
-  ),
-  option_2_dict = dict(
-    name = 'None',
-    options = [], # List of string options. Selected option passed to driver
-    default_val = 'None'
-  )
-)
 
 TEST_DRV_DICT = {
 'group': 'PTX',

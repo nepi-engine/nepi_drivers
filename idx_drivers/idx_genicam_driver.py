@@ -26,9 +26,6 @@ from genicam.genapi import EAccessMode
 
 PKG_NAME = 'IDX_GENICAM' # Use in display menus
 FILE_TYPE = 'DRIVER'
-DRIVER_DICT = dict(
-class_name = 'GenicamCamDriver'
-)
 
 
 TEST_NEX_DICT = {

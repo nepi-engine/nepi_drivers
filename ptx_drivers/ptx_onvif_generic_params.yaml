@@ -1,0 +1,20 @@
+description: Driver package for generic ONVIF pan tilt devices
+group: PTX
+group_id: ONVIF
+NODE_DICT:
+  description: Driver package for generic ONVIF pan tilt devices
+  class_name: OnvifPanTiltNode
+  group: PTX
+  group_id: ONVIF
+  driver_pkg_name: PTX_ONVIF_GENERIC
+  discovery_pkg_name: None
+  pkg_name: PTX_ONVIF_GENERIC
+  file_name: ptx_onvif_generic_node.py
+  module_name: ptx_onvif_generic_node
+DRIVER_DICT:
+  class_name: GenericONVIF_PTZ
+  pkg_name: PTX_ONVIF_GENERIC
+  file_name: ptx_onvif_generic_driver.py
+  module_name: ptx_onvif_generic_driver
+DISCOVERY_DICT:
+  pkg_name: None

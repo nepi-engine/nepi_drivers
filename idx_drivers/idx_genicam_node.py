@@ -22,14 +22,6 @@ from nepi_edge_sdk_base import nepi_drv
 
 PKG_NAME = 'IDX_GENICAM' # Use in display menus
 FILE_TYPE = 'NODE'
-NODE_DICT = dict(
-description = 'Driver package for generic GenICam camera devices',
-class_name = 'GenicamCamNode', # Should Match Class Name,
-group ='IDX',
-group_id = 'GENICAM' ,
-driver_pkg_name = 'IDX_GENICAM', # 'Required Driver PKG_NAME or 'None'
-discovery_pkg_name = 'IDX_GENICAM' # 'Required Discovery PKG_NAME or 'None'
-)
 
 TEST_DRV_DICT = {
 'group': 'IDX',
@@ -511,7 +503,7 @@ class GenicamCamNode:
 
         # Apply controls
         if self.current_controls.get("controls_enable") and cv2_img is not None:
-          cv2_img = nepi_drv.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+          cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
 
         # Make a copy for the bw thread to use rather than grabbing a new cv2_img
         if self.bw_image_acquisition_running:
@@ -559,7 +551,7 @@ class GenicamCamNode:
                 ros_timestamp = nepi_ros.time_now()
             # Apply controls
             if self.current_controls.get("controls_enable") and cv2_img is not None:
-                cv2_img = nepi_drv.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+                cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
         else:
             #nepi_msg.publishMsgWarn(self,"Debugging: getBWImg reusing")
             cv2_img = self.cached_2d_color_frame.copy()
