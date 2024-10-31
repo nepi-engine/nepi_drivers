@@ -16,6 +16,7 @@ import ros_numpy
 import threading
 import cv2
 import copy
+import yaml
 
 import rospy
 
@@ -76,8 +77,8 @@ TEST_DRV_DICT = {
     'class_name': 'ZEDCamDiscovery',
     'interfaces': ['USB'],
     'options_1_dict': {
-        'default_val': 'None',
-        'set_val': 'None'
+        'default_val': 'HD720',
+        'set_val': 'HD720'
     },
     'options_2_dict': {
         'default_val': 'None',
@@ -87,7 +88,7 @@ TEST_DRV_DICT = {
     'include_ids': ['ZED 2','ZED 2i','ZED-M'],
     'exclude_ids': ['msm_vidc_vdec']
 },
-'DEVICE_DICT': {'zed_type': 'zed2'},
+'DEVICE_DICT': {'zed_type': 'zed2','res_val': 3},
 'path': '/opt/nepi/ros/lib/nepi_drivers',
 'order': 1,
 'active': True,
@@ -101,6 +102,7 @@ class ZedCamNode(object):
     CAL_SRC_PATH = "/usr/local/zed/settings"
     USER_CFG_PATH = "/mnt/nepi_storage/user_cfg"
     CAL_BACKUP_PATH = USER_CFG_PATH + "/zed_cals"
+    ZED_PARAMS_PATH = '/opt/nepi/ros/share/zed_wrapper/params/'
 
     CAP_SETTINGS = dict(
       pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","100.0"]},
@@ -195,7 +197,7 @@ class ZedCamNode(object):
     img_renderer = None
     img_renderer_mtl = None
     
-
+    
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"         
     drv_dict = dict()                          
@@ -219,12 +221,10 @@ class ZedCamNode(object):
             nepi_msg.publishMsgInfo(self,"Restored zed cal files: " + strList)
         else:
           nepi_msg.publishMsgInfo(self,"Failed to restore zed cal files")
-        # This parameter should be automatically set by idx_sensor_mgr
-        self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
-
 
         # Connect to Zed node
         self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
+        self.res_val = self.drv_dict['DEVICE_DICT']['res_val']
         ZED_BASE_NAMESPACE = nepi_ros.get_base_namespace() + self.zed_type + "/zed_node/"
 
 
@@ -242,6 +242,24 @@ class ZedCamNode(object):
           rospy.signal_shutdown("Zed ROS Wrapper still running, Shutting Down")
         else:
         '''
+
+        # Set resolution in zed wrapper param file
+        zed_params_path = os.path.join(self.ZED_PARAMS_PATH,self.zed_type + ".yaml")
+        if os.path.exists(zed_params_path):
+          try:
+            with open(zed_params_path) as f:
+              cfg = yaml.load(f, Loader=yaml.FullLoader)
+            #nepi_msg.publishMsgWarn(self,"Updating zed param config with resolution " + str(self.res_val))
+            cfg['general']['resolution'] = self.res_val
+            #nepi_msg.publishMsgWarn(self,"Updating zed param file: " + zed_params_path + " with cfg " + str(cfg))
+            with open(zed_params_path, "w") as f:
+                cfg = yaml.dump(
+                    cfg, stream=f, default_flow_style=False, sort_keys=False
+                )
+          except:
+            nepi_msg.publishMsgWarn(self,"Failed to update zed param file: " + zed_params_path + " " + str(e))
+        else:
+          nepi_msg.publishMsgWarn(self,"Failed to find zed param file: " + zed_params_path)
 
         # Run the correct zed_ros_wrapper launch file
         zed_launchfile = self.zed_type + '.launch'
