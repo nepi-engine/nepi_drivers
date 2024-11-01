@@ -56,7 +56,7 @@ class OnvifCamNode:
        sw_version = "")
 
 
-
+    idx_if = None
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                                                    
@@ -497,7 +497,7 @@ class OnvifCamNode:
             ros_timestamp = nepi_ros.time_now()
 
         # Apply controls
-        if self.current_controls.get("controls_enable") and cv2_img is not None:
+        if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
           cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)        
         
         # Make a copy for the bw thread to use rather than grabbing a new cv2_img
@@ -544,7 +544,7 @@ class OnvifCamNode:
             else:
                 ros_timestamp = nepi_ros.time_now()
             # Apply controls
-            if self.current_controls.get("controls_enable") and cv2_img is not None:
+            if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
                 cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
         else:
             cv2_img = self.cached_2d_color_frame.copy()

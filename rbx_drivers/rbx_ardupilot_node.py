@@ -163,9 +163,9 @@ class ArdupilotNode:
     ## Define RBX NavPose Publishers
     NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
     ROBOT_NAMESPACE = NEPI_BASE_NAMESPACE + self.node_name + "/"
-    NEPI_RBX_NAVPOSE_GPS_TOPIC = ROBOT_NAMESPACE + "gps_fix"
-    NEPI_RBX_NAVPOSE_ODOM_TOPIC = ROBOT_NAMESPACE + "odom"
-    NEPI_RBX_NAVPOSE_HEADING_TOPIC = ROBOT_NAMESPACE + "heading"
+    NEPI_RBX_NAVPOSE_GPS_TOPIC = ROBOT_NAMESPACE + "rbx/gps_fix"
+    NEPI_RBX_NAVPOSE_ODOM_TOPIC = ROBOT_NAMESPACE + "rbx/odom"
+    NEPI_RBX_NAVPOSE_HEADING_TOPIC = ROBOT_NAMESPACE + "rbx/heading"
 
     self.rbx_navpose_gps_pub = rospy.Publisher(NEPI_RBX_NAVPOSE_GPS_TOPIC, NavSatFix, queue_size=1)
     self.rbx_navpose_odom_pub = rospy.Publisher(NEPI_RBX_NAVPOSE_ODOM_TOPIC, Odometry, queue_size=1)

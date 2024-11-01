@@ -61,6 +61,7 @@ TEST_DRV_DICT = {
 'msg': ""
 }
 
+
 class GenicamCamNode:
     FACTORY_SETTINGS_OVERRIDES = dict( BalanceWhiteAuto = 'Continuous',
                                       ColorCorrectionMode = 'Auto',
@@ -91,6 +92,7 @@ class GenicamCamNode:
        hw_version = "",
        sw_version = "")
 
+    idx_if = None
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                             
@@ -502,7 +504,7 @@ class GenicamCamNode:
             ros_timestamp = nepi_ros.time_now()
 
         # Apply controls
-        if self.current_controls.get("controls_enable") and cv2_img is not None:
+        if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
           cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
 
         # Make a copy for the bw thread to use rather than grabbing a new cv2_img
@@ -550,7 +552,7 @@ class GenicamCamNode:
             else:
                 ros_timestamp = nepi_ros.time_now()
             # Apply controls
-            if self.current_controls.get("controls_enable") and cv2_img is not None:
+            if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
                 cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
         else:
             #nepi_msg.publishMsgWarn(self,"Debugging: getBWImg reusing")

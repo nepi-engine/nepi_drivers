@@ -189,7 +189,7 @@ class ZedCamNode(object):
     img_renderer = None
     img_renderer_mtl = None
     
-    
+    idx_if = None
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"         
     drv_dict = dict()                          
@@ -657,7 +657,7 @@ class ZedCamNode(object):
             status = True
             msg = ""
             ros_timestamp = img_msg.header.stamp
-            if self.current_controls.get("controls_enable"):
+            if self.current_controls.get("controls_enable") and self.idx_if is not None:
               cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
               cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
               #img_msg = nepi_img.cv2img_to_rosimg(cv2_img, encoding = encoding)
@@ -709,7 +709,7 @@ class ZedCamNode(object):
             status = True
             msg = ""
             ros_timestamp = img_msg.header.stamp
-            if self.current_controls.get("controls_enable"):
+            if self.current_controls.get("controls_enable") and self.idx_if is not None:
               cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
               cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
               #img_msg = nepi_img.cv2img_to_rosimg(cv2_img, encoding = encoding)
