@@ -109,7 +109,7 @@ class AfTowerLightDiscovery:
     for path_str in path_purge_list:
       del  self.active_devices_dict[path_str]
       if path_str in self.active_paths_list:
-        self.active_paths_list.remove(paht_str)
+        self.active_paths_list.remove(path_str)
 
     ### Checking for devices on available paths
     for path_str in self.path_list:

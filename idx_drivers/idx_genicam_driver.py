@@ -340,16 +340,22 @@ class GenicamCamDriver(object):
         return True, available_framerates
 
     def setFramerate(self, max_fps):
+        ret = [False,-999]
         if not self.hasAdjustableFramerate():
             return False, "Framerate is not adjustable"
         fps_too_low = max_fps < self.camera_settings["AcquisitionFrameRate"]["min"]
         fps_too_high = max_fps > self.camera_settings["AcquisitionFrameRate"]["max"]
         if fps_too_low or fps_too_high:
             return False, "Invalid framerate requested"
-        ret = self._setNodeVal("AcquisitionFrameRate", max_fps)
+        try:
+            ret = self._setNodeVal("AcquisitionFrameRate", max_fps)
+        except:
+            pass
+
         return ret
 
     def getFramerate(self):
+
         if "AcquisitionFrameRate" not in self.camera_settings:
             return False, "Camera does not provide framerate information"
         ret = self._getNodeVal("AcquisitionFrameRate")

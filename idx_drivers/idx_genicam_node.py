@@ -272,33 +272,35 @@ class GenicamCamNode:
         # Add Resolution Cap Settting
         try:
             [success,available_resolutions] = self.driver.getCurrentFormatAvailableResolutions()
-            cap_setting = dict()
-            cap_setting['type'] = 'Discrete'
-            options = []
-            for res_dict in available_resolutions:
-                width = str(res_dict['width'])
-                height = str(res_dict['height'])
-                cap_setting_option = (width + ":" + height)
-                options.append(cap_setting_option)
-            cap_setting['options'] = options
-            cap_setting['name'] = 'resolution'
-            cap_settings['resolution'] = cap_setting
+            if success == True:
+                cap_setting = dict()
+                cap_setting['type'] = 'Discrete'
+                options = []
+                for res_dict in available_resolutions:
+                    width = str(res_dict['width'])
+                    height = str(res_dict['height'])
+                    cap_setting_option = (width + ":" + height)
+                    options.append(cap_setting_option)
+                cap_setting['options'] = options
+                cap_setting['name'] = 'resolution'
+                cap_settings['resolution'] = cap_setting
         except Exception as e:
             nepi_msg.publishMsgInfo(self," " + "Driver returned invalid resolution options: " + str(available_resolutions))
         # Add Framerate Cap cap_setting
         try:
             [success,framerates] = self.driver.getCurrentResolutionAvailableFramerates()
-            nepi_msg.publishMsgInfo(self," " + "Driver returned framerate options: " + str(framerates))
-            cap_setting = dict()
-            cap_setting['type'] = 'Descrete'
-            options = []
-            if len(framerates) > 0:
-                for rate in framerates:
-                    cap_setting_option = (str(round(rate,2)))
-                    options.append(cap_setting_option)
-                cap_setting['options'] = options
-                cap_setting['name'] = 'framerate'
-                cap_settings['framerate'] = cap_setting
+            if success == True:
+                nepi_msg.publishMsgInfo(self," " + "Driver returned framerate options: " + str(framerates))
+                cap_setting = dict()
+                cap_setting['type'] = 'Descrete'
+                options = []
+                if len(framerates) > 0:
+                    for rate in framerates:
+                        cap_setting_option = (str(round(rate,2)))
+                        options.append(cap_setting_option)
+                    cap_setting['options'] = options
+                    cap_setting['name'] = 'framerate'
+                    cap_settings['framerate'] = cap_setting
         except Exception as e:
             nepi_msg.publishMsgInfo(self," " + "Driver returned invalid framerate options: " + str(framerates))
         return cap_settings
@@ -333,21 +335,23 @@ class GenicamCamNode:
             settings[setting_name] = setting
         # Add Resolution Cap Settting
         [success,res_dict] = self.driver.getCurrentResolution()
-        setting = dict()
-        setting['type'] = 'Discrete'
-        width = str(res_dict['width'])
-        height = str(res_dict['height'])
-        setting_value = (width + ":" + height)
-        setting['value'] = setting_value
-        setting['name'] = 'Resolution'
-        settings['Resolution'] = setting
+        if success == True:
+            setting = dict()
+            setting['type'] = 'Discrete'
+            width = str(res_dict['width'])
+            height = str(res_dict['height'])
+            setting_value = (width + ":" + height)
+            setting['value'] = setting_value
+            setting['name'] = 'Resolution'
+            settings['Resolution'] = setting
         # Add Framerate Cap Setting
         [success,framerate] = self.driver.getFramerate()
-        setting['type'] = 'Float'
-        setting_value = (str(round(framerate,2)))
-        setting['value'] = setting_value
-        setting['name'] = 'Framerate'
-        settings['Framerate'] = setting
+        if success == True:
+            setting['type'] = 'Float'
+            setting_value = (str(round(framerate,2)))
+            setting['value'] = setting_value
+            setting['name'] = 'Framerate'
+            settings['Framerate'] = setting
         return settings
 
 
