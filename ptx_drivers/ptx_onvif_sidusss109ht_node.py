@@ -18,8 +18,7 @@ FILE_TYPE = 'NODE'
 
 class OnvifSidusSsPanTiltNode(OnvifPanTiltNode):
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"
-  def __init__(self):
-    pass
+  pass
 
 if __name__ == '__main__':
 	node = OnvifSidusSsPanTiltNode()

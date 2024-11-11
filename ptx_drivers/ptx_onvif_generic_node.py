@@ -213,6 +213,7 @@ class OnvifPanTiltNode:
             default_settings = dict()
             if hasattr(self.driver, 'getPositionLimitsInDegrees'):
                 driver_specified_limits = self.driver.getPositionLimitsInDegrees()
+                default_settings['max_yaw_hardstop_deg'] = driver_specified_limits['max_yaw_hardstop_deg']
                 default_settings['min_yaw_hardstop_deg'] = driver_specified_limits['min_yaw_hardstop_deg']
                 default_settings['max_pitch_hardstop_deg'] = driver_specified_limits['max_pitch_hardstop_deg']
                 default_settings['min_pitch_hardstop_deg'] = driver_specified_limits['min_pitch_hardstop_deg']
@@ -325,12 +326,14 @@ class OnvifPanTiltNode:
         self.driver.stopMotion()
 
     def moveYaw(self, direction, duration):
-        driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.driver.PT_DIRECTION_NEGATIVE
-        self.driver.jog(pan_direction = driver_direction, tilt_direction = self.driver.PT_DIRECTION_NONE, speed_ratio = self.speed_ratio, time_s = duration)
+        if self.ptx_if is None:
+            driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.driver.PT_DIRECTION_NEGATIVE
+            self.driver.jog(pan_direction = driver_direction, tilt_direction = self.driver.PT_DIRECTION_NONE, speed_ratio = self.speed_ratio, time_s = duration)
 
     def movePitch(self, direction, duration):
-        driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.driver.PT_DIRECTION_NEGATIVE
-        self.driver.jog(pan_direction = self.driver.PT_DIRECTION_NONE, tilt_direction = driver_direction, speed_ratio = self.speed_ratio, time_s = duration)
+        if self.ptx_if is None:
+            driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.driver.PT_DIRECTION_NEGATIVE
+            self.driver.jog(pan_direction = self.driver.PT_DIRECTION_NONE, tilt_direction = driver_direction, speed_ratio = self.speed_ratio, time_s = duration)
 
     def setSpeed(self, speed_ratio):
         # TODO: Limits checking and driver unit conversion?
@@ -342,11 +345,21 @@ class OnvifPanTiltNode:
             
     def getCurrentPosition(self):
         pan_ratio_onvif, tilt_ratio_onvif = self.driver.getCurrentPosition()
+        #print("Got pos_ratio_onvif from driver: " + str([pan_ratio_onvif, tilt_ratio_onvif]))
         # Recenter the -1.0,1.0 ratio from Onvif to the 0.0,1.0 used throughout the rest of NEPI
         pan_ratio = (0.5 * pan_ratio_onvif) + 0.5
         tilt_ratio = (0.5 * tilt_ratio_onvif) + 0.5
-        pan_deg = self.ptx_if.yawRatioToDeg(pan_ratio)
-        tilt_deg = self.ptx_if.pitchRatioToDeg(tilt_ratio)
+
+        #print("Got pos_ratio adj: " + str([pan_ratio, tilt_ratio]))
+
+        if self.ptx_if is None:
+            pan_deg = 0
+            tilt_deg = 0
+        else:
+            pan_deg = self.ptx_if.yawRatioToDeg(pan_ratio)
+            tilt_deg = self.ptx_if.pitchRatioToDeg(tilt_ratio)
+
+        #print("Got pos degs : " + str([pan_deg, tilt_deg]))
         return pan_deg, tilt_deg
 
     def gotoPosition(self, yaw_deg, pitch_deg):
@@ -360,7 +373,7 @@ class OnvifPanTiltNode:
     def goHome(self):
         if self.driver.canHome() is True:
             self.driver.goHome(self.speed_ratio)
-        elif self.driver.hasAbsolutePositioning() is True:
+        elif self.driver.hasAbsolutePositioning() is True and self.ptx_if is not None:
             home_yaw_ratio = self.ptx_if.yawDegToRatio(self.home_yaw_deg)
             home_pitch_ratio = self.ptx_if.pitchDegToRatio(self.home_pitch_deg)
             home_yaw_ratio_onvif = 2 * (home_yaw_ratio - 0.5)
@@ -377,8 +390,9 @@ class OnvifPanTiltNode:
             curr_yaw_ratio_onvif, curr_pitch_ratio_onvif = self.driver.getCurrentPosition()
             curr_yaw_ratio = (curr_yaw_ratio_onvif + 1.0) * 0.5
             curr_pitch_ratio = (curr_pitch_ratio_onvif + 1.0) * 0.5
-            self.home_yaw_deg = self.ptx_if.yawRatioToDeg(curr_yaw_ratio)
-            self.home_pitch_deg = self.ptx_if.pitchRatioToDeg(curr_pitch_ratio) 
+            if self.ptx_if is not None:
+                self.home_yaw_deg = self.ptx_if.yawRatioToDeg(curr_yaw_ratio)
+                self.home_pitch_deg = self.ptx_if.pitchRatioToDeg(curr_pitch_ratio) 
 
         if self.driver.homePositionAdjustable is True:
             self.driver.setHomeHere()
@@ -386,7 +400,7 @@ class OnvifPanTiltNode:
     def gotoWaypoint(self, waypoint_index):
         if self.driver.hasWaypoints() is True:
            self.driver.gotoPreset(waypoint_index, self.speed_ratio)
-        elif self.driver.hasAbsolutePositioning() is True:
+        elif self.driver.hasAbsolutePositioning() is True and self.ptx_if is not None:
             if waypoint_index not in self.waypoints:
                 return
             
@@ -404,7 +418,7 @@ class OnvifPanTiltNode:
         self.waypoints[waypoint_index] = {'yaw_deg': yaw_deg, 'pitch_deg': pitch_deg}
         
     def setWaypointHere(self, waypoint_index):
-        if self.driver.reportsPosition():
+        if self.driver.reportsPosition() and self.ptx_if is not None:
             yaw_ratio_onvif, pitch_ratio_onvif = self.driver.getCurrentPosition()
             yaw_ratio = (yaw_ratio_onvif + 1.0) * 0.5
             pitch_ratio = (pitch_ratio_onvif + 1.0) * 0.5
@@ -419,10 +433,12 @@ class OnvifPanTiltNode:
 
     def setCurrentSettingsAsDefault(self):
         # Don't need to worry about any of our params in this class, just child interfaces' params
-        self.ptx_if.setCurrentSettingsToParamServer()
+        if self.ptx_if is not None:
+            self.ptx_if.setCurrentSettingsToParamServer()
 
     def updateFromParamServer(self):
-        self.ptx_if.updateFromParamServer()
+        if self.ptx_if is not None:
+            self.ptx_if.updateFromParamServer()
 
 if __name__ == '__main__':
 	node = OnvifPanTiltNode()

@@ -70,10 +70,13 @@ class SidusSS109HT_PTZ(object):
         position_limits_deg = {
             'max_yaw_hardstop_deg' : 180.0,
             'min_yaw_hardstop_deg' : -180.0,
-            'max_pitch_hardstop_deg' : 180.0,
-            'min_pitch_hardstop_deg' : -180.0,
+
             'max_yaw_softstop_deg' : 179.9,
             'min_yaw_softstop_deg' : -179.9,
+
+            'max_pitch_hardstop_deg' : 180.0,
+            'min_pitch_hardstop_deg' : -180.0,
+
             'max_pitch_softstop_deg' : 179.9,
             'min_pitch_softstop_deg' : -179.9
         }
@@ -98,7 +101,7 @@ class SidusSS109HT_PTZ(object):
                current_pan_ratio = float(tokens[1])
                current_tilt_ratio = float(tokens[3])
                break
-
+        #print(f'Debug: sidus_driver Current_Position ({current_pan_ratio},{current_tilt_ratio})')
         return current_pan_ratio, current_tilt_ratio
     
     def parseSoapDeviceInfo(self, soap_device_info):
