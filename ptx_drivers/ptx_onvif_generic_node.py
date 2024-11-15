@@ -210,26 +210,26 @@ class OnvifPanTiltNode:
             
             # Driver can specify position limits via getPositionLimitsInDegrees. Otherwise, we hard-code them 
             # to arbitrary values here, but can be overridden in device config file (see ptx_if.py)
-            default_settings = dict()
+            self.default_settings = dict()
             if hasattr(self.driver, 'getPositionLimitsInDegrees'):
                 driver_specified_limits = self.driver.getPositionLimitsInDegrees()
-                default_settings['max_yaw_hardstop_deg'] = driver_specified_limits['max_yaw_hardstop_deg']
-                default_settings['min_yaw_hardstop_deg'] = driver_specified_limits['min_yaw_hardstop_deg']
-                default_settings['max_pitch_hardstop_deg'] = driver_specified_limits['max_pitch_hardstop_deg']
-                default_settings['min_pitch_hardstop_deg'] = driver_specified_limits['min_pitch_hardstop_deg']
-                default_settings['max_yaw_softstop_deg'] = driver_specified_limits['max_yaw_softstop_deg']
-                default_settings['min_yaw_softstop_deg'] = driver_specified_limits['min_yaw_softstop_deg']
-                default_settings['max_pitch_softstop_deg'] = driver_specified_limits['max_pitch_softstop_deg']
-                default_settings['min_pitch_softstop_deg'] = driver_specified_limits['min_pitch_softstop_deg']
+                self.default_settings['max_yaw_hardstop_deg'] = driver_specified_limits['max_yaw_hardstop_deg']
+                self.default_settings['min_yaw_hardstop_deg'] = driver_specified_limits['min_yaw_hardstop_deg']
+                self.default_settings['max_pitch_hardstop_deg'] = driver_specified_limits['max_pitch_hardstop_deg']
+                self.default_settings['min_pitch_hardstop_deg'] = driver_specified_limits['min_pitch_hardstop_deg']
+                self.default_settings['max_yaw_softstop_deg'] = driver_specified_limits['max_yaw_softstop_deg']
+                self.default_settings['min_yaw_softstop_deg'] = driver_specified_limits['min_yaw_softstop_deg']
+                self.default_settings['max_pitch_softstop_deg'] = driver_specified_limits['max_pitch_softstop_deg']
+                self.default_settings['min_pitch_softstop_deg'] = driver_specified_limits['min_pitch_softstop_deg']
             else:
-                default_settings['max_yaw_hardstop_deg'] = 60.0
-                default_settings['min_yaw_hardstop_deg'] = -60.0
-                default_settings['max_pitch_hardstop_deg'] = 60.0
-                default_settings['min_pitch_hardstop_deg'] = -60.0
-                default_settings['max_yaw_softstop_deg'] = 59.0
-                default_settings['min_yaw_softstop_deg'] = -59.0
-                default_settings['max_pitch_softstop_deg'] = 59.0
-                default_settings['min_pitch_softstop_deg'] = -59.0
+                self.default_settings['max_yaw_hardstop_deg'] = 60.0
+                self.default_settings['min_yaw_hardstop_deg'] = -60.0
+                self.default_settings['max_pitch_hardstop_deg'] = 60.0
+                self.default_settings['min_pitch_hardstop_deg'] = -60.0
+                self.default_settings['max_yaw_softstop_deg'] = 59.0
+                self.default_settings['min_yaw_softstop_deg'] = -59.0
+                self.default_settings['max_pitch_softstop_deg'] = 59.0
+                self.default_settings['min_pitch_softstop_deg'] = -59.0
 
             # Initialize settings
             self.cap_settings = self.getCapSettings()
@@ -247,7 +247,7 @@ class OnvifPanTiltNode:
                                         settingUpdateFunction=self.settingUpdateFunction,
                                         getSettingsFunction=self.getSettings,
                                         factoryControls = self.FACTORY_CONTROLS,
-                                        defaultSettings = default_settings,
+                                        defaultSettings = self.default_settings,
                                         capabilities_dict = ptx_capabilities_dict,
                                         stopMovingCb = ptx_callback_names["StopMoving"],
                                         moveYawCb = ptx_callback_names["MoveYaw"],
@@ -350,6 +350,16 @@ class OnvifPanTiltNode:
         pan_ratio = (0.5 * pan_ratio_onvif) + 0.5
         tilt_ratio = (0.5 * tilt_ratio_onvif) + 0.5
 
+        max_yh = self.default_settings['max_yaw_hardstop_deg']
+        min_yh = self.default_settings['min_yaw_hardstop_deg']        
+        max_ys = self.default_settings['max_yaw_softstop_deg']
+        min_ys = self.default_settings['min_yaw_softstop_deg']
+
+
+        max_ph = self.default_settings['max_pitch_hardstop_deg']
+        min_ph = self.default_settings['min_pitch_hardstop_deg']
+        max_ps = self.default_settings['max_pitch_softstop_deg']
+        min_ps = self.default_settings['min_pitch_softstop_deg']
         #print("Got pos_ratio adj: " + str([pan_ratio, tilt_ratio]))
 
         if self.ptx_if is None:
@@ -361,6 +371,8 @@ class OnvifPanTiltNode:
 
         #print("Got pos degs : " + str([pan_deg, tilt_deg]))
         return pan_deg, tilt_deg
+
+    def yawRatioToDeg()
 
     def gotoPosition(self, yaw_deg, pitch_deg):
         yaw_ratio = self.ptx_if.yawDegToRatio(yaw_deg)
