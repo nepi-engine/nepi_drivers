@@ -42,6 +42,15 @@ PTXInterface::PTXInterface(PTXNode *parent, ros::NodeHandle *parent_pub_nh, ros:
     max_speed_driver_units{default_settings.max_speed_driver_units},
     min_speed_driver_units{default_settings.min_speed_driver_units}
 { 
+    // Set reset values
+    _min_yaw_hardstop_deg = default_settings.min_yaw_hardstop_deg;
+    _max_yaw_hardstop_deg = default_settings.max_yaw_hardstop_deg;
+    _min_pitch_hardstop_deg = default_settings.min_pitch_hardstop_deg;
+    _max_pitch_hardstop_deg = default_settings.max_pitch_hardstop_deg;
+    _speed_ratio = default_settings.speed_ratio;
+    _reverse_yaw_control = default_settings.reverse_yaw_control;
+    _reverse_pitch_control = default_settings.reverse_pitch_control;
+
     // Initialize the joint_state message
     joint_state.name.resize(2);
     joint_state.position.resize(2);
@@ -102,6 +111,9 @@ void PTXInterface::initSubscribers()
 {
     SDKInterface::initSubscribers();
 
+    subscribers.push_back(_parent_priv_nh->subscribe("reset_device", 3, &PTXInterface::resetAppHandler, this));
+
+
     if (has_speed_control == true)
     {
         subscribers.push_back(_parent_priv_nh->subscribe("ptx/set_speed_ratio", 3, &PTXInterface::setSpeedRatioHandler, this));
@@ -112,6 +124,7 @@ void PTXInterface::initSubscribers()
         subscribers.push_back(_parent_priv_nh->subscribe("ptx/jog_to_position", 3, &PTXInterface::jogToPositionHandler, this));
         subscribers.push_back(_parent_priv_nh->subscribe("ptx/jog_to_yaw_ratio", 3, &PTXInterface::jogToYawRatioHandler, this));
         subscribers.push_back(_parent_priv_nh->subscribe("ptx/jog_to_pitch_ratio", 3, &PTXInterface::jogToPitchRatioHandler, this));
+        subscribers.push_back(_parent_priv_nh->subscribe("ptx/set_hard_limits", 3, &PTXInterface::setHardLimitsHandler, this));
         subscribers.push_back(_parent_priv_nh->subscribe("ptx/set_soft_limits", 3, &PTXInterface::setSoftLimitsHandler, this));
     }
 
@@ -166,6 +179,24 @@ bool PTXInterface::positionIsValid(float yaw_deg, float pitch_deg) const
 
     return true;
 }
+
+
+void PTXInterface::resetAppHandler(const std_msgs::Empty::ConstPtr &msg)
+{
+    min_yaw_hardstop_deg = _min_yaw_hardstop_deg;
+    max_yaw_hardstop_deg = _max_yaw_hardstop_deg;
+    min_yaw_softstop_deg = _min_yaw_hardstop_deg;
+    max_yaw_softstop_deg = _max_yaw_hardstop_deg;
+    min_pitch_hardstop_deg = _min_pitch_hardstop_deg;
+    max_pitch_hardstop_deg = _max_pitch_hardstop_deg;
+    min_pitch_softstop_deg = _min_pitch_hardstop_deg;
+    max_pitch_softstop_deg = _max_pitch_hardstop_deg;
+    speed_ratio = _speed_ratio;
+    reverse_yaw_control = _reverse_yaw_control;
+    reverse_pitch_control = _reverse_pitch_control;
+}
+
+
 
 void PTXInterface::publishJointStateAndStatus()
 {
@@ -302,22 +333,53 @@ void PTXInterface::setSoftLimitsHandler(const nepi_ros_interfaces::PanTiltLimits
     const float hard_pitch_max = max_pitch_hardstop_deg;
 
     
-    if ((msg->min_yaw_softstop_deg < hard_yaw_min) ||
-        (msg->max_yaw_softstop_deg > hard_yaw_max) ||
-        (msg->min_pitch_softstop_deg < hard_pitch_min) ||
-        (msg->max_pitch_softstop_deg > hard_pitch_max))
+    if ((msg->min_yaw_deg < hard_yaw_min) ||
+        (msg->max_yaw_deg > hard_yaw_max) ||
+        (msg->min_pitch_deg < hard_pitch_min) ||
+        (msg->max_pitch_deg > hard_pitch_max))
     {
         ROS_ERROR("Soft limits cannot exceed hard limits... ignoring");
         return;
     }
 
     ROS_INFO("Updating soft limits: Yaw = [%0.2f, %0.2f], Pitch = [%0.2f, %0.2f]", 
-             msg->min_yaw_softstop_deg, msg->max_yaw_softstop_deg, msg->min_pitch_softstop_deg, msg->max_pitch_softstop_deg);
+             msg->min_yaw_deg, msg->max_yaw_deg, msg->min_pitch_deg, msg->max_pitch_deg);
     
-    min_yaw_softstop_deg = msg->min_yaw_softstop_deg;
-    max_yaw_softstop_deg = msg->max_yaw_softstop_deg;
-    min_pitch_softstop_deg = msg->min_pitch_softstop_deg;
-    max_pitch_softstop_deg = msg->max_pitch_softstop_deg;
+    min_yaw_softstop_deg = msg->min_yaw_deg;
+    max_yaw_softstop_deg = msg->max_yaw_deg;
+    min_pitch_softstop_deg = msg->min_pitch_deg;
+    max_pitch_softstop_deg = msg->max_pitch_deg;
+
+    // TODO: Move to soft limits if current position not within (or at least report it)?
+    // At present, the next valid motion command (relative or absolute) will move system to inside soft limits
+}
+
+
+void PTXInterface::setHardLimitsHandler(const nepi_ros_interfaces::PanTiltLimits::ConstPtr &msg)
+{
+
+    const float hard_yaw_min = _min_yaw_hardstop_deg;
+    const float hard_yaw_max = _max_yaw_hardstop_deg;
+    const float hard_pitch_min = _min_pitch_hardstop_deg;
+    const float hard_pitch_max = _max_pitch_hardstop_deg;
+
+    
+    if ((msg->min_yaw_deg < hard_yaw_min) ||
+        (msg->max_yaw_deg > hard_yaw_max) ||
+        (msg->min_pitch_deg < hard_pitch_min) ||
+        (msg->max_pitch_deg > hard_pitch_max))
+    {
+        ROS_ERROR("Soft limits cannot exceed hard limits... ignoring");
+        return;
+    }
+
+    ROS_INFO("Updating soft limits: Yaw = [%0.2f, %0.2f], Pitch = [%0.2f, %0.2f]", 
+             msg->min_yaw_deg, msg->max_yaw_deg, msg->min_pitch_deg, msg->max_pitch_deg);
+    
+    min_yaw_hardstop_deg = msg->min_yaw_deg;
+    max_yaw_hardstop_deg = msg->max_yaw_deg;
+    min_pitch_hardstop_deg = msg->min_pitch_deg;
+    max_pitch_hardstop_deg = msg->max_pitch_deg;
 
     // TODO: Move to soft limits if current position not within (or at least report it)?
     // At present, the next valid motion command (relative or absolute) will move system to inside soft limits

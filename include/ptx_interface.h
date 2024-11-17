@@ -102,9 +102,11 @@ public:
         const float speed = speed_ratio; 
         return (uint16_t)(speed * max_speed_driver_units + ((1.0 - speed) * min_speed_driver_units));
     }
+    void resetAppHandler(const std_msgs::Empty::ConstPtr &msg);
     void publishJointStateAndStatus();
     void setSpeedRatioHandler(const std_msgs::Float32::ConstPtr &msg);
     void setHomePositionHandler(const nepi_ros_interfaces::PanTiltPosition::ConstPtr &msg);
+    void setHardLimitsHandler(const nepi_ros_interfaces::PanTiltLimits::ConstPtr &msg);
     void setSoftLimitsHandler(const nepi_ros_interfaces::PanTiltLimits::ConstPtr &msg);
     void goHomeHandler(const std_msgs::Empty::ConstPtr &msg);
     void jogToPositionHandler(const nepi_ros_interfaces::PanTiltPosition::ConstPtr &msg);
@@ -149,6 +151,14 @@ private:
 
     float max_speed_driver_units;
     float min_speed_driver_units;
+
+    float _min_yaw_hardstop_deg;
+    float _max_yaw_hardstop_deg;
+    float _min_pitch_hardstop_deg;
+    float _max_pitch_hardstop_deg;
+    float _speed_ratio;
+    bool _reverse_yaw_control;
+    bool _reverse_pitch_control;
 
     ros::Publisher jointPub;
     ros::Publisher odomPub;
