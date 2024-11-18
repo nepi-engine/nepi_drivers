@@ -373,9 +373,14 @@ void PTXInterface::setHardLimitsHandler(const nepi_ros_interfaces::PanTiltLimits
         return;
     }
 
-    ROS_INFO("Updating soft limits: Yaw = [%0.2f, %0.2f], Pitch = [%0.2f, %0.2f]", 
+    ROS_INFO("Updating hard and soft limits: Yaw = [%0.2f, %0.2f], Pitch = [%0.2f, %0.2f]", 
              msg->min_yaw_deg, msg->max_yaw_deg, msg->min_pitch_deg, msg->max_pitch_deg);
     
+    min_yaw_softstop_deg = msg->min_yaw_deg;
+    max_yaw_softstop_deg = msg->max_yaw_deg;
+    min_pitch_softstop_deg = msg->min_pitch_deg;
+    max_pitch_softstop_deg = msg->max_pitch_deg;
+
     min_yaw_hardstop_deg = msg->min_yaw_deg;
     max_yaw_hardstop_deg = msg->max_yaw_deg;
     min_pitch_hardstop_deg = msg->min_pitch_deg;
