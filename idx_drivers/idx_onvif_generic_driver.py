@@ -361,8 +361,7 @@ class GenericONVIF_NVT(object):
                                 
             self.img_uri_locks[uri_index].release()
 
-
-            time.sleep(0.01)
+            time.sleep(0.001)
     
     def stopImageAcquisition(self, uri_index = 0):
         if uri_index < 0 or uri_index > len(self.rtsp_uris) - 1:
@@ -379,6 +378,7 @@ class GenericONVIF_NVT(object):
         return True, "Success"
     
     def getImage(self, uri_index = 0):
+        start = time.time()
         if uri_index < 0 or uri_index > len(self.rtsp_uris) - 1:
             return None, None, False, "Invalid URI index: " + str(uri_index)
 
@@ -390,10 +390,8 @@ class GenericONVIF_NVT(object):
         # Experimental -- Just decode and return latest grabbed by acquisition thread
         self.img_uri_locks[uri_index].acquire()
         if self.latest_frame_successes[uri_index] is True:
-            start = time.time()
+            
             ret, self.latest_frames[uri_index] = self.rtsp_caps[uri_index].retrieve()
-            stop = time.time()
-            #print('R: ', stop - start)
         else:
             ret = False
             self.latest_frames[uri_index] = None
@@ -406,7 +404,8 @@ class GenericONVIF_NVT(object):
                 self.stopImageAcquisition(uri_index)
                 self.startImageAcquisition(uri_index)
                 return None, None, False, "Failed to read next frame " + str(self.MAX_CONSEC_FRAME_FAIL_COUNT) + "times consec... auto-restarting image acquisition"
-        
+        stop = time.time()
+        #print('R: ', stop - start)
         return self.latest_frames[uri_index], self.latest_frame_timestamps[uri_index], True, "Success"
     
     def getEncoding(self, video_encoder_id=0):
