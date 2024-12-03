@@ -200,7 +200,7 @@ class AfTowerLightNode(object):
                   setColorFunction = self.setColorOption,
                   kelvin_limits_list = None, #self.kelvin_limits, 
                   setKelvinFunction =None, #self.setKelvinVal,
-                  blinkOnOffFunction = self.blinkOnOff,
+                  supportsBlinking = True,
                   enableStrobeFunction = None, #self.setStrobeEnable,
                   reports_temp = False, 
                   reports_power = False
@@ -294,18 +294,6 @@ class AfTowerLightNode(object):
     else:
       self.send_msg(OFF)
     self.on_off_state = turn_on_off
-
-  def blinkOnOff(self,blink_on_off):
-    #nepi_msg.publishMsgWarn(self,"setting blink state to " + str(blink_on_off) )
-    ON = self.on_off_dict[self.current_color][0]
-    OFF = self.on_off_dict[self.current_color][1]
-    new_state = blink_on_off
-    if new_state == True:
-        self.send_msg(ON)
-    else:
-      self.send_msg(OFF)
-    self.blink_state = new_state
-
 
   def setColorOption(self,color_option):
     last_color = self.current_color

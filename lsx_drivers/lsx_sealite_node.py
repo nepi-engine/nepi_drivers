@@ -189,7 +189,7 @@ class SealiteNode(object):
                   standbyEnableFunction = self.setStandby,
                   turnOnOffFunction = self.turnOnOff,
                   setIntensityRatioFunction = self.setIntensityRatio, 
-                  blinkOnOffFunction = self.blinkOnOff,
+                  supportsBlinking = True,
                   enableStrobeFunction = self.setStrobeEnable,
                   reports_temp = True, 
                   reports_power = False
@@ -356,14 +356,6 @@ class SealiteNode(object):
       self.set_intensity(self.intensity_ratio)
     self.turn_on_off_state = turn_on_off
 
-  def blinkOnOff(self,blink_on_off):
-    if self.blink_on_off_state == True:
-      if blink_on_off == False:
-        self.set_intensity(0)
-      else:
-        self.set_intensity(self.intensity_ratio)
-    else:
-      self.set_intensity(0)
 
   def setIntensityRatio(self,intensity_ratio):
     success = False
