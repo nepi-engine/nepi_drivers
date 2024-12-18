@@ -46,8 +46,8 @@ TEST_NEX_DICT = {
         'set_val': 'HD720'
     },
     'options_2_dict': {
-        'default_val': 'None',
-        'set_val': 'None'
+        'default_val': '5',
+        'set_val': '5'
     },
     'method': 'AUTO', 
     'include_ids': ['ZED 2','ZED 2i','ZED-M'],
@@ -70,7 +70,6 @@ class ZedCamDiscovery:
     HD1080 = 1,
     HD720 = 3,
     VGA = 5
-
   )
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"                                   
@@ -93,6 +92,12 @@ class ZedCamDiscovery:
       self.res_val = self.RES_DICT[res_str]
     else:
       self.res_val = 3
+
+    fr_str = self.drv_dict['DISCOVERY_DICT']['option_2_dict']['set_val']
+    try:
+      self.fr_val = int(fr_str)
+    except Exception as e:
+      self.fr_val = 5
     
     nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
 
@@ -225,7 +230,7 @@ class ZedCamDiscovery:
           nepi_msg.publishMsgInfo(self,"Launching node " + device_node_name)
           if dtype in self.includeDevices:
             #Setup required param server drv_dict for discovery node
-            self.drv_dict['DEVICE_DICT']={'zed_type': root_name, 'res_val': self.res_val}
+            self.drv_dict['DEVICE_DICT']={'zed_type': root_name, 'res_val': self.res_val, 'fr_val': self.fr_val}
             dict_param_name = device_node_name + "/drv_dict"
             nepi_ros.set_param(self,dict_param_name,self.drv_dict)
             file_name = self.drv_dict['NODE_DICT']['file_name']

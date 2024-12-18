@@ -237,6 +237,7 @@ class GenicamCamDriver(object):
             self.camera_settings[node_name] = entry
             if entry["readable"] == True and entry["writable"] == True and "value" in entry.keys():
                 self.camera_controls[node_name] = entry
+                #print("GenICam_Drv Control: " + node_name + " : " + str(self.camera_controls[node_name]))
 
 
 
@@ -253,8 +254,8 @@ class GenicamCamDriver(object):
             width = 0
         elif height is None:
             height = 0
-        #else:
-            #self.setResolution({"width": width, "height": height})
+        else:
+            self.setResolution({"width": width, "height": height})
         self.resolution = dict(width = width,height = height)
         return True, "Success"
 
@@ -319,19 +320,48 @@ class GenicamCamDriver(object):
         video_settings_dict["height"] = self.resolution["height"]
         return True, video_settings_dict
 
-    def getCurrentResolution(self):
-        return True, self.resolution
 
     def setResolution(self, resolution_dict):
         # TODO: Maybe resolution adjustment should be based on "Binning" or "Decimation" controls, not in s/w via cv2.resize()
-        width_too_small = resolution_dict["width"] < self.camera_settings["Width"]["min"]
-        width_too_large = resolution_dict["width"] > self.camera_settings["Width"]["max"]
-        height_too_small = resolution_dict["height"] < self.camera_settings["Height"]["min"]
-        height_too_large = resolution_dict["height"] > self.camera_settings["Height"]["max"]
+        height = resolution_dict["height"]
+        width = resolution_dict["width"]
+        new_res = str(width)+":"+str(height)
+        width_too_small = width < self.camera_settings["Width"]["min"]
+        width_too_large = width > self.camera_settings["Width"]["max"]
+        height_too_small = height < self.camera_settings["Height"]["min"]
+        height_too_large = height > self.camera_settings["Height"]["max"]
         if width_too_small or width_too_large or height_too_small or height_too_large:
             return False, "Requested resolution is not available"
-        self.resolution = resolution_dict
-        return True, "Success"
+        else:
+            try:
+                self._setNodeVal(["Width"], width)
+                self._setNodeVal(["Height"], height)
+            except Exception as e:
+                print("Failed to set resolution: " + str(resolution_dict) + " " + str(e))
+            time.sleep(0.5)
+            #print("requestion resolution dict")
+            success, cur_res_dict = self.getCurrentResolution()
+            height = cur_res_dict["height"]
+            width = cur_res_dict["width"]
+            cur_res = str(width)+":"+str(height)
+            if cur_res != new_res:
+                msg = "Failed to update resolution, asked for: " + new_res + "returned: " + cur_res
+                return False, msg
+            else:
+                self.resolution = resolution_dict
+                return True, ""
+
+    def getCurrentResolution(self):
+        width, msg = self._getNodeVal("Width")
+        height, msg = self._getNodeVal("Height")
+        if width is None:
+            width = 0
+        elif height is None:
+            height = 0
+        self.resolution = dict(width = width,height = height)
+        #print("Got Genicam Driver RES: " + str(self.resolution))
+        return True, self.resolution
+
 
     def getCurrentResolutionAvailableFramerates(self):
         NUM_OPTIONS = 20
@@ -347,19 +377,26 @@ class GenicamCamDriver(object):
         fps_too_high = max_fps > self.camera_settings["AcquisitionFrameRate"]["max"]
         if fps_too_low or fps_too_high:
             return False, "Invalid framerate requested"
+        else:
+            success = False
         try:
-            ret = self._setNodeVal("AcquisitionFrameRate", max_fps)
-        except:
-            pass
-
-        return ret
+            self._setNodeVal("AcquisitionFrameRate", max_fps)
+            success = True
+        except Exception as e:
+            print("Failed to set Framerate: " + str(max_fps) + " " + str(e))
+        return success, ""
 
     def getFramerate(self):
-
         if "AcquisitionFrameRate" not in self.camera_settings:
             return False, "Camera does not provide framerate information"
         ret = self._getNodeVal("AcquisitionFrameRate")
-        return ret[1],round(ret[0],2)
+        #print("Got Genicam Driver FR: " + str(ret))
+        try:
+            fr=round(ret[0],2)
+            return True, fr
+        except Exception as e:
+            #print("Failed to get Genicam Driver FR: " + str(e))
+            return False, 0
 
     def getCurrentFormat(self):
         return self._getNodeVal("PixelFormat")

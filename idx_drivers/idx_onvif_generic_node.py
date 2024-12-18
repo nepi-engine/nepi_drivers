@@ -29,16 +29,17 @@ FILE_TYPE = 'NODE'
 class OnvifCamNode:
 
     FACTORY_SETTINGS_OVERRIDES = dict(WhiteBalance_Mode = "AUTO",
-                                      Exposure_Mode = "AUTO" )
+                                      Exposure_Mode = "AUTO",
+                                      Resolution = "2560:1440" )
 
     #Factory Control Values 
-    FACTORY_CONTROLS = dict( controls_enable = True,
+    FACTORY_CONTROLS = dict( controls_enable = False,
     auto_adjust = False,
     brightness_ratio = 0.5,
     contrast_ratio =  0.5,
     threshold_ratio =  0.0,
     resolution_mode = 3, # LOW, MED, HIGH, MAX
-    framerate_mode = 3, # LOW, MED, HIGH, MAX
+    framerate_mode = 2, # LOW, MED, HIGH, MAX
     start_range_ratio = None, 
     stop_range_ratio = None,
     min_range_m = None,
@@ -57,6 +58,14 @@ class OnvifCamNode:
 
 
     idx_if = None
+
+    current_fps = 20
+    cl_img_last_time = None
+    bw_img_last_time = None
+    dm_img_last_time = None
+    di_img_last_time = None
+    pc_img_last_time = None
+    pc_last_time = None
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                                                    
@@ -205,6 +214,7 @@ class OnvifCamNode:
                                         setBrightness=idx_callback_names["Controls"]["Brightness"], 
                                         setThresholding=idx_callback_names["Controls"]["Thresholding"], 
                                         setRange=idx_callback_names["Controls"]["Range"], 
+                                        getFramerate = self.getFramerate,
                                         getColor2DImg=idx_callback_names["Data"]["Color2DImg"], 
                                         stopColor2DImgAcquisition=idx_callback_names["Data"]["StopColor2DImg"],
                                         getBW2DImg=idx_callback_names["Data"]["BW2DImg"], 
@@ -259,37 +269,35 @@ class OnvifCamNode:
                 cap_settings[cap_setting_name] = cap_setting
         # Add Resolution Cap Settting
         try:
-            [success,available_resolutions,encoder_cfg] = self.driver.getAvailableResolutions()
-            cap_setting = dict()
-            cap_setting['type'] = 'Discrete'
-            options = []
-            for res_dict in available_resolutions:
-                width = str(res_dict['Width'])
-                height = str(res_dict['Height'])
-                cap_setting_option = (width + ":" + height)
-                options.append(cap_setting_option)
-            cap_setting['options'] = options
-            cap_setting['name'] = 'Resolution'
-            cap_settings['Resolution'] = cap_setting
-        except Exception as e:
-            nepi_msg.publishMsgInfo(self," " + "Driver returned invalid resolution options: " + str(available_resolutions))
-        # Add Framerate Cap cap_setting
-        '''
-        try:
-            [success,framerates] = self.driver.getFramerateRange()
-            cap_setting = dict()
-            cap_setting['type'] = 'Descrete'
-            options = []
-            if len(framerates) > 0:
-                for rate in framerates:
-                    cap_setting_option = (str(round(framerate,2)))
+            [success,resolutions,encoder_cfg] = self.driver.getAvailableResolutions()
+            nepi_msg.publishMsgInfo(self," " + "Driver returned resolution options: " + str(resolutions))
+            if success:
+                cap_setting = dict()
+                cap_setting['name'] = 'Resolution'
+                cap_setting['type'] = 'Discrete'
+                options = []
+                for res_dict in resolutions:
+                    width = str(res_dict['Width'])
+                    height = str(res_dict['Height'])
+                    cap_setting_option = (width + ":" + height)
                     options.append(cap_setting_option)
                 cap_setting['options'] = options
-                cap_setting['name'] = 'framerate'
-                cap_settings['framerate'] = cap_setting
+                cap_settings['Resolution'] = cap_setting
         except Exception as e:
-            nepi_msg.publishMsgInfo(self," " + "Driver returned invalid framerate options: " + str(framerates))
-        '''
+            nepi_msg.publishMsgWarn(self," " + "Driver returned invalid resolution options: " + str(e))
+        # Add Framerate Cap cap_setting
+        try:
+            [success,framerates,encoder_cfg] = self.driver.getFramerateRange()
+            nepi_msg.publishMsgInfo(self," " + "Driver returned framerate options: " + str(framerates))
+            if success:
+                cap_setting = dict()
+                cap_setting['name'] = 'Framerate'
+                cap_setting['type'] = 'Int'
+                options = [str(framerates['Min']),str(framerates['Max'])]
+                cap_setting['options'] = options
+                cap_settings['Framerate'] = cap_setting
+        except Exception as e:
+            nepi_msg.publishMsgWarn(self," " + "Driver returned invalid framerate options: " + str(e))
         return cap_settings
 
 
@@ -339,29 +347,31 @@ class OnvifCamNode:
         [success,res_dict] = self.driver.getResolution()
         #nepi_msg.publishMsgInfo(self,str(res_dict))
         setting = dict()
+        setting['name'] = 'Resolution'
         setting['type'] = 'Discrete'
         width = str(res_dict['Width'])
         height = str(res_dict['Height'])
         setting_value = (width + ":" + height)
         setting['value'] = setting_value
-        setting['name'] = 'Resolution'
         settings['Resolution'] = setting
-        '''
+
         # Add Framerate Cap Setting
         [success,framerate] = self.driver.getFramerate()
-        setting['type'] = 'Float'
+        setting = dict()
+        setting['name'] = 'Framerate'
+        setting['type'] = 'Int'
         setting_value = (str(round(framerate,2)))
         setting['value'] = setting_value
-        setting['name'] = 'Framerate'
         settings['Framerate'] = setting
-        '''
+        self.current_fps = framerate
         return settings
 
 
     def settingUpdateFunction(self,setting):
         success = False
         setting_str = str(setting)
-        [setting_name, setting_type, data] = nepi_settings.get_data_from_setting(setting)
+        ret = nepi_settings.get_data_from_setting(setting)
+        [setting_name, setting_type, data] = ret
         if data is not None:
             setting_data = data
             found_setting = False
@@ -373,18 +383,21 @@ class OnvifCamNode:
                         if success:
                             msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
                     elif setting_name == "Resolution":
-                        data = data.split(":")
+                        data_split = data.split(":")
                         try:
-                            width = int(data[0])
-                            height = int(data[1])
-                            res_dict = {'width': width, 'height': height}
+                            width = int(data_split[0])
+                            height = int(data_split[1])
+                        except Exception as e:
+                            nepi_msg.publishMsgInfo(self,"Resoluton setting: " + data + " could not be parsed to int " + str(e)) 
+                        try:
+                            res_dict = {'Width': width, 'Height': height}
                             success, msg = self.driver.setResolution(res_dict)
                         except Exception as e:
-                            nepi_msg.publishMsgInfo(self,"Resoluton setting: " + data + " could not be parsed to float " + str(e))                            
+                            nepi_msg.publishMsgInfo(self,"setResolution function failed " + str(e))                            
                         break     
                     elif setting_name == "Framerate":
                         try:
-                            framerate = float(data)
+                            framerate = int(data)
                             success, msg = self.driver.setFramerate(framerate)
                         except Exception as e:
                             nepi_msg.publishMsgInfo(self,"Framerate setting: " + data + " could not be parsed to float " + str(e))
@@ -469,45 +482,64 @@ class OnvifCamNode:
         status = True
         err_str = ""
         return status, err_str
+
+    def getFramerate(self):
+        fr_mode = self.current_controls.get("framerate_mode")
+        adj_fps =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        return adj_fps
     
     def getColorImg(self):
-        encoding = "bgr8"
-        self.img_uri_lock.acquire()
-        # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
-        ret, msg = self.driver.startImageAcquisition(uri_index = self.img_uri_index)
-        if ret is False:
-            self.img_uri_lock.release()
-            return ret, msg, None, None, None
-        
-        self.color_image_acquisition_running = True
-
-        timestamp = None
-        
-        start = time.time()
-        cv2_img, timestamp, ret, msg = self.driver.getImage(uri_index = self.img_uri_index)
-        stop = time.time()
-        #print('GI: ', stop - start)
-        if ret is False:
-            self.img_uri_lock.release()
-            return ret, msg, None, None, None
-        
-        if timestamp is not None:
-            ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+        # Check for control framerate adjustment
+        last_time = self.cl_img_last_time
+        current_time = nepi_ros.get_rostime()
+        controls_enabled = self.current_controls.get("controls_enable")
+        fr_mode = self.current_controls.get("framerate_mode")
+        need_data = False
+        if fr_mode != 3 and last_time != None and self.idx_if is not None:
+          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+          fr_delay = float(1) / adj_fr
+          timer =(current_time.to_sec() - last_time.to_sec())
+          if timer > fr_delay:
+            need_data = True
         else:
-            ros_timestamp = nepi_ros.time_now()
+          need_data = True
 
-        # Apply controls
-        if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
-          cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)        
+        # Get and Process Data if Needed
+        if need_data == False:
+          return False, "Waiting for Timer", None, None, None  # Return None data
+        else:
+            self.cl_img_last_time = current_time
+
+            encoding = "bgr8"
+            self.img_uri_lock.acquire()
+            # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
+            ret, msg = self.driver.startImageAcquisition(uri_index = self.img_uri_index)
+            if ret is False:
+                self.img_uri_lock.release()
+                return ret, msg, None, None, None
+            self.color_image_acquisition_running = True
+            timestamp = None
+            start = time.time()
+            cv2_img, timestamp, ret, msg = self.driver.getImage(uri_index = self.img_uri_index)
+            stop = time.time()
+            #print('GI: ', stop - start)
+            if ret is False:
+                self.img_uri_lock.release()
+                return ret, msg, None, None, None
+            if timestamp is not None:
+                ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+            else:
+                ros_timestamp = nepi_ros.time_now()
+            # Make a copy for the bw thread to use rather than grabbing a new cv2_img
+            if self.bw_image_acquisition_running:
+                self.cached_2d_color_frame = cv2_img
+                self.cached_2d_color_frame_timestamp = ros_timestamp
+            self.img_uri_lock.release()
+            # Apply controls
+            if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
+                cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)        
+            return ret, msg, cv2_img, ros_timestamp, encoding
         
-        # Make a copy for the bw thread to use rather than grabbing a new cv2_img
-        if self.bw_image_acquisition_running:
-            self.cached_2d_color_frame = cv2_img
-            self.cached_2d_color_frame_timestamp = ros_timestamp
-
-        self.img_uri_lock.release()
-        return ret, msg, cv2_img, ros_timestamp, encoding
-    
     def stopColorImg(self):
         self.img_uri_lock.acquire()
         # Don't stop acquisition if the b/w image is still being requested
@@ -523,48 +555,62 @@ class OnvifCamNode:
         return ret,msg
     
     def getBWImg(self):
-        encoding = "mono8"
-        self.img_uri_lock.acquire()
-        # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
-        ret, msg = self.driver.startImageAcquisition(uri_index = self.img_uri_index)
-        if ret is False:
-            self.img_uri_lock.release()
-            return ret, msg, None, None, None
-        
-        self.bw_image_acquisition_running = True
 
-        ros_timestamp = None
-        
-        # Only grab a frame if we don't already have a cached color frame... avoids cutting the update rate in half when
-        # both image streams are running
-        if self.color_image_acquisition_running is False or self.cached_2d_color_frame is None:
-            cv2_img, timestamp, ret, msg = self.driver.getImage(uri_index = self.img_uri_index)
-            if timestamp is not None:
-                ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+        # Check for control framerate adjustment
+        last_time = self.bw_img_last_time
+        current_time = nepi_ros.get_rostime()
+        controls_enabled = self.current_controls.get("controls_enable")
+        fr_mode = self.current_controls.get("framerate_mode")
+        need_data = False
+        if fr_mode != 3 and last_time != None and self.idx_if is not None:
+          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+          fr_delay = float(1) / adj_fr
+          timer =(current_time.to_sec() - last_time.to_sec())
+          if timer > fr_delay:
+            need_data = True
+        else:
+          need_data = True
+        # Get and Process Data if Needed
+        if need_data == False:
+          return False, "Waiting for Timer", None, None, None  # Return None data
+        else:
+            self.bw_img_last_time = current_time
+
+            encoding = "mono8"
+            self.img_uri_lock.acquire()
+            # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
+            ret, msg = self.driver.startImageAcquisition(uri_index = self.img_uri_index)
+            if ret is False:
+                self.img_uri_lock.release()
+                return ret, msg, None, None, None
+            self.bw_image_acquisition_running = True
+            ros_timestamp = None
+            # Only grab a frame if we don't already have a cached color frame... avoids cutting the update rate in half when
+            # both image streams are running
+            if self.color_image_acquisition_running is False or self.cached_2d_color_frame is None:
+                cv2_img, timestamp, ret, msg = self.driver.getImage(uri_index = self.img_uri_index)
+                if timestamp is not None:
+                    ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+                else:
+                    ros_timestamp = nepi_ros.time_now()
             else:
-                ros_timestamp = nepi_ros.time_now()
+                cv2_img = self.cached_2d_color_frame.copy()
+                ros_timestamp = self.cached_2d_color_frame_timestamp
+                self.cached_2d_color_frame = None # Clear it to avoid using it multiple times in the event that threads are running at different rates
+                self.cached_2d_color_frame_timestamp = None
+                ret = True
+                msg = "Success: Reusing cached cv2_img"
+            self.img_uri_lock.release()
+            # Abort if there was some error or issue in acquiring the image
+            if ret is False or cv2_img is None:
+                return False, msg, None, None, None
+            # Fix the channel count if necessary
+            if cv2_img.ndim == 3:
+                cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2GRAY)
             # Apply controls
             if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
                 cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
-        else:
-            cv2_img = self.cached_2d_color_frame.copy()
-            ros_timestamp = self.cached_2d_color_frame_timestamp
-            self.cached_2d_color_frame = None # Clear it to avoid using it multiple times in the event that threads are running at different rates
-            self.cached_2d_color_frame_timestamp = None
-            ret = True
-            msg = "Success: Reusing cached cv2_img"
-
-        self.img_uri_lock.release()
-
-        # Abort if there was some error or issue in acquiring the image
-        if ret is False or cv2_img is None:
-            return False, msg, None, None, None
-
-        # Fix the channel count if necessary
-        if cv2_img.ndim == 3:
-            cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2GRAY)
-        
-        return ret, msg, cv2_img, ros_timestamp, encoding
+            return ret, msg, cv2_img, ros_timestamp, encoding
     
     def stopBWImg(self):
         self.img_uri_lock.acquire()

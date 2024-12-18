@@ -33,9 +33,10 @@ DISCOVERY_DICT:
     - VGA
     default_val: HD720
   option_2_dict:
-    name: None
-    options: []
-    default_val: None
+    name: Framerate (Req Reboot)
+    options:
+    - 15
+    default_val: 15
   pkg_name: IDX_ZED
   file_name: idx_zed_discovery.py
   module_name: idx_zed_discovery

@@ -452,23 +452,23 @@ class GenericONVIF_NVT(object):
         return True, resolution
 
     # Method broken for SS400 -- camera nacks the request packets
-    def setResolution(self, resolution, video_encoder_id=0, readback_check=True):
+    def setResolution(self, resolution_dict, video_encoder_id=0, readback_check=True):
+        Width = resolution_dict['Width']
+        Height = resolution_dict['Height']
         if video_encoder_id >= self.encoder_count:
             return False, "Device does not support resolution adjustment"
 
         # First, get the available resolutions and current encoder_cfg so that we can update just the resolution
         success, available_resolutions, encoder_cfg = self.getAvailableResolutions(video_encoder_id)
-        
+
         # Ensure that the specified resolution is available
-        if resolution not in available_resolutions:
-            return False, "Invalid resolution"
-
+        #if resolution not in available_resolutions:
+            #return False, "Invalid resolution"
         # Check whether we need to make a change
-        if resolution.Width == encoder_cfg.Resolution.Width and resolution.Height == encoder_cfg.Resolution.Height:
+        if Width == encoder_cfg.Resolution.Width and Height == encoder_cfg.Resolution.Height:
             return True, "Desired resolution already set"
-
         # Update the encoder_cfg
-        encoder_cfg.Resolution = resolution
+        encoder_cfg.Resolution = resolution_dict
         
         # Create the request
         request = self.media_service.create_type('SetVideoEncoderConfiguration')
@@ -479,40 +479,41 @@ class GenericONVIF_NVT(object):
         # Check
         if readback_check is True:
             encoder_cfg = self.media_service.GetVideoEncoderConfigurations()[video_encoder_id]
-            if resolution.Width != encoder_cfg.Resolution.Width or resolution.Height != encoder_cfg.Resolution.Height:
+            if Width != encoder_cfg.Resolution.Width or Height != encoder_cfg.Resolution.Height:
                 return False, "Camera failed update resolution"
 
         return True, "Success"
     
     def getFramerateRange(self, video_encoder_id=0):
         if video_encoder_id >= self.encoder_count:
-            return {}, None
+            return False, {}, None
         
         # First, figure out what compression format is available for this encoder
         encoding, encoder_cfg = self.getEncoding(video_encoder_id)
                 
         if not hasattr(self.encoder_options, encoding):
-            return {}, encoder_cfg 
+            return False, {}, encoder_cfg 
 
         range = self.encoder_options[encoding].FrameRateRange
         
         #TODO: Framerate range can be a function of resolution, as ONWOTE camera displays in its encoder_cfg_extensions. How to handle?
-        return range, encoder_cfg  
+        return True, range, encoder_cfg  
     
     def getFramerate(self, video_encoder_id=0):
         if video_encoder_id >= self.encoder_count:
-            return -1.0
+            return False, -1.0
         
         encoder_cfg = self.media_service.GetVideoEncoderConfigurations()[video_encoder_id]
         #print("Debugging: Encoder cfg = " + str(encoder_cfg))
 
         if not hasattr(encoder_cfg, "RateControl"):
-            return -1.0
+            return False, -1.0
         
         max_fps = encoder_cfg.RateControl.FrameRateLimit
-        return max_fps
+        return True, max_fps
     
     def setFramerate(self, max_fps, video_encoder_id=0, readback_check=True):
+        print("Setting Framerate to: " + str(max_fps))
         if video_encoder_id >= self.encoder_count:
             return False, "Device does not support framerate adjustment"
 
@@ -594,7 +595,7 @@ if __name__ == '__main__':
 
     # Query, adjust, and check framerate limit
     print("Max Framerate:")
-    framerate = driver.getFramerate()
+    success, framerate = driver.getFramerate()
     print(str(framerate))
     if TEST_SET_FRAMERATE:
         new_framerate = 15

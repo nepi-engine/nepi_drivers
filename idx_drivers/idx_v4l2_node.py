@@ -18,6 +18,7 @@ from nepi_edge_sdk_base.device_if_idx import ROSIDXSensorIF
 from nepi_edge_sdk_base import nepi_ros
 from nepi_edge_sdk_base import nepi_msg
 from nepi_edge_sdk_base import nepi_drv
+from nepi_edge_sdk_base import nepi_img
 from nepi_edge_sdk_base import nepi_settings
 
 PKG_NAME = 'IDX_V4L2' # Use in display menus
@@ -71,13 +72,13 @@ class V4l2CamNode:
     DEFAULT_DEVICE_PATH = '/dev/video0'
 
     #Factory Control Values 
-    FACTORY_CONTROLS = dict( controls_enable = True,
+    FACTORY_CONTROLS = dict( controls_enable = False,
     auto_adjust = False,
     brightness_ratio = 0.5,
     contrast_ratio =  0.5,
     threshold_ratio =  0.0,
     resolution_mode = 3, # LOW, MED, HIGH, MAX
-    framerate_mode = 3, # LOW, MED, HIGH, MAX
+    framerate_mode = 2, # LOW, MED, HIGH, MAX
     start_range_ratio = None, 
     stop_range_ratio = None,
     min_range_m = None,
@@ -103,6 +104,16 @@ class V4l2CamNode:
     cached_2d_color_image_timestamp = None
     set_framerate = 0
     idx_if = None
+
+
+    current_fps = 20
+    cl_img_last_time = None
+    bw_img_last_time = None
+    dm_img_last_time = None
+    di_img_last_time = None
+    pc_img_last_time = None
+    pc_last_time = None
+
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                             
@@ -211,6 +222,7 @@ class V4l2CamNode:
                                      setBrightness=idx_callback_names["Controls"]["Brightness"], 
                                      setThresholding=idx_callback_names["Controls"]["Thresholding"], 
                                      setRange=idx_callback_names["Controls"]["Range"], 
+                                     getFramerate = self.getFramerate,
                                      getColor2DImg=idx_callback_names["Data"]["Color2DImg"], 
                                      stopColor2DImgAcquisition=idx_callback_names["Data"]["StopColor2DImg"],
                                      getBW2DImg=idx_callback_names["Data"]["BW2DImg"], 
@@ -345,7 +357,7 @@ class V4l2CamNode:
         for setting_name in settings.keys():
             if setting_name in self.FACTORY_SETTINGS_OVERRIDES.keys():
                 settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
-            return settings
+        return settings
 
             
 
@@ -392,8 +404,8 @@ class V4l2CamNode:
         height = str(res_dict['height'])
         setting_value = (width + ":" + height)
         setting['value'] = setting_value
-        setting['name'] = 'Resolution'
-        settings['Resolution'] = setting
+        setting['name'] = 'resolution'
+        settings['resolution'] = setting
         # Framerate
         [success,framerate] = self.driver.getFramerate() 
         setting = dict()
@@ -401,6 +413,7 @@ class V4l2CamNode:
         setting['value'] = str(framerate)
         setting['name'] = 'framerate'
         settings['framerate'] = setting
+        self.current_fps = framerate
         return settings
 
 
@@ -531,51 +544,73 @@ class V4l2CamNode:
         if (mode > self.idx_if.FRAMERATE_MODE_MAX):
             return False, "Invalid mode value"
         self.current_controls["framerate_mode"] = mode
+        #print('Set FR Mode: ' +  str(self.current_controls["framerate_mode"]))
         status = True
         err_str = ""
         return status, err_str
+
+    def getFramerate(self):
+        fr_mode = self.current_controls.get("framerate_mode")
+        #print('Got FR Mode: ' +  str(fr_mode))
+        adj_fps =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        return adj_fps
 
     def setDriverCameraControl(self, control_name, value):
         return self.driver.setScaledCameraControl(control_name, value)
     
     # Good base class candidate - Shared with ONVIF
     def getColorImg(self):
-        encoding = "bgr8"
-        self.img_lock.acquire()
-        # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
-        ret, msg = self.driver.startImageAcquisition()
-        if ret is False:
-            self.img_lock.release()
-            return ret, msg, None, None, None
-        
-        self.color_image_acquisition_running = True
 
-        timestamp = None
-        
-        start = time.time()
-        cv2_img, timestamp, ret, msg = self.driver.getImage()
-        stop = time.time()
-        #print('GI: ', stop - start)
-        if ret is False:
-            self.img_lock.release()
-            return ret, msg, None, None, None
-        
-        if timestamp is not None:
-            ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+        # Check for control framerate adjustment
+        last_time = self.cl_img_last_time
+        current_time = nepi_ros.get_rostime()
+        controls_enabled = self.current_controls.get("controls_enable")
+        fr_mode = self.current_controls.get("framerate_mode")
+        need_data = False
+        if fr_mode != 3 and last_time != None and self.idx_if is not None:
+          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+          fr_delay = float(1) / adj_fr
+          timer =(current_time.to_sec() - last_time.to_sec())
+          if timer > fr_delay:
+            need_data = True
         else:
-            ros_timestamp = nepi_ros.time_n
-        
-        # Apply controls
-        if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
-          cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+          need_data = True
 
-        # Make a copy for the bw thread to use rather than grabbing a new image
-        if self.bw_image_acquisition_running:
-            self.cached_2d_color_image = cv2_img
-            self.cached_2d_color_image_timestamp = ros_timestamp
+        # Get and Process Data if Needed
+        if need_data == False:
+          return False, "Waiting for Timer", None, None, None  # Return None data
+        else:
+            self.cl_img_last_time = current_time
 
-        self.img_lock.release()
-        return ret, msg, cv2_img, ros_timestamp, encoding
+            encoding = "bgr8"
+            self.img_lock.acquire()
+            # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
+            ret, msg = self.driver.startImageAcquisition()
+            if ret is False:
+                self.img_lock.release()
+                return ret, msg, None, None, None
+            self.color_image_acquisition_running = True
+            timestamp = None
+            start = time.time()
+            cv2_img, timestamp, ret, msg = self.driver.getImage()
+            stop = time.time()
+            #print('GI: ', stop - start)
+            if ret is False:
+                self.img_lock.release()
+                return ret, msg, None, None, None
+            if timestamp is not None:
+                ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+            else:
+                ros_timestamp = nepi_ros.time_n
+            # Make a copy for the bw thread to use rather than grabbing a new image
+            if self.bw_image_acquisition_running:
+                self.cached_2d_color_image = cv2_img
+                self.cached_2d_color_image_timestamp = ros_timestamp
+            self.img_lock.release()
+            # Apply controls
+            if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
+                cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+            return ret, msg, cv2_img, ros_timestamp, encoding
     
     # Good base class candidate - Shared with ONVIF
     def stopColorImg(self):
@@ -594,49 +629,65 @@ class V4l2CamNode:
     
     # Good base class candidate - Shared with ONVIF
     def getBWImg(self):
-        encoding = "mono8"
-        self.img_lock.acquire()
-        # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
-        ret, msg = self.driver.startImageAcquisition()
-        if ret is False:
-            self.img_lock.release()
-            return ret, msg, None, None, None
-        
-        self.bw_image_acquisition_running = True
 
-        ros_timestamp = None
-        
-        # Only grab a image if we don't already have a cached color image... avoids cutting the update rate in half when
-        # both image streams are running
-        if self.color_image_acquisition_running is False or self.cached_2d_color_image is None:
-            cv2_img, timestamp, ret, msg = self.driver.getImage()
-            if timestamp is not None:
-                ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
-            else:
-                ros_timestamp = nepi_ros.time_n
-            # Apply controls
-            if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
-                cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+        # Check for control framerate adjustment
+        last_time = self.bw_img_last_time
+        current_time = nepi_ros.get_rostime()
+        controls_enabled = self.current_controls.get("controls_enable")
+        fr_mode = self.current_controls.get("framerate_mode")
+        need_data = False
+        if fr_mode != 3 and last_time != None and self.idx_if is not None:
+          adj_fr = nepi_img.adjust_framerate(self.current_fps,fr_mode)
+          fr_delay = float(1) / adj_fr
+          timer =(current_time.to_sec() - last_time.to_sec())
+          if timer > fr_delay:
+            need_data = True
         else:
-            cv2_img = self.cached_2d_color_image.copy()
-            ros_timestamp = self.cached_2d_color_image_timestamp
-            self.cached_2d_color_image = None # Clear it to avoid using it multiple times in the event that threads are running at different rates
-            self.cached_2d_color_image_timestamp = None
-            ret = True
-            msg = "Success: Reusing cached cv2_img"
+          need_data = True
+          
+        # Get and Process Data if Needed
+        if need_data == False:
+          return False, "Waiting for Timer", None, None, None  # Return None data
+        else:
+            self.bw_img_last_time = current_time
 
-        self.img_lock.release()
-
-        # Abort if there was some error or issue in acquiring the image
-        if ret is False or cv2_img is None:
-            return False, msg, None, None, None
-
-        # Fix the channel count if necessary
-        if cv2_img.ndim == 3:
-            cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2GRAY)
+            encoding = "mono8"
+            self.img_lock.acquire()
+            # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
+            ret, msg = self.driver.startImageAcquisition()
+            if ret is False:
+                self.img_lock.release()
+                return ret, msg, None, None, None
+            
+            self.bw_image_acquisition_running = True
+            ros_timestamp = None
+            # Only grab a image if we don't already have a cached color image... avoids cutting the update rate in half when
+            # both image streams are running
+            if self.color_image_acquisition_running is False or self.cached_2d_color_image is None:
+                cv2_img, timestamp, ret, msg = self.driver.getImage()
+                if timestamp is not None:
+                    ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+                else:
+                    ros_timestamp = nepi_ros.time_n
+            else:
+                cv2_img = self.cached_2d_color_image.copy()
+                ros_timestamp = self.cached_2d_color_image_timestamp
+                self.cached_2d_color_image = None # Clear it to avoid using it multiple times in the event that threads are running at different rates
+                self.cached_2d_color_image_timestamp = None
+                ret = True
+                msg = "Success: Reusing cached cv2_img"
+            self.img_lock.release()
+            # Abort if there was some error or issue in acquiring the image
+            if ret is False or cv2_img is None:
+                return False, msg, None, None, None
+            # Fix the channel count if necessary
+            if cv2_img.ndim == 3:
+                cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2GRAY)
+                 # Apply controls
+            if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
+                cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)               
+            return ret, msg, cv2_img, ros_timestamp, encoding
         
-        return ret, msg, cv2_img, ros_timestamp, encoding
-    
     # Good base class candidate - Shared with ONVIF
     def stopBWImg(self):
         self.img_lock.acquire()

@@ -17,6 +17,7 @@ from nepi_edge_sdk_base.device_if_idx import ROSIDXSensorIF
 
 from nepi_edge_sdk_base import nepi_ros
 from nepi_edge_sdk_base import nepi_msg
+from nepi_edge_sdk_base import nepi_img
 from nepi_edge_sdk_base import nepi_settings
 from nepi_edge_sdk_base import nepi_drv
 
@@ -69,13 +70,13 @@ class GenicamCamNode:
                                       GainAuto = 'Continuous')
 
     #Factory Control Values 
-    FACTORY_CONTROLS = dict( controls_enable = True,
+    FACTORY_CONTROLS = dict( controls_enable = False,
     auto_adjust = False,
     brightness_ratio = 0.5,
     contrast_ratio =  0.5,
     threshold_ratio =  0.0,
     resolution_mode = 3, # LOW, MED, HIGH, MAX
-    framerate_mode = 3, # LOW, MED, HIGH, MAX
+    framerate_mode = 2, # LOW, MED, HIGH, MAX
     start_range_ratio = None, 
     stop_range_ratio = None,
     min_range_m = None,
@@ -93,6 +94,14 @@ class GenicamCamNode:
        sw_version = "")
 
     idx_if = None
+
+    current_fps = 20
+    cl_img_last_time = None
+    bw_img_last_time = None
+    dm_img_last_time = None
+    di_img_last_time = None
+    pc_img_last_time = None
+    pc_last_time = None
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                             
@@ -183,14 +192,18 @@ class GenicamCamNode:
 
         # Initialize settings
         self.cap_settings = self.getCapSettings()
-        #nepi_msg.publishMsgInfo(self,"CAPS SETTINGS")
-        #for setting in self.cap_settings:
-            #nepi_msg.publishMsgInfo(self,setting)
-        self.factory_settings = self.getFactorySettings()
-        #nepi_msg.publishMsgInfo(self,"FACTORY SETTINGS")
-        #for setting in self.factory_settings:
-            #nepi_msg.publishMsgInfo(self,setting)
+        '''
+        nepi_msg.publishMsgInfo(self,"CAPS SETTINGS")
+        for setting_name in self.cap_settings.keys():
+            nepi_msg.publishMsgInfo(self,self.cap_settings[setting_name])
+        '''
 
+        self.factory_settings = self.getFactorySettings()
+        '''
+        nepi_msg.publishMsgInfo(self,"FACTORY SETTINGS")
+        for setting_name in self.factory_settings.keys():
+            nepi_msg.publishMsgInfo(self,self.factory_settings[setting_name])
+        '''
 
           
         # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
@@ -216,6 +229,7 @@ class GenicamCamNode:
                                      setBrightness=idx_callback_names["Controls"]["Brightness"], 
                                      setThresholding=idx_callback_names["Controls"]["Thresholding"], 
                                      setRange=idx_callback_names["Controls"]["Range"], 
+                                     getFramerate = self.getFramerate,
                                      getColor2DImg=idx_callback_names["Data"]["Color2DImg"], 
                                      stopColor2DImgAcquisition=idx_callback_names["Data"]["StopColor2DImg"],
                                      getBW2DImg=idx_callback_names["Data"]["BW2DImg"], 
@@ -237,7 +251,7 @@ class GenicamCamNode:
 
 
         ## Initiation Complete
-        nepi_msg.publishMsgInfo(self," " + "Initialization Complete")
+        nepi_msg.publishMsgInfo(self,"Initialization Complete")
         # Now start the node
         nepi_ros.spin()
 
@@ -273,7 +287,9 @@ class GenicamCamNode:
         try:
             [success,available_resolutions] = self.driver.getCurrentFormatAvailableResolutions()
             if success == True:
+                nepi_msg.publishMsgInfo(self,"Driver returned Resolution options: " + str(available_resolutions))
                 cap_setting = dict()
+                cap_setting['name'] = 'Resolution'
                 cap_setting['type'] = 'Discrete'
                 options = []
                 for res_dict in available_resolutions:
@@ -282,27 +298,26 @@ class GenicamCamNode:
                     cap_setting_option = (width + ":" + height)
                     options.append(cap_setting_option)
                 cap_setting['options'] = options
-                cap_setting['name'] = 'resolution'
-                cap_settings['resolution'] = cap_setting
+                cap_settings['Resolution'] = cap_setting
         except Exception as e:
-            nepi_msg.publishMsgInfo(self," " + "Driver returned invalid resolution options: " + str(available_resolutions))
+            nepi_msg.publishMsgWarn(self,"Driver returned invalid resolution options: " + str(e))
         # Add Framerate Cap cap_setting
         try:
             [success,framerates] = self.driver.getCurrentResolutionAvailableFramerates()
             if success == True:
-                nepi_msg.publishMsgInfo(self," " + "Driver returned framerate options: " + str(framerates))
+                nepi_msg.publishMsgInfo(self,"Driver returned framerate options: " + str(framerates))
                 cap_setting = dict()
-                cap_setting['type'] = 'Descrete'
+                cap_setting['name'] = 'Framerate'
+                cap_setting['type'] = 'Float'
                 options = []
                 if len(framerates) > 0:
                     for rate in framerates:
                         cap_setting_option = (str(round(rate,2)))
                         options.append(cap_setting_option)
                     cap_setting['options'] = options
-                    cap_setting['name'] = 'framerate'
-                    cap_settings['framerate'] = cap_setting
+                    cap_settings['Framerate'] = cap_setting
         except Exception as e:
-            nepi_msg.publishMsgInfo(self," " + "Driver returned invalid framerate options: " + str(framerates))
+            nepi_msg.publishMsgWarn(self,"Driver returned invalid framerate options: " + str(e))
         return cap_settings
 
     def getFactorySettings(self):
@@ -311,6 +326,14 @@ class GenicamCamNode:
         for setting_name in settings.keys():
             if setting_name in self.FACTORY_SETTINGS_OVERRIDES.keys():
                 settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
+            '''
+            if setting_name == "Resolution":
+                options = self.cap_settings[setting_name]['options']
+                cur_val = settings[setting_name]['value']
+                nepi_msg.publishMsgWarn(self,"Checking that " + cur_val + " in options " + str(options))
+                if cur_val not in options:
+                    settings[setting_name]['value'] = options[-1]
+            '''
         return settings
             
 
@@ -334,24 +357,32 @@ class GenicamCamNode:
             setting['value'] = str(info['value'])
             settings[setting_name] = setting
         # Add Resolution Cap Settting
-        [success,res_dict] = self.driver.getCurrentResolution()
-        if success == True:
+        try:
+            [success,res_dict] = self.driver.getCurrentResolution()
             setting = dict()
+            setting['name'] = 'Resolution'
             setting['type'] = 'Discrete'
             width = str(res_dict['width'])
             height = str(res_dict['height'])
-            setting_value = (width + ":" + height)
+            setting_value = width + ":" + height
             setting['value'] = setting_value
-            setting['name'] = 'Resolution'
             settings['Resolution'] = setting
+            #nepi_msg.publishMsgWarn(self,"Driver returned res setting: " + str(settings['Resolution']) )
+        except Exception as e:
+            nepi_msg.publishMsgWarn(self,"Failed to get current resolution: " + str(e))
         # Add Framerate Cap Setting
-        [success,framerate] = self.driver.getFramerate()
-        if success == True:
+        try:
+            [success,framerate] = self.driver.getFramerate()
+            setting = dict()
+            setting['name'] = 'Framerate'
             setting['type'] = 'Float'
             setting_value = (str(round(framerate,2)))
             setting['value'] = setting_value
-            setting['name'] = 'Framerate'
             settings['Framerate'] = setting
+            #nepi_msg.publishMsgWarn(self,"Driver returned fr setting: " + str(settings['Framerate']) )
+            self.current_fps = framerate
+        except Exception as e:
+            nepi_msg.publishMsgWarn(self,"Failed to get current framerate: " + str(e))
         return settings
 
 
@@ -359,6 +390,7 @@ class GenicamCamNode:
         success = False
         setting_str = str(setting)
         [setting_name, setting_type, data] = nepi_settings.get_data_from_setting(setting)
+        #nepi_msg.publishMsgWarn(self,"Updating Setting: " + setting_str)
         if data is not None:
             setting_data = data
             found_setting = False
@@ -375,16 +407,17 @@ class GenicamCamNode:
                             width = int(data[0])
                             height = int(data[1])
                             res_dict = {'width': width, 'height': height}
+                            nepi_msg.publishMsgWarn(self,"Updating Res with Res Dict: " + str(res_dict))
                             success, msg = self.driver.setResolution(res_dict)
                         except Exception as e:
-                            nepi_msg.publishMsgInfo(self,"Resoluton setting: " + data + " could not be parsed to float " + str(e))                            
+                            nepi_msg.publishMsgWarn(self,"Resoluton setting: " + data + " could not be parsed to float " + str(e))                            
                         break     
                     elif setting_name == "Framerate":
                         try:
                             framerate = float(data)
                             success, msg = self.driver.setFramerate(framerate)
                         except Exception as e:
-                            nepi_msg.publishMsgInfo(self,"Framerate setting: " + data + " could not be parsed to float " + str(e))
+                            nepi_msg.publishMsgWarn(self,"Framerate setting: " + data + " could not be parsed to float " + str(e))
                         break    
             if found_setting is False:
                 msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                   
@@ -403,7 +436,7 @@ class GenicamCamNode:
         controls_dict = self.driver.getCameraControls()
         #for key in controls_dict.keys():
             #string = str(controls_dict[key])
-            #nepi_msg.publishMsgInfo(self,key + " " + string)
+            #nepi_msg.publishMsgInfo(self,key + string)
             
         _, fmt = self.driver.getCurrentFormat()
         device_info_str += f"\tCamera Output Format: {fmt}\n"
@@ -481,44 +514,65 @@ class GenicamCamNode:
         err_str = ""
         return status, err_str
 
+    def getFramerate(self):
+        fr_mode = self.current_controls.get("framerate_mode")
+        adj_fps =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        return adj_fps
+
     def getColorImg(self):
-        encoding = "bgr8"
-        self.img_lock.acquire()
-        # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
-        ret, msg = self.driver.startImageAcquisition()
-        if ret is False:
-            self.img_lock.release()
-            return ret, msg, None, None, None
 
-        self.color_image_acquisition_running = True
-
-        timestamp = None
-
-        start = time.time()
-        cv2_img, timestamp, ret, msg = self.driver.getImage()
-        stop = time.time()
-        #print('GI: ', stop - start)
-        if ret is False:
-            self.img_lock.release()
-            return ret, msg, None, None, None
-
-        if timestamp is not None:
-            ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+        # Check for control framerate adjustment
+        last_time = self.cl_img_last_time
+        current_time = nepi_ros.get_rostime()
+        controls_enabled = self.current_controls.get("controls_enable")
+        fr_mode = self.current_controls.get("framerate_mode")
+        need_data = False
+        if fr_mode != 3 and last_time != None and self.idx_if is not None:
+          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+          fr_delay = float(1) / adj_fr
+          timer =(current_time.to_sec() - last_time.to_sec())
+          if timer > fr_delay:
+            need_data = True
         else:
-            ros_timestamp = nepi_ros.time_now()
+          need_data = True
+        # Get and Process Data if Needed
+        if need_data == False:
+          return False, "Waiting for Timer", None, None, None  # Return None data
+        else:
+            self.cl_img_last_time = current_time
 
-        # Apply controls
-        if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
-          cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+            encoding = "bgr8"
+            self.img_lock.acquire()
+            # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
+            ret, msg = self.driver.startImageAcquisition()
+            if ret is False:
+                self.img_lock.release()
+                return ret, msg, None, None, None
 
-        # Make a copy for the bw thread to use rather than grabbing a new cv2_img
-        if self.bw_image_acquisition_running:
-            self.cached_2d_color_frame = cv2_img
-            self.cached_2d_color_frame_timestamp = ros_timestamp
-
-        self.img_lock.release()
-        return ret, msg, cv2_img, ros_timestamp, encoding
-    
+            self.color_image_acquisition_running = True
+            timestamp = None
+            start = time.time()
+            cv2_img, timestamp, ret, msg = self.driver.getImage()
+            stop = time.time()
+            #print('GI: ', stop - start)
+            if ret is False:
+                self.img_lock.release()
+                return ret, msg, None, None, None
+            if timestamp is not None:
+                ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+            else:
+                ros_timestamp = nepi_ros.time_now()
+            # Make a copy for the bw thread to use rather than grabbing a new cv2_img
+            if self.bw_image_acquisition_running:
+                self.cached_2d_color_frame = cv2_img
+                self.cached_2d_color_frame_timestamp = ros_timestamp
+            self.img_lock.release()
+            #nepi_msg.publishMsgInfo(self,"About to run cl_img controls with controls: " + str(self.current_controls))
+            # Apply controls
+            if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
+                cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+            return ret, msg, cv2_img, ros_timestamp, encoding
+        
     def stopColorImg(self):
         self.img_lock.acquire()
         # Don't stop acquisition if the b/w image is still being requested
@@ -534,50 +588,65 @@ class GenicamCamNode:
         return ret,msg
     
     def getBWImg(self):
-        encoding = "mono8"
-        self.img_lock.acquire()
-        # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
-        ret, msg = self.driver.startImageAcquisition()
-        if ret is False:
-            self.img_lock.release()
-            return ret, msg, None, None
-        
-        self.bw_image_acquisition_running = True
 
-        ros_timestamp = None
-        
-        # Only grab a frame if we don't already have a cached color frame... avoids cutting the update rate in half when
-        # both image streams are running
-        if self.color_image_acquisition_running is False or self.cached_2d_color_frame is None:
-            #nepi_msg.publishMsgWarn(self,"Debugging: getBWImg acquiring")
-            cv2_img, timestamp, ret, msg = self.driver.getImage()
-            if timestamp is not None:
-                ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+        # Check for control framerate adjustment
+        last_time = self.bw_img_last_time
+        current_time = nepi_ros.get_rostime()
+        controls_enabled = self.current_controls.get("controls_enable")
+        fr_mode = self.current_controls.get("framerate_mode")
+        need_data = False
+        if fr_mode != 3 and last_time != None and self.idx_if is not None:
+          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+          fr_delay = float(1) / adj_fr
+          timer =(current_time.to_sec() - last_time.to_sec())
+          if timer > fr_delay:
+            need_data = True
+        else:
+          need_data = True
+        # Get and Process Data if Needed
+        if need_data == False:
+          return False, "Waiting for Timer", None, None, None  # Return None data
+        else:
+            self.bw_img_last_time = current_time
+
+
+            encoding = "mono8"
+            self.img_lock.acquire()
+            # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
+            ret, msg = self.driver.startImageAcquisition()
+            if ret is False:
+                self.img_lock.release()
+                return ret, msg, None, None
+            self.bw_image_acquisition_running = True
+            ros_timestamp = None
+            # Only grab a frame if we don't already have a cached color frame... avoids cutting the update rate in half when
+            # both image streams are running
+            if self.color_image_acquisition_running is False or self.cached_2d_color_frame is None:
+                #nepi_msg.publishMsgWarn(self,"Debugging: getBWImg acquiring")
+                cv2_img, timestamp, ret, msg = self.driver.getImage()
+                if timestamp is not None:
+                    ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+                else:
+                    ros_timestamp = nepi_ros.time_now()
             else:
-                ros_timestamp = nepi_ros.time_now()
+                #nepi_msg.publishMsgWarn(self,"Debugging: getBWImg reusing")
+                cv2_img = self.cached_2d_color_frame.copy()
+                ros_timestamp = self.cached_2d_color_frame_timestamp
+                self.cached_2d_color_frame = None # Clear it to avoid using it multiple times in the event that threads are running at different rates
+                self.cached_2d_color_frame_timestamp = None
+                ret = True
+                msg = "Success: Reusing cached cv2_img"
+            self.img_lock.release()
+            # Abort if there was some error or issue in acquiring the image
+            if ret is False or cv2_img is None:
+                return False, msg, None, None, None
+            # Fix the channel count if necessary
+            if cv2_img.ndim == 3:
+                cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2GRAY)
             # Apply controls
             if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
                 cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
-        else:
-            #nepi_msg.publishMsgWarn(self,"Debugging: getBWImg reusing")
-            cv2_img = self.cached_2d_color_frame.copy()
-            ros_timestamp = self.cached_2d_color_frame_timestamp
-            self.cached_2d_color_frame = None # Clear it to avoid using it multiple times in the event that threads are running at different rates
-            self.cached_2d_color_frame_timestamp = None
-            ret = True
-            msg = "Success: Reusing cached cv2_img"
-
-        self.img_lock.release()
-
-        # Abort if there was some error or issue in acquiring the image
-        if ret is False or cv2_img is None:
-            return False, msg, None, None, None
-
-        # Fix the channel count if necessary
-        if cv2_img.ndim == 3:
-            cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2GRAY)
-        
-        return ret, msg, cv2_img, ros_timestamp, encoding
+            return ret, msg, cv2_img, ros_timestamp, encoding
     
     def stopBWImg(self):
         self.img_lock.acquire()

@@ -73,8 +73,8 @@ TEST_DRV_DICT = {
         'set_val': 'HD720'
     },
     'options_2_dict': {
-        'default_val': 'None',
-        'set_val': 'None'
+        'default_val': '5',
+        'set_val': '5'
     },
     'method': 'AUTO', 
     'include_ids': ['ZED 2','ZED 2i','ZED-M'],
@@ -118,21 +118,19 @@ class ZedCamNode(object):
     
     
     #Factory Control Values 
-    FACTORY_CONTROLS = dict( controls_enable = True,
+    FACTORY_CONTROLS = dict( controls_enable = False,
     auto_adjust = False,
     brightness_ratio = 0.5,
     contrast_ratio =  0.5,
     threshold_ratio =  0.0,
     resolution_mode = 3, # LOW, MED, HIGH, MAX
-    framerate_mode = 3, # LOW, MED, HIGH, MAX
+    framerate_mode = 2, # LOW, MED, HIGH, MAX
     start_range_ratio = 0.0, 
     stop_range_ratio = 1.0,
     min_range_m = 0.0,
     max_range_m = 20.0,
     frame_id = 'sensor_frame' 
     )
-
-    DEFAULT_CURRENT_FPS = 20 # Will be update later with actual
 
     ZED_MIN_RANGE_M_OVERRIDES = { 'zed': .2, 'zedm': .15, 'zed2': .2, 'zedx': .2} 
     ZED_MAX_RANGE_M_OVERRIDES = { 'zed':  15, 'zedm': 15, 'zed2': 20, 'zedx': 15} 
@@ -190,6 +188,16 @@ class ZedCamNode(object):
     img_renderer_mtl = None
     
     idx_if = None
+
+    current_fps = 100
+    cl_img_last_time = None
+    bw_img_last_time = None
+    dm_img_last_time = None
+    di_img_last_time = None
+    pc_img_last_time = None
+    pc_last_time = None
+
+
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"         
     drv_dict = dict()                          
@@ -217,6 +225,7 @@ class ZedCamNode(object):
         # Connect to Zed node
         self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
         self.res_val = self.drv_dict['DEVICE_DICT']['res_val']
+        self.fr_val = self.drv_dict['DEVICE_DICT']['fr_val']
         ZED_BASE_NAMESPACE = nepi_ros.get_base_namespace() + self.zed_type + "/zed_node/"
 
 
@@ -243,7 +252,8 @@ class ZedCamNode(object):
               cfg = yaml.load(f, Loader=yaml.FullLoader)
             #nepi_msg.publishMsgWarn(self,"Updating zed param config with resolution " + str(self.res_val))
             cfg['general']['resolution'] = self.res_val
-            #nepi_msg.publishMsgWarn(self,"Updating zed param file: " + zed_params_path + " with cfg " + str(cfg))
+            cfg['general']['grab_frame_rate'] = self.fr_val
+            nepi_msg.publishMsgWarn(self,"Updating zed param file: " + zed_params_path + " with cfg " + str(cfg))
             with open(zed_params_path, "w") as f:
                 cfg = yaml.dump(
                     cfg, stream=f, default_flow_style=False, sort_keys=False
@@ -360,7 +370,7 @@ class ZedCamNode(object):
           self.factory_controls['max_range_m'] = self.ZED_MAX_RANGE_M_OVERRIDES[self.zed_type]
         
         self.current_controls = self.factory_controls # Updateded during initialization
-        self.current_fps = self.DEFAULT_CURRENT_FPS # Should be updateded when settings read
+        self.current_fps = self.fr_val # Should be updateded when settings read
 
         # Initialize settings
         self.cap_settings = self.getCapSettings()
@@ -390,6 +400,7 @@ class ZedCamNode(object):
                                     setBrightness=idx_callback_names["Controls"]["Brightness"], 
                                     setThresholding=idx_callback_names["Controls"]["Thresholding"], 
                                     setRange=idx_callback_names["Controls"]["Range"], 
+                                    getFramerate = self.getFramerate,
                                     getColor2DImg=idx_callback_names["Data"]["Color2DImg"], 
                                     stopColor2DImgAcquisition=idx_callback_names["Data"]["StopColor2DImg"],
                                     getBW2DImg=idx_callback_names["Data"]["BW2DImg"], 
@@ -498,42 +509,152 @@ class ZedCamNode(object):
 
     # callback to get color 2d image data
     def color_2d_image_callback(self, image_msg):
-      self.color_img_lock.acquire()
-      self.color_img_msg = image_msg
-      self.color_img_lock.release()
+        # Check for control framerate adjustment
+        last_time = self.cl_img_last_time
+        current_time = nepi_ros.get_rostime()
+        controls_enabled = self.current_controls.get("controls_enable")
+        fr_mode = self.current_controls.get("framerate_mode")
+        need_data = False
+        if fr_mode != 3 and last_time != None and self.idx_if is not None:
+          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+          fr_delay = float(1) / adj_fr
+          timer =(current_time.to_sec() - last_time.to_sec())
+          if timer > fr_delay:
+            need_data = True
+        else:
+          need_data = True
+
+        # Get and Process Data if Needed
+        if need_data == True:
+          self.cl_img_last_time = current_time
+
+          self.color_img_lock.acquire()
+          self.color_img_msg = image_msg
+          self.color_img_lock.release()
 
     # callback to get 2d image data
     def bw_2d_image_callback(self, image_msg):
-      self.bw_img_lock.acquire()
-      self.bw_img_msg = image_msg
-      self.bw_img_lock.release()
+        # Check for control framerate adjustment
+        last_time = self.bw_img_last_time
+        current_time = nepi_ros.get_rostime()
+        controls_enabled = self.current_controls.get("controls_enable")
+        fr_mode = self.current_controls.get("framerate_mode")
+        need_data = False
+        if fr_mode != 3 and last_time != None and self.idx_if is not None:
+          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+          fr_delay = float(1) / adj_fr
+          timer =(current_time.to_sec() - last_time.to_sec())
+          if timer > fr_delay:
+            need_data = True
+        else:
+          need_data = True
+
+        # Get and Process Data if Needed
+        if need_data == True:
+          self.bw_img_last_time = current_time
+
+          self.bw_img_lock.acquire()
+          self.bw_img_msg = image_msg
+          self.bw_img_lock.release()
 
 
     # callback to get depthmap
     def depth_map_callback(self, image_msg):
-      image_msg.header.stamp = nepi_ros.time_now()
-      self.depth_map_lock.acquire()
-      self.depth_map_msg = image_msg
-      self.depth_map_lock.release()
+        # Check for control framerate adjustment
+        last_time = self.dm_img_last_time
+        current_time = nepi_ros.get_rostime()
+        controls_enabled = self.current_controls.get("controls_enable")
+        fr_mode = self.current_controls.get("framerate_mode")
+        need_data = False
+        if fr_mode != 3 and last_time != None and self.idx_if is not None:
+          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+          fr_delay = float(1) / adj_fr
+          timer =(current_time.to_sec() - last_time.to_sec())
+          if timer > fr_delay:
+            need_data = True
+        else:
+          need_data = True
+        # Get and Process Data if Needed
+        if need_data == True:
+          self.dm_img_last_time = current_time
+
+          image_msg.header.stamp = nepi_ros.time_now()
+          self.depth_map_lock.acquire()
+          self.depth_map_msg = image_msg
+          self.depth_map_lock.release()
 
     # callback to get depthmap
     def depth_image_callback(self, image_msg):
-      image_msg.header.stamp = nepi_ros.time_now()
-      self.depth_img_lock.acquire()
-      self.depth_img_msg = image_msg
-      self.depth_img_lock.release()
+        # Check for control framerate adjustment
+        last_time = self.di_img_last_time
+        current_time = nepi_ros.get_rostime()
+        controls_enabled = self.current_controls.get("controls_enable")
+        fr_mode = self.current_controls.get("framerate_mode")
+        need_data = False
+        if fr_mode != 3 and last_time != None and self.idx_if is not None:
+          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+          fr_delay = float(1) / adj_fr
+          timer =(current_time.to_sec() - last_time.to_sec())
+          if timer > fr_delay:
+            need_data = True
+        else:
+          need_data = True
+        # Get and Process Data if Needed
+        if need_data == True:
+          self.di_img_last_time = current_time
+
+          image_msg.header.stamp = nepi_ros.time_now()
+          self.depth_img_lock.acquire()
+          self.depth_img_msg = image_msg
+          self.depth_img_lock.release()
 
     # callback to get and republish point_cloud
     def pointcloud_callback(self, pointcloud_msg):
-      self.pc_lock.acquire()
-      self.pc_msg = pointcloud_msg
-      self.pc_lock.release()
+        # Check for control framerate adjustment
+        last_time = self.pc_last_time
+        current_time = nepi_ros.get_rostime()
+        controls_enabled = self.current_controls.get("controls_enable")
+        fr_mode = self.current_controls.get("framerate_mode")
+        need_data = False
+        if fr_mode != 3 and last_time != None and self.idx_if is not None:
+          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+          fr_delay = float(1) / adj_fr
+          timer =(current_time.to_sec() - last_time.to_sec())
+          if timer > fr_delay:
+            need_data = True
+        else:
+          need_data = True
+        # Get and Process Data if Needed
+        if need_data == True:
+          self.pc_last_time = current_time
 
-    # callback to get and process point_cloud image
+          self.pc_lock.acquire()
+          self.pc_msg = pointcloud_msg
+          self.pc_lock.release()
+
+        # callback to get and process point_cloud image
     def pointcloud_image_callback(self, pointcloud_msg):
-      self.pc_img_lock.acquire()
-      self.pc_img_msg = pointcloud_msg
-      self.pc_img_lock.release()
+        # Check for control framerate adjustment
+        last_time = self.pc_img_last_time
+        current_time = nepi_ros.get_rostime()
+        controls_enabled = self.current_controls.get("controls_enable")
+        fr_mode = self.current_controls.get("framerate_mode")
+        need_data = False
+        if fr_mode != 3 and last_time != None and self.idx_if is not None:
+          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+          fr_delay = float(1) / adj_fr
+          timer =(current_time.to_sec() - last_time.to_sec())
+          if timer > fr_delay:
+            need_data = True
+        else:
+          need_data = True
+        # Get and Process Data if Needed
+        if need_data == True:
+          self.pc_img_last_time = current_time
+
+          self.pc_img_lock.acquire()
+          self.pc_img_msg = pointcloud_msg
+          self.pc_img_lock.release()
 
 
 
@@ -608,6 +729,11 @@ class ZedCamNode(object):
         err_str = ""
         return status, err_str
 
+    def getFramerate(self):
+        fr_mode = self.current_controls.get("framerate_mode")
+        adj_fps =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        return adj_fps
+
     def setRange(self, min_ratio, max_ratio):
         if min_ratio > 1:
             min_ratio = 1
@@ -627,7 +753,7 @@ class ZedCamNode(object):
           err_str = "Invalid Range Window"
         return status, err_str
 
-    
+
  
 
     # Good base class candidate - Shared with ONVIF
@@ -635,6 +761,9 @@ class ZedCamNode(object):
         if self.color_img_sub == None:
           self.color_img_sub = rospy.Subscriber(self.color_img_topic, Image, self.color_2d_image_callback, queue_size = 1)
           time.sleep(0.1)
+
+
+
         # Set process input variables
         data_product = "color_2d_image"
         self.color_img_lock.acquire()
@@ -687,6 +816,8 @@ class ZedCamNode(object):
         if self.bw_img_sub == None:
           self.bw_img_sub =rospy.Subscriber(self.bw_img_topic, Image, self.bw_2d_image_callback, queue_size = 1)
           time.sleep(0.1)
+
+
         # Set process input variables
         data_product = "bw_2d_image"
         self.bw_img_lock.acquire()
@@ -711,7 +842,7 @@ class ZedCamNode(object):
             ros_timestamp = img_msg.header.stamp
             if self.current_controls.get("controls_enable") and self.idx_if is not None:
               cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
-              cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+              cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls)
               #img_msg = nepi_img.cv2img_to_rosimg(cv2_img, encoding = encoding)
             self.bw_img_last_stamp = ros_timestamp
           else:
@@ -740,6 +871,7 @@ class ZedCamNode(object):
         if self.depth_map_sub == None:
           self.depth_map_sub =rospy.Subscriber(self.depth_map_topic, Image, self.depth_map_callback, queue_size = 1)
           time.sleep(0.1)
+
         # Set process input variables
         data_product = "depth_map"
         self.depth_map_lock.acquire()
@@ -782,7 +914,7 @@ class ZedCamNode(object):
               depth_data[depth_data >= max_range_m] = float('nan')  # set to NaN
               cv2_img = depth_data
               #img_msg = nepi_img.cv2img_to_rosimg(cv2_depth_image,encoding)
-           
+          
           else:
             msg = "No new data for " + data_product + " available"
         else:
@@ -808,6 +940,8 @@ class ZedCamNode(object):
         if self.depth_img_sub == None:
           self.depth_img_sub =rospy.Subscriber(self.depth_map_topic, Image, self.depth_image_callback, queue_size = 1)
           time.sleep(0.1)
+
+
         # Set process input variables
         data_product = "depth_image"
         self.depth_img_lock.acquire()
@@ -817,7 +951,7 @@ class ZedCamNode(object):
             img_msg = copy.deepcopy(self.depth_img_msg)
         self.depth_img_lock.release()
         encoding = 'bgr8'
-         # Run get process
+        # Run get process
         # Initialize some process return variables
         status = False
         msg = ""
@@ -878,13 +1012,14 @@ class ZedCamNode(object):
         if self.pc_sub == None:
           self.pc_sub =rospy.Subscriber(self.pc_topic, PointCloud2, self.pointcloud_callback, queue_size = 1)
           time.sleep(0.1)
+
         # Set process input variables
         data_product = "pointcloud"
         self.pc_lock.acquire()
         pc_msg = None
         if self.pc_msg != None:
           if self.pc_msg.header.stamp != self.pc_last_stamp:
-           pc_msg = copy.deepcopy(self.pc_msg)
+            pc_msg = copy.deepcopy(self.pc_msg)
         self.pc_lock.release()
         # Run get process
         # Initialize some process return variables
@@ -937,6 +1072,7 @@ class ZedCamNode(object):
         if self.pc_img_sub == None:
           self.pc_img_sub =rospy.Subscriber(self.pc_topic, PointCloud2, self.pointcloud_image_callback, queue_size = 1) 
           time.sleep(0.1)
+
         # Set process input variables
         data_product = "pointcloud_image"
         self.pc_img_lock.acquire()
@@ -979,7 +1115,7 @@ class ZedCamNode(object):
               if start_range_ratio > 0 or stop_range_ratio < 1:
                 o3d_pc = nepi_pc.rospc_to_o3dpc(pc_msg, remove_nans=False)
                 o3d_pc = nepi_pc.range_clip_spherical( o3d_pc, range_clip_min_range_m, range_clip_max_range_m)
-       
+        
               zoom_ratio = render_controls[0]
               zoom_scaler = 1 - zoom_ratio
               render_eye = [number*zoom_scaler for number in self.render_eye] # Apply IDX zoom control
@@ -988,7 +1124,7 @@ class ZedCamNode(object):
               rotate_angle = (0.5 - rotate_ratio) * 2 * 180
               rotate_vector = [0, 0, rotate_angle]
               o3d_pc = nepi_pc.rotate_pc(o3d_pc, rotate_vector)
-             
+              
               tilt_ratio = render_controls[2]
               tilt_angle = (0.5 - tilt_ratio) * 2 * 180
               tilt_vector = [0, tilt_angle, 0]
