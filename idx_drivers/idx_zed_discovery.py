@@ -46,8 +46,8 @@ TEST_NEX_DICT = {
         'set_val': 'HD720'
     },
     'options_2_dict': {
-        'default_val': '5',
-        'set_val': '5'
+        'default_val': '15',
+        'set_val': '15'
     },
     'method': 'AUTO', 
     'include_ids': ['ZED 2','ZED 2i','ZED-M'],
