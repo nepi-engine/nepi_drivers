@@ -18,7 +18,7 @@ DISCOVERY_DICT:
   process: CALL
   method: AUTO
   include_ids:
-  - iqr_pan_tilt
+  - ttyACM
   exclude_ids: []
   interfaces:
   - USB

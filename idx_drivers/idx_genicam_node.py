@@ -70,7 +70,7 @@ class GenicamCamNode:
                                       GainAuto = 'Continuous')
 
     #Factory Control Values 
-    FACTORY_CONTROLS = dict( controls_enable = False,
+    FACTORY_CONTROLS = dict( controls_enable = True,
     auto_adjust = False,
     brightness_ratio = 0.5,
     contrast_ratio =  0.5,

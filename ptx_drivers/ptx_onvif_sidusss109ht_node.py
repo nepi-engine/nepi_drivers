@@ -16,6 +16,7 @@ from nepi_edge_sdk_base import nepi_settings
 
 from nepi_edge_sdk_base.device_if_ptx import ROSPTXActuatorIF
 
+from ptx_onvif_generic_node import OnvifPanTiltNode
 
 PKG_NAME = 'PTX_ONVIF_SIDUS_SS109HT' # Use in display menus
 FILE_TYPE = 'NODE'
@@ -348,8 +349,8 @@ class OnvifSidusSsPanTiltNode(OnvifPanTiltNode):
      
     def pitchDegToOvRatio(self, deg):
         ratio = 0.5
-        max_ph = rospy.get_param('~ptx/limits/max_pitch_hardstop_deg', self.defaultSettings['max_pitch_hardstop_deg'])
-        min_ph = rospy.get_param('~ptx/limits/min_pitch_hardstop_deg', self.defaultSettings['min_pitch_hardstop_deg'])
+        max_ph = nepi_ros.get_param(self,'~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
+        min_ph = nepi_ros.get_param(self,'~ptx/limits/min_pitch_hardstop_deg', self.default_settings['min_pitch_hardstop_deg'])
         if self.reverse_pitch_control == False:
           ratio = 1 - (deg - min_ph) / (max_ph - min_ph)
         else:
@@ -359,8 +360,8 @@ class OnvifSidusSsPanTiltNode(OnvifPanTiltNode):
 
     def yawDegToOvRatio(self, deg):
         ratio = 0.5
-        max_yh = rospy.get_param('~ptx/limits/max_yaw_hardstop_deg', self.defaultSettings['max_yaw_hardstop_deg'])
-        min_yh = rospy.get_param('~ptx/limits/min_yaw_hardstop_deg', self.defaultSettings['min_yaw_hardstop_deg'])
+        max_yh = nepi_ros.get_param(self,'~ptx/limits/max_yaw_hardstop_deg', self.default_settings['max_yaw_hardstop_deg'])
+        min_yh = nepi_ros.get_param(self,'~ptx/limits/min_yaw_hardstop_deg', self.default_settings['min_yaw_hardstop_deg'])
         if self.reverse_yaw_control == False:
           ratio = 1 - (deg - min_yh) / (max_yh - min_yh)
         else:
@@ -370,8 +371,8 @@ class OnvifSidusSsPanTiltNode(OnvifPanTiltNode):
 
     def yawOvRatioToDeg(self, ovRatio):
         yaw_deg = 0
-        max_yh = rospy.get_param('~ptx/limits/max_yaw_hardstop_deg', self.defaultSettings['max_yaw_hardstop_deg'])
-        min_yh = rospy.get_param('~ptx/limits/min_yaw_hardstop_deg', self.defaultSettings['min_yaw_hardstop_deg'])
+        max_yh = nepi_ros.get_param(self,'~ptx/limits/max_yaw_hardstop_deg', self.default_settings['max_yaw_hardstop_deg'])
+        min_yh = nepi_ros.get_param(self,'~ptx/limits/min_yaw_hardstop_deg', self.default_settings['min_yaw_hardstop_deg'])
         if self.reverse_yaw_control == False:
            yaw_deg =  min_yh + (1-ovRatio) * (max_yh - min_yh)
         else:
@@ -380,8 +381,8 @@ class OnvifSidusSsPanTiltNode(OnvifPanTiltNode):
     
     def pitchOvRatioToDeg(self, ovRatio):
         pitch_deg = 0
-        max_ph = rospy.get_param('~ptx/limits/max_pitch_hardstop_deg', self.defaultSettings['max_pitch_hardstop_deg'])
-        min_ph = rospy.get_param('~ptx/limits/min_pitch_hardstop_deg', self.defaultSettings['min_pitch_hardstop_deg'])
+        max_ph = nepi_ros.get_param(self,'~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
+        min_ph = nepi_ros.get_param(self,'~ptx/limits/min_pitch_hardstop_deg', self.default_settings['min_pitch_hardstop_deg'])
         if self.reverse_pitch_control == False:
            pitch_deg =  min_ph + (1-ovRatio) * (max_ph - min_ph)
         else:
@@ -393,16 +394,16 @@ class OnvifSidusSsPanTiltNode(OnvifPanTiltNode):
     def getCurrentPosition(self):
         pan_ratio_onvif, tilt_ratio_onvif = self.driver.getCurrentPosition()
 
-        max_yh = rospy.get_param('~ptx/limits/max_yaw_hardstop_deg', self.defaultSettings['max_yaw_hardstop_deg'])
-        min_yh = rospy.get_param('~ptx/limits/min_yaw_hardstop_deg', self.defaultSettings['min_yaw_hardstop_deg'])
-        max_ph = rospy.get_param('~ptx/limits/max_pitch_hardstop_deg', self.defaultSettings['max_pitch_hardstop_deg'])
-        min_ph = rospy.get_param('~ptx/limits/min_pitch_hardstop_deg', self.defaultSettings['min_pitch_hardstop_deg'])
+        max_yh = nepi_ros.get_param(self,'~ptx/limits/max_yaw_hardstop_deg', self.default_settings['max_yaw_hardstop_deg'])
+        min_yh = nepi_ros.get_param(self,'~ptx/limits/min_yaw_hardstop_deg', self.default_settings['min_yaw_hardstop_deg'])
+        max_ph = nepi_ros.get_param(self,'~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
+        min_ph = nepi_ros.get_param(self,'~ptx/limits/min_pitch_hardstop_deg', self.default_settings['min_pitch_hardstop_deg'])
 
         # Soft limits
-        max_ys = rospy.get_param('~ptx/limits/max_yaw_softstop_deg', self.defaultSettings['max_yaw_softstop_deg'])
-        min_ys = rospy.get_param('~ptx/limits/min_yaw_softstop_deg', self.defaultSettings['min_yaw_softstop_deg'])
-        max_ps = rospy.get_param('~ptx/limits/max_pitch_softstop_deg', self.defaultSettings['max_pitch_softstop_deg'])
-        min_ps = rospy.get_param('~ptx/limits/min_pitch_softstop_deg', self.defaultSettings['min_pitch_softstop_deg'])
+        max_ys = nepi_ros.get_param(self,'~ptx/limits/max_yaw_softstop_deg', self.default_settings['max_yaw_softstop_deg'])
+        min_ys = nepi_ros.get_param(self,'~ptx/limits/min_yaw_softstop_deg', self.default_settings['min_yaw_softstop_deg'])
+        max_ps = nepi_ros.get_param(self,'~ptx/limits/max_pitch_softstop_deg', self.default_settings['max_pitch_softstop_deg'])
+        min_ps = nepi_ros.get_param(self,'~ptx/limits/min_pitch_softstop_deg', self.default_settings['min_pitch_softstop_deg'])
 
         #print("Got pos_ratio_onvif from driver: " + str([pan_ratio_onvif, tilt_ratio_onvif]))
         # Recenter the -1.0,1.0 ratio from Onvif to the 0.0,1.0 used throughout the rest of NEPI

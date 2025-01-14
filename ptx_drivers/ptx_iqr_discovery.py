@@ -45,7 +45,7 @@ TEST_DRV_DICT = {
         'set_val': 'None'
     },
     'method': 'AUTO', 
-    'include_ids': ['iqr_pan_tilt'],
+    'include_ids': ['ttyACM'],
     'exclude_ids': []
 },
 'DEVICE_DICT': {},
@@ -104,7 +104,7 @@ class IqrPanTiltDiscovery:
 
   def checkForDevice(self,path_str):
     for included_device in self.includeDevices:
-      found_device = path_str.find(included_device) != -1
+      found_device = path_str.find(included_device) != -1 
       if found_device:
         return True
     return False
@@ -128,7 +128,7 @@ class IqrPanTiltDiscovery:
 
   def launchDeviceNode(self, path_str):
     file_name = 'iqr_ros_pan_tilt_node'
-    node_name = path_str.split('/')[-1]
+    node_name = 'iqr_pan_tilt_' + path_str.split("ttyACM")[1]
     nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "***Launching node with name: " + node_name)
     [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, node_name, device_path = path_str)
     if success:
