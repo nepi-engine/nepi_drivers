@@ -30,9 +30,9 @@ from nepi_ros_interfaces.srv import RBXCapabilitiesQuery
 from mavros_msgs.srv import VehicleInfoGet
 from mavros_msgs.msg import VehicleInfo
 
-from nepi_edge_sdk_base import nepi_ros
-from nepi_edge_sdk_base import nepi_msg
-from nepi_edge_sdk_base import nepi_drv
+from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_drv
 
 PKG_NAME = 'RBX_ARDUPILOT' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
@@ -343,7 +343,7 @@ class ArdupilotDiscovery:
       #Start the an RBX fake gps for this ardupilot node
       fgps_node_name = "fake_gps_" + device_id_str
       nepi_msg.printMsgInfo(self.log_name + ": " + "Starting fake gps rbx node: " + fgps_node_name)
-      processor_run_cmd = ["rosrun", "nepi_edge_sdk_base", "fake_gps.py",
+      processor_run_cmd = ["rosrun", "nepi_env", "fake_gps.py",
                             "__name:=" + fgps_node_name, f"__ns:={self.base_namespace}"]
       fgps_subproc = subprocess.Popen(processor_run_cmd)
 
@@ -529,7 +529,7 @@ class ArdupilotDiscovery:
 # Main
 #########################################
 if __name__ == '__main__':
-  from nepi_edge_sdk_base import nepi_ros
+  from nepi_sdk import nepi_ros
   bn = nepi_ros.get_base_namespace()
   ardu = ArdupilotDiscovery()
   print(ardu.discoveryFunction([],[],bn))

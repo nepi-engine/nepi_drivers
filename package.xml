@@ -51,7 +51,7 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <depend>nepi_ros_interfaces</depend>
-  <depend>nepi_edge_sdk_base</depend>
+  <depend>nepi_sdk</depend>
   <depend>cv_bridge</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>

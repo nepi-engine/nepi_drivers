@@ -21,9 +21,9 @@ import time
 import serial
 import serial.tools.list_ports
 
-from nepi_edge_sdk_base import nepi_ros
-from nepi_edge_sdk_base import nepi_msg
-from nepi_edge_sdk_base import nepi_drv
+from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_drv
 
 PKG_NAME = 'LSX_AFTOWER' # Use in display menus
 FILE_TYPE = 'DISCOVERY'

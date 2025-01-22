@@ -24,9 +24,9 @@ import os
 import subprocess
 import time
 
-from nepi_edge_sdk_base import nepi_ros
-from nepi_edge_sdk_base import nepi_msg
-from nepi_edge_sdk_base import nepi_drv
+from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_drv
 
 # Needed for GenICam auto-detect
 from harvesters.core import Harvester

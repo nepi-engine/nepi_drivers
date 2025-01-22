@@ -23,7 +23,7 @@ from copy import deepcopy
 import time
 import threading
 
-from nepi_edge_sdk_base import nepi_msg
+from nepi_sdk import nepi_msg
 
 import numpy as np
 from harvesters.core import Harvester

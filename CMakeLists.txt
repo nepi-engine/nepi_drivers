@@ -20,7 +20,7 @@ set(CMAKE_VERBOSE_MAKEFILE TRUE)
 set(OpenCV_DIR /usr/share/OpenCV)
 
 find_package(catkin REQUIRED
-    COMPONENTS std_msgs sensor_msgs nepi_edge_sdk_base nepi_ros_interfaces cv_bridge OpenCV  serial pcl_ros pcl_conversions tf2_ros )
+    COMPONENTS std_msgs sensor_msgs nepi_sdk nepi_ros_interfaces cv_bridge OpenCV  serial pcl_ros pcl_conversions tf2_ros )
 
 find_package(PkgConfig)
 
@@ -111,7 +111,7 @@ catkin_python_setup()
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 	INCLUDE_DIRS include
-	CATKIN_DEPENDS sensor_msgs nepi_ros_interfaces nepi_edge_sdk_base
+	CATKIN_DEPENDS sensor_msgs nepi_ros_interfaces nepi_sdk
 )
 
 ###########
@@ -273,7 +273,7 @@ install(DIRECTORY rbx_drivers/
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_nepi_edge_sdk_base.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_nepi_sdk.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

@@ -21,8 +21,8 @@ import os
 import subprocess
 import time
 
-from nepi_edge_sdk_base import nepi_drv
-from nepi_edge_sdk_base import nepi_msg
+from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_msg
 
 PKG_NAME = 'PTX_IQR' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
@@ -138,6 +138,7 @@ class IqrPanTiltDiscovery:
 
   def launchDeviceNode(self, path_str):
     file_name = 'iqr_ros_pan_tilt_node'
+    nepi_msg.publishMsgWarn(self, "launching on path: " + path_str)
     node_name = 'iqr_pan_tilt_' + path_str.split("ttyACM")[1]
     nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "***Launching node with name: " + node_name)
     [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, node_name, device_path = path_str)

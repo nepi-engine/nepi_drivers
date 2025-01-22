@@ -16,12 +16,12 @@
 # - mailto:nepi@numurus.com
 #
 
-from nepi_edge_sdk_base import nepi_ros
-from nepi_edge_sdk_base import nepi_msg
-from nepi_edge_sdk_base import nepi_drv
-from nepi_edge_sdk_base import nepi_settings
+from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_settings
 
-from nepi_edge_sdk_base.device_if_ptx import ROSPTXActuatorIF
+from nepi_sdk.device_if_ptx import ROSPTXActuatorIF
 
 PKG_NAME = 'PTX_ONVIF_GENERIC' # Use in display menus
 FILE_TYPE = 'NODE'

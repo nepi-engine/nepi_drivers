@@ -23,7 +23,7 @@ import os
 import copy
 from onvif import ONVIFCamera # python-onvif
 
-from nepi_edge_sdk_base import nepi_msg
+from nepi_sdk import nepi_msg
 
 
 PKG_NAME = 'IDX_ONVIF_GENERIC' # Use in display menus

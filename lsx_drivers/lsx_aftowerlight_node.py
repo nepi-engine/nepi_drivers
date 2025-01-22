@@ -25,14 +25,14 @@ import time
 import re
 import sys
 
-from nepi_edge_sdk_base.device_if_lsx import ROSLSXDeviceIF
+from nepi_sdk.device_if_lsx import ROSLSXDeviceIF
 
 from nepi_ros_interfaces.msg import LSXStatus
 
-from nepi_edge_sdk_base import nepi_ros
-from nepi_edge_sdk_base import nepi_msg
-from nepi_edge_sdk_base import nepi_drv
-from nepi_edge_sdk_base import nepi_settings
+from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_settings
 
 
 PKG_NAME = 'LSX_AFTOWER' # Use in display menus

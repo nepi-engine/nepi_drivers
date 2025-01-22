@@ -34,15 +34,15 @@ import dynamic_reconfigure.client
 import numpy as np
 import tf
 
-from nepi_edge_sdk_base.device_if_idx import ROSIDXSensorIF
+from nepi_sdk.device_if_idx import ROSIDXSensorIF
 
-from nepi_edge_sdk_base import nepi_ros
-from nepi_edge_sdk_base import nepi_msg
-from nepi_edge_sdk_base import nepi_nav
-from nepi_edge_sdk_base import nepi_img
-from nepi_edge_sdk_base import nepi_pc
-from nepi_edge_sdk_base import nepi_drv
-from nepi_edge_sdk_base import nepi_settings
+from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_nav
+from nepi_sdk import nepi_img
+from nepi_sdk import nepi_pc
+from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_settings
 
 from datetime import datetime
 from std_msgs.msg import UInt8, Empty, String, Bool, Float32

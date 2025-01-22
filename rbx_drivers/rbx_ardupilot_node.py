@@ -28,12 +28,12 @@ import sys
 import cv2
 import copy
 
-from nepi_edge_sdk_base import nepi_ros 
-from nepi_edge_sdk_base import nepi_nav
-from nepi_edge_sdk_base import nepi_msg
-from nepi_edge_sdk_base import nepi_settings
+from nepi_sdk import nepi_ros 
+from nepi_sdk import nepi_nav
+from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_settings
 
-from nepi_edge_sdk_base.device_if_rbx import ROSRBXRobotIF
+from nepi_sdk.device_if_rbx import ROSRBXRobotIF
 
 from std_msgs.msg import Empty, Int8, UInt8, UInt32, Bool, String, Float32, Float64
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
