@@ -1,11 +1,21 @@
 /*
- * Copyright (c) 2024 Numurus, LLC <https://www.numurus.com>.
- *
- * This file is part of nepi-engine
- * (see https://github.com/nepi-engine).
- *
- * License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
- */
+ #
+# Copyright (c) 2024 Numurus <https://www.numurus.com>.
+#
+# This file is part of nepi applications (nepi_apps) repo
+# (see https://https://github.com/nepi-engine/nepi_apps)
+#
+# License: nepi applications are licensed under the "Numurus Software License", 
+# which can be found at: <https://numurus.com/wp-content/uploads/Numurus-Software-License-Terms.pdf>
+#
+# Redistributions in source code must retain this top-level comment block.
+# Plagiarizing this software to sidestep the license obligations is illegal.
+#
+# Contact Information:
+# ====================
+# - mailto:nepi@numurus.com
+#
+*/
 #include "ptx_interface.h"
 #include "ptx_node.h"
 
@@ -242,7 +252,6 @@ void PTXInterface::publishJointStateAndStatus()
     status_msg.yaw_home_pos_deg = yaw_home_pos_deg * reverse_yaw_int;
     status_msg.yaw_goal_deg = status.yaw_goal * reverse_yaw_int;
     status_msg.yaw_now_deg = status.yaw_now * reverse_yaw_int;
-
     if (reverse_yaw_control){
         status_msg.yaw_min_hardstop_deg = -1 * max_yaw_hardstop_deg;
         status_msg.yaw_max_hardstop_deg = -1 * min_yaw_hardstop_deg;
@@ -255,10 +264,30 @@ void PTXInterface::publishJointStateAndStatus()
         status_msg.yaw_min_softstop_deg = min_yaw_softstop_deg;
         status_msg.yaw_max_softstop_deg = max_yaw_softstop_deg;
     }
-    status_msg.reverse_pitch_control = reverse_pitch_control; 
+    float yaw_now_ratio =  1 - (status_msg.yaw_now_deg - status_msg.yaw_min_softstop_deg) / (status_msg.yaw_max_softstop_deg - status_msg.yaw_min_softstop_deg) ;
+    if (yaw_now_ratio < 0) {
+        yaw_now_ratio = 0;
+    }
+    else if (yaw_now_ratio > 1){
+        yaw_now_ratio = 1;
+    }       
+    status_msg.yaw_now_ratio = yaw_now_ratio;
+
+    float yaw_goal_ratio =  1 - (status_msg.yaw_goal_deg - status_msg.yaw_min_softstop_deg) / (status_msg.yaw_max_softstop_deg - status_msg.yaw_min_softstop_deg) ;
+    if (yaw_goal_ratio < 0) {
+        yaw_goal_ratio = 0;
+    }
+    else if (yaw_goal_ratio > 1){
+        yaw_goal_ratio = 1;
+    }       
+    status_msg.yaw_goal_ratio = yaw_goal_ratio;
+
+
+
+    status_msg.reverse_pitch_control = reverse_pitch_control;
     status_msg.pitch_home_pos_deg = pitch_home_pos_deg * reverse_pitch_int;
-    status_msg.pitch_goal_deg = status.pitch_goal  * reverse_pitch_int;
-    status_msg.pitch_now_deg = status.pitch_now  * reverse_pitch_int;
+    status_msg.pitch_goal_deg = status.pitch_goal * reverse_pitch_int;
+    status_msg.pitch_now_deg = status.pitch_now * reverse_pitch_int;
     if (reverse_pitch_control){
         status_msg.pitch_min_hardstop_deg = -1 * max_pitch_hardstop_deg;
         status_msg.pitch_max_hardstop_deg = -1 * min_pitch_hardstop_deg;
@@ -271,6 +300,28 @@ void PTXInterface::publishJointStateAndStatus()
         status_msg.pitch_min_softstop_deg = min_pitch_softstop_deg;
         status_msg.pitch_max_softstop_deg = max_pitch_softstop_deg;
     }
+    float pitch_now_ratio =  1 - (status_msg.pitch_now_deg - status_msg.pitch_min_softstop_deg) / (status_msg.pitch_max_softstop_deg - status_msg.pitch_min_softstop_deg) ;
+    if (pitch_now_ratio < 0) {
+        pitch_now_ratio = 0;
+    }
+    else if (pitch_now_ratio > 1){
+        pitch_now_ratio = 1;
+    }       
+    status_msg.pitch_now_ratio = pitch_now_ratio; 
+
+    float pitch_goal_ratio =  1 - (status_msg.pitch_goal_deg - status_msg.pitch_min_softstop_deg) / (status_msg.pitch_max_softstop_deg - status_msg.pitch_min_softstop_deg) ;
+    if (pitch_goal_ratio < 0) {
+        pitch_goal_ratio = 0;
+    }
+    else if (pitch_goal_ratio > 1){
+        pitch_goal_ratio = 1;
+    }       
+    status_msg.pitch_goal_ratio = pitch_goal_ratio;
+
+    status_msg.has_adjustable_speed = has_speed_control;
+    status_msg.has_position_feedback = has_absolute_positioning;      
+
+
     status_msg.error_msgs = status.driver_errors;
 
     statusPub.publish(status_msg);
@@ -405,7 +456,6 @@ void PTXInterface::goHomeHandler(const std_msgs::Empty::ConstPtr &msg)
 
 void PTXInterface::jogToPositionHandler(const nepi_ros_interfaces::PanTiltPosition::ConstPtr &msg)
 {
-
 
     const bool can_position = has_absolute_positioning;
     if (false == can_position)

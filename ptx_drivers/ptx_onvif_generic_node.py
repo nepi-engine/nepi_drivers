@@ -1,13 +1,20 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2024 Numurus, LLC <https://www.numurus.com>.
+# Copyright (c) 2024 Numurus <https://www.numurus.com>.
 #
-# This file is part of nepi-engine
-# (see https://github.com/nepi-engine).
+# This file is part of nepi applications (nepi_apps) repo
+# (see https://https://github.com/nepi-engine/nepi_apps)
 #
-# License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
+# License: nepi applications are licensed under the "Numurus Software License", 
+# which can be found at: <https://numurus.com/wp-content/uploads/Numurus-Software-License-Terms.pdf>
 #
-
+# Redistributions in source code must retain this top-level comment block.
+# Plagiarizing this software to sidestep the license obligations is illegal.
+#
+# Contact Information:
+# ====================
+# - mailto:nepi@numurus.com
+#
 
 from nepi_edge_sdk_base import nepi_ros
 from nepi_edge_sdk_base import nepi_msg
@@ -39,6 +46,9 @@ class OnvifPanTiltNode:
     hw_version = "Unknown"
     sw_version = "Unknown"
     ptx_if = None
+
+    last_pan_ratio_onvif = 0
+    last_tilt_ratio_onvif = 0
 
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
@@ -85,8 +95,8 @@ class OnvifPanTiltNode:
         nepi_msg.publishMsgInfo(self,"Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
         [success, msg, self.driver_class] = nepi_drv.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
         
+        driver_constructed = False
         if success:
-            driver_constructed = False
             attempts = 0
             while not nepi_ros.is_shutdown() and driver_constructed == False and attempts < 5:
                 try:
@@ -95,7 +105,7 @@ class OnvifPanTiltNode:
                     nepi_msg.publishMsgInfo(self,"Driver constructed")
                 except Exception as e:
                     nepi_msg.publishMsgInfo(self,"Failed to construct driver: " + self.driver_module + "with exception: " + str(e))
-                    time.sleep(1)
+                    nepi_ros.sleep(1)
                 attempts += 1 
         if driver_constructed == False:
             nepi_ros.signal_shutdown("Shutting down Onvif node " + self.node_name + ", unable to connect to driver")
@@ -204,8 +214,8 @@ class OnvifPanTiltNode:
                 'pitch_joint_name' : self.node_name + '_pitch_joint',
                 'reverse_yaw_control' : False,
                 'reverse_pitch_control' : False,
-                'speed_ratio' : 1.0,
-                'status_update_rate_hz' : 1.0
+                'speed_ratio' : 0.5,
+                'status_update_rate_hz' : 10
             }
             
             # Driver can specify position limits via getPositionLimitsInDegrees. Otherwise, we hard-code them 
@@ -241,6 +251,11 @@ class OnvifPanTiltNode:
             #for setting in self.factory_settings:
                 #nepi_msg.publishMsgInfo(self,"" +setting)
 
+            self.speed_ratio = 0.5
+            self.home_yaw_deg = 0.0
+            self.home_pitch_deg = 0.0
+            self.waypoints = {} # Dictionary of dictionaries with numerical key and {waypoint_pitch, waypoint_yaw} dict value
+
             self.ptx_if = ROSPTXActuatorIF(device_info = self.device_info_dict, 
                                         capSettings = self.cap_settings,
                                         factorySettings = self.factory_settings,
@@ -264,10 +279,6 @@ class OnvifPanTiltNode:
                                         setWaypointHereCb = ptx_callback_names["SetWaypointHere"])
             nepi_msg.publishMsgInfo(self," ... PTX interface running")
 
-            self.speed_ratio = 1.0
-            self.home_yaw_deg = 0.0
-            self.home_pitch_deg = 0.0
-            self.waypoints = {} # Dictionary of dictionaries with numerical key and {waypoint_pitch, waypoint_yaw} dict value
 
             nepi_ros.spin()
 
@@ -303,7 +314,8 @@ class OnvifPanTiltNode:
         success = False
         setting_str = str(setting)
         [setting_name, s_type, data] = nepi_ros.get_data_from_setting(setting)
-        if data is not None:
+        print("Onvif PT updating setting: " + str(setting_str))
+        if data is not None and data != "None":
             setting_data = data
             found_setting = False
             for cap_setting in self.cap_settings:
@@ -343,14 +355,15 @@ class OnvifPanTiltNode:
         # TODO: Driver unit conversion?
         return self.speed_ratio
             
-
-    
      
     def pitchDegToOvRatio(self, deg):
         ratio = 0.5
         max_ph = nepi_ros.get_param(self,'~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
         min_ph = nepi_ros.get_param(self,'~ptx/limits/min_pitch_hardstop_deg', self.default_settings['min_pitch_hardstop_deg'])
-        if self.reverse_pitch_control == False:
+        reverse_pitch = False
+        if self.ptx_if is not None:
+            reverse_pitch = self.ptx_if.reverse_pitch_control
+        if reverse_pitch == False:
           ratio = 1 - (deg - min_ph) / (max_ph - min_ph)
         else:
           ratio = (deg - min_ph) / (max_ph - min_ph)
@@ -361,7 +374,10 @@ class OnvifPanTiltNode:
         ratio = 0.5
         max_yh = nepi_ros.get_param(self,'~ptx/limits/max_yaw_hardstop_deg', self.default_settings['max_yaw_hardstop_deg'])
         min_yh = nepi_ros.get_param(self,'~ptx/limits/min_yaw_hardstop_deg', self.default_settings['min_yaw_hardstop_deg'])
-        if self.reverse_yaw_control == False:
+        reverse_yaw = False
+        if self.ptx_if is not None:
+            reverse_yaw = self.ptx_if.reverse_yaw_control 
+        if reverse_yaw == False:
           ratio = 1 - (deg - min_yh) / (max_yh - min_yh)
         else:
           ratio = (deg - min_yh) / (max_yh - min_yh)
@@ -372,7 +388,10 @@ class OnvifPanTiltNode:
         yaw_deg = 0
         max_yh = nepi_ros.get_param(self,'~ptx/limits/max_yaw_hardstop_deg', self.default_settings['max_yaw_hardstop_deg'])
         min_yh = nepi_ros.get_param(self,'~ptx/limits/min_yaw_hardstop_deg', self.default_settings['min_yaw_hardstop_deg'])
-        if self.reverse_yaw_control == False:
+        reverse_yaw = False
+        if self.ptx_if is not None:
+            reverse_yaw = self.ptx_if.reverse_yaw_control 
+        if reverse_yaw == False:
            yaw_deg =  min_yh + (1-ovRatio) * (max_yh - min_yh)
         else:
            yaw_deg =  max_yh - (1-ovRatio)  * (max_yh - min_yh)
@@ -382,7 +401,10 @@ class OnvifPanTiltNode:
         pitch_deg = 0
         max_ph = nepi_ros.get_param(self,'~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
         min_ph = nepi_ros.get_param(self,'~ptx/limits/min_pitch_hardstop_deg', self.default_settings['min_pitch_hardstop_deg'])
-        if self.reverse_pitch_control == False:
+        reverse_pitch = False
+        if self.ptx_if is not None:
+            reverse_pitch = self.ptx_if.reverse_pitch_control
+        if reverse_pitch == False:
            pitch_deg =  min_ph + (1-ovRatio) * (max_ph - min_ph)
         else:
            pitch_deg =  max_ph - (1-ovRatio) * (max_ph - min_ph)
@@ -392,36 +414,23 @@ class OnvifPanTiltNode:
 
     def getCurrentPosition(self):
         pan_ratio_onvif, tilt_ratio_onvif = self.driver.getCurrentPosition()
-
-        max_yh = nepi_ros.get_param(self,'~ptx/limits/max_yaw_hardstop_deg', self.default_settings['max_yaw_hardstop_deg'])
-        min_yh = nepi_ros.get_param(self,'~ptx/limits/min_yaw_hardstop_deg', self.default_settings['min_yaw_hardstop_deg'])
-        max_ph = nepi_ros.get_param(self,'~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
-        min_ph = nepi_ros.get_param(self,'~ptx/limits/min_pitch_hardstop_deg', self.default_settings['min_pitch_hardstop_deg'])
-
-        # Soft limits
-        max_ys = nepi_ros.get_param(self,'~ptx/limits/max_yaw_softstop_deg', self.default_settings['max_yaw_softstop_deg'])
-        min_ys = nepi_ros.get_param(self,'~ptx/limits/min_yaw_softstop_deg', self.default_settings['min_yaw_softstop_deg'])
-        max_ps = nepi_ros.get_param(self,'~ptx/limits/max_pitch_softstop_deg', self.default_settings['max_pitch_softstop_deg'])
-        min_ps = nepi_ros.get_param(self,'~ptx/limits/min_pitch_softstop_deg', self.default_settings['min_pitch_softstop_deg'])
-
+        if pan_ratio_onvif != -999 and tilt_ratio_onvif != -999:
+            self.last_pan_ratio_onvif = pan_ratio_onvif
+            self.last_tilt_ratio_onvif = tilt_ratio_onvif
         #print("Got pos_ratio_onvif from driver: " + str([pan_ratio_onvif, tilt_ratio_onvif]))
         # Recenter the -1.0,1.0 ratio from Onvif to the 0.0,1.0 used throughout the rest of NEPI
-        pan_ratio_onvif = (0.5 * pan_ratio_onvif) + 0.5
-        tilt_ratio_onvif = (0.5 * tilt_ratio_onvif) + 0.5
-
-
+        pan_ratio_onvif = (0.5 * self.last_pan_ratio_onvif) + 0.5
+        tilt_ratio_onvif = (0.5 * self.last_tilt_ratio_onvif) + 0.5
         #print("Got pos_ratio adj: " + str([pan_ratio_onvif, tilt_ratio_onvif]))
-
         if self.ptx_if is None:
             pan_deg = 0
             tilt_deg = 0
         else:
             pan_deg = self.yawOvRatioToDeg(pan_ratio_onvif)
             tilt_deg = self.pitchOvRatioToDeg(tilt_ratio_onvif)
-
         #print("Got pos degs : " + str([pan_deg, tilt_deg]))
         return pan_deg, tilt_deg
-
+        
 
     def gotoPosition(self, yaw_deg, pitch_deg):
         yaw_ratio_onvif = self.yawDegToOvRatio(yaw_deg)
@@ -446,7 +455,7 @@ class OnvifPanTiltNode:
         if self.driver.reportsPosition() is True:
             curr_yaw_ratio_onvif, curr_pitch_ratio_onvif = self.driver.getCurrentPosition()
             if self.ptx_if is not None:
-                self.home_yaw_deg = self.yawOvRatioToDeg(curr_yaw_rati_onvif)
+                self.home_yaw_deg = self.yawOvRatioToDeg(curr_yaw_ratio_onvif)
                 self.home_pitch_deg = self.pitchOvRatioToDeg(curr_pitch_ratio_onvif) 
 
         if self.driver.homePositionAdjustable is True:
@@ -489,6 +498,7 @@ class OnvifPanTiltNode:
     def updateFromParamServer(self):
         if self.ptx_if is not None:
             self.ptx_if.updateFromParamServer()
+
 
 
 if __name__ == '__main__':

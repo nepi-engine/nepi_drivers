@@ -54,6 +54,7 @@ IqrRosPanTiltNode::IqrRosPanTiltNode() :
     settings.reverse_pitch_control = DEFAULT_REVERSE_PITCH_CONTROL;
 
     PTXCapabilities capabilities;
+    capabilities.has_standby_mode = false;
     capabilities.has_absolute_positioning = true;
     capabilities.has_speed_control = true;
     capabilities.has_homing = true;

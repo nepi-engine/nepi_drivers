@@ -237,26 +237,32 @@ install(DIRECTORY ptx_drivers/iqr_ros_pan_tilt/include
   PATTERN ".svn" EXCLUDE
 )
 
+## Mark other files for installation (e.g. launch and bag files, etc.)
+set( NEPI_DRIVERS_SHARE_FOLDER 
+  # Must hard-coded 
+  /opt/nepi/ros/share/nepi_drivers/params
+)
+
 install(DIRECTORY idx_drivers/
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION} 
+  DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER} 
   FILES_MATCHING PATTERN "*.yaml"
   PATTERN ".py" EXCLUDE
 )
 
 install(DIRECTORY lsx_drivers/
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}  
+  DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER}  
   FILES_MATCHING PATTERN "*.yaml"
   PATTERN ".py" EXCLUDE
 )
 
 install(DIRECTORY ptx_drivers/
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}  
+  DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER}  
   FILES_MATCHING PATTERN "*.yaml"
   PATTERN ".py" EXCLUDE
 )
 
 install(DIRECTORY rbx_drivers/
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}  
+  DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER}  
   FILES_MATCHING PATTERN "*.yaml"
   PATTERN ".py" EXCLUDE
 )
