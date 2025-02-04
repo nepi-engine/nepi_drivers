@@ -41,7 +41,7 @@ class GenericONVIF_NVT(object):
     WSDL_FOLDER = "/opt/nepi/ros/etc/onvif/wsdl/"
     RTSP_PORT = 554
     MAX_CONSEC_FRAME_FAIL_COUNT = 3
-
+    secure_uri = None
     def __init__(self, username, password, ip_addr, port=80):
         print("Starting ONVIF Cam Driver Setup")
         self.username = username
@@ -298,6 +298,23 @@ class GenericONVIF_NVT(object):
         
         return (self.rtsp_caps[uri_index] != None)
 
+
+    def getSecureUri(self, uri_index = 0):
+        if uri_index < 0 or uri_index > len(self.rtsp_uris) - 1:
+            return False, "Invalid URI index: " + str(uri_index)
+        #print("!!!!!!!! Debug: Backend is " + self.rtsp_caps[uri_index].getBackendName() + "!!!!!!!")
+        secure_uri = None
+        # Try adding username and password to URI per RTSP standards
+        if '//' in self.rtsp_uris[uri_index]: # Hasn't been updated to the 'secure' version yet
+            uri_pre = self.rtsp_uris[uri_index].split('//')[0]
+            uri_post = self.rtsp_uris[uri_index].split('//')[1]
+            secure_uri = uri_pre + self.username + ":" + self.password + "@" + uri_post
+        else: # If not a standard URL with '//,' assume the secure URI is already set
+            secure_uri = self.rtsp_uris[uri_index]
+        if secure_uri.find('/') != -1:
+            secure_uri = secure_uri.split("/")[0]
+        return secure_uri
+
     def startImageAcquisition(self, uri_index = 0):
         if uri_index < 0 or uri_index > len(self.rtsp_uris) - 1:
             return False, "Invalid URI index: " + str(uri_index)
@@ -319,9 +336,9 @@ class GenericONVIF_NVT(object):
             if '//' in self.rtsp_uris[uri_index]: # Hasn't been updated to the 'secure' version yet
                 uri_pre = self.rtsp_uris[uri_index].split('//')[0]
                 uri_post = self.rtsp_uris[uri_index].split('//')[1]
-                secure_uri = uri_pre + self.username + ":" + self.password + "@" + uri_post
+                self.secure_uri = uri_pre + self.username + ":" + self.password + "@" + uri_post
             else: # If not a standard URL with '//,' assume the secure URI is already set
-                secure_uri = self.rtsp_uris[uri_index]
+                self.secure_uri = self.rtsp_uris[uri_index]
             self.rtsp_caps[uri_index] = cv2.VideoCapture(secure_uri)
             if not self.rtsp_caps[uri_index].isOpened():
                 self.rtsp_caps[uri_index].release()

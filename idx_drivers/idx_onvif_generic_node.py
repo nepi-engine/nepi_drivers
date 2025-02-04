@@ -216,6 +216,7 @@ class OnvifCamNode:
                                         settingUpdateFunction=self.settingUpdateFunction,
                                         getSettingsFunction=self.getSettings,
                                         factoryControls = self.FACTORY_CONTROLS,
+                                        get_rtsp_url = self.getRtspUrl,
                                         setControlsEnable = idx_callback_names["Controls"]["Controls_Enable"],
                                         setAutoAdjust= idx_callback_names["Controls"]["Auto_Adjust"],
                                         setResolutionMode=idx_callback_names["Controls"]["Resolution"], 
@@ -251,6 +252,11 @@ class OnvifCamNode:
     #**********************
     # Sensor setting functions
 
+    def getRtspUrl(self):
+        onvif_port = nepi_ros.get_param(self,'~network/port', 80)
+        uri = self.driver.getSecureUri()
+        url = uri.rsplit(':', 1)[0] + ":" + str(onvif_port)
+        return url
 
     def getCapSettings(self):
         cap_settings = dict()
