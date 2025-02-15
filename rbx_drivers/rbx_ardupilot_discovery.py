@@ -343,7 +343,7 @@ class ArdupilotDiscovery:
       #Start the an RBX fake gps for this ardupilot node
       fgps_node_name = "fake_gps_" + device_id_str
       nepi_msg.printMsgInfo(self.log_name + ": " + "Starting fake gps rbx node: " + fgps_node_name)
-      processor_run_cmd = ["rosrun", "nepi_env", "fake_gps.py",
+      processor_run_cmd = ["rosrun", "nepi_drivers", "fake_gps.py",
                             "__name:=" + fgps_node_name, f"__ns:={self.base_namespace}"]
       fgps_subproc = subprocess.Popen(processor_run_cmd)
 

@@ -611,7 +611,7 @@ class V4l2CamNode:
             if timestamp is not None:
                 ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
             else:
-                ros_timestamp = nepi_ros.time_n
+                ros_timestamp = nepi_ros.time_now()
             # Make a copy for the bw thread to use rather than grabbing a new image
             if self.bw_image_acquisition_running:
                 self.cached_2d_color_image = cv2_img
@@ -678,7 +678,7 @@ class V4l2CamNode:
                 if timestamp is not None:
                     ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
                 else:
-                    ros_timestamp = nepi_ros.time_n
+                    ros_timestamp = nepi_ros.time_now()
             else:
                 cv2_img = self.cached_2d_color_image.copy()
                 ros_timestamp = self.cached_2d_color_image_timestamp

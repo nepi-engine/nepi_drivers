@@ -158,6 +158,11 @@ target_link_libraries(iqr_ros_pan_tilt_node
 #############
 
 catkin_install_python(PROGRAMS
+  scripts/fake_gps.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+catkin_install_python(PROGRAMS
   idx_drivers/idx_genicam_node.py
   idx_drivers/idx_genicam_discovery.py 
   idx_drivers/idx_genicam_driver.py     

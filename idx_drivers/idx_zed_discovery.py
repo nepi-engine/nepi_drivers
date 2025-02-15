@@ -90,7 +90,7 @@ class ZedCamDiscovery:
     self.node_name = nepi_ros.get_node_name()
     self.base_namespace = nepi_ros.get_base_namespace()
     nepi_msg.createMsgPublishers(self)
-    nepi_msg.publishMsgWarn(self,"Starting Initialization Processes")
+    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
     ##############################
     # Get required drv driver dict info
     self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 

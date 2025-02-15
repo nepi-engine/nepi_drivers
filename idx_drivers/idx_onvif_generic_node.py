@@ -253,10 +253,13 @@ class OnvifCamNode:
     # Sensor setting functions
 
     def getRtspUrl(self):
-        onvif_port = nepi_ros.get_param(self,'~network/port', 80)
-        uri = self.driver.getSecureUri()
-        url = uri.rsplit(':', 1)[0] + ":" + str(onvif_port)
-        return url
+        onvif_port = str(nepi_ros.get_param(self,'~network/port', 80))
+        onvif_address = str(nepi_ros.get_param(self,'~network/host',""))
+        url = "http://" + onvif_address #+ ":" + onvif_port
+        username = str(nepi_ros.get_param(self,'~credentials/username'))
+        password = str(nepi_ros.get_param(self,'~credentials/password'))
+        return url, username, password
+
 
     def getCapSettings(self):
         cap_settings = dict()

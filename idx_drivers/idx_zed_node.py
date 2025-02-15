@@ -279,7 +279,7 @@ class ZedCamNode(object):
         # Now that Zed SDK is started, we can set up the reconfig client
         nepi_ros.sleep(5,10)
         success = False
-        timeout = 5
+        timeout = 10
         waittime = 1
         timer = 0
         self.zed_dynamic_reconfig_client = None
