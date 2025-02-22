@@ -284,10 +284,11 @@ class V4L2CamDiscovery:
 
   def short_name(self,name):
     split = name.split("_")
-    if len(split) > 3:
-      short_name = (split[0] + "_" + split[1] + "_" + split[2])
-    else:
-      short_name = name
+    #if len(split) > 3:
+    #  short_name = (split[0] + "_" + split[1] + "_" + split[2])
+    #else:
+    #  short_name = name
+    short_name = split[0]
     return short_name
     
 if __name__ == '__main__':
