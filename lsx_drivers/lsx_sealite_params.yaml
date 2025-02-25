@@ -29,7 +29,7 @@ DISCOVERY_DICT:
     - '9600'
     - '19200'
     - '57600'
-    default_val: '57600'
+    default_val: '9600'
   option_2_dict:
     name: Address Search Range
     options:

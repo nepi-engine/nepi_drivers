@@ -74,13 +74,16 @@ class AfTowerLightDiscovery:
   def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
     nepi_msg.createMsgPublishers(self)
+    time.sleep(1)
+    nepi_msg.publishMsgInfo(self, "AF Tower Light Discovery")
+
 
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
   def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict = TEST_NEX_DICT):
     self.drv_dict = drv_dict
-    #nepi_msg.publishMsgInfo(self, ":  " + self.log_name + "Got drv_dict : " + str(self.drv_dict))
+    nepi_msg.publishMsgInfo(self, ":  " + self.log_name + "Got drv_dict : " + str(self.drv_dict))
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
@@ -133,6 +136,8 @@ class AfTowerLightDiscovery:
   ##########  Device specific calls
 
   def checkForDevice(self,path_str):
+    nepi_msg.publishMsgWarn(self, "Sealight checkForDevice end")###
+
     found_device = False
     #nepi_msg.printMsgWarn(self.log_name + "path_str " + path_str)
     if path_str.find('ttyUSB') != -1:
@@ -144,7 +149,10 @@ class AfTowerLightDiscovery:
         if str(usb_dict[path_str]['product_id']) in self.includeDevices:
           #nepi_msg.printMsgWarn(self.log_name + "found device on path: " + path_str)
           found_device = True
+          nepi_msg.publishMsgWarn(self, found_device)###
+
     return found_device
+
 
 
   def checkOnDevice(self,path_str):

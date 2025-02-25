@@ -134,6 +134,8 @@ class SealiteNode(object):
 
   lsx_if = None
 
+  addr_str = ""
+
   ### LXS Driver NODE Initialization
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
@@ -148,10 +150,6 @@ class SealiteNode(object):
     # Get required drv driver dict info
     self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
     #nepi_msg.publishMsgWarn(self,"Nex_Dict: " + str(self.drv_dict))
-    self.driver_path = self.drv_dict['path']
-    self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
-    self.driver_module = self.drv_dict['DRIVER_DICT']['module_name']
-    self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
     self.ser_port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
     self.ser_buad_int = self.drv_dict['DEVICE_DICT']['baud_int'] 
     self.addr_str = self.drv_dict['DEVICE_DICT']['addr_str'] 
@@ -160,7 +158,7 @@ class SealiteNode(object):
     for z in range(zero_prefix_len):
       self.addr_str = ('0' + self.addr_str)  
     ################################################  
-    nepi_msg.publishMsgInfo(self,"Connecting to Device on port " + self.ser_port_str + " with buad " + self.ser_buad_int)
+    nepi_msg.publishMsgInfo(self,"Connecting to Device on port " + self.ser_port_str + " with buad " + str(self.ser_buad_int))
     ### Try and connect to device
     self.connected = self.connect() 
     if self.connected:
@@ -196,7 +194,6 @@ class SealiteNode(object):
                   turnOnOffFunction = self.turnOnOff,
                   setIntensityRatioFunction = self.setIntensityRatio, 
                   supportsBlinking = True,
-                  enableStrobeFunction = self.setStrobeEnable,
                   reports_temp = True, 
                   reports_power = False
                  )
@@ -205,14 +202,14 @@ class SealiteNode(object):
       nepi_msg.publishMsgInfo(self,"Starting an activity check process")
       nepi_ros.start_timer_process(nepi_ros.duration(0.2), self.check_timer_callback)
       # Initialization Complete
-      lsx_if.publishMsg(" Initialization Complete")
+      self.lsx_if.publishMsg(" Initialization Complete")
       #Set up node shutdown
       nepi_ros.on_shutdown(self.cleanup_actions)
       # Spin forever (until object is detected)
       nepi_ros.spin()
     else:
-      lsx_if.publishMsg(" Shutting down node")
-      lsx_if.publishMsg(" Specified serial port not available")
+      self.lsx_if.publishMsg(" Shutting down node")
+      self.lsx_if.publishMsg(" Specified serial port not available")
       nepi_ros.signal_shutdown("Serial port not available")   
 
 
@@ -357,9 +354,9 @@ class SealiteNode(object):
 
   def turnOnOff(self,turn_on_off):
     if turn_on_off == False:
-      self.set_intensity(0)
+      self.setIntensityRatio(0)
     else:
-      self.set_intensity(self.intensity_ratio)
+      self.setIntensityRatio(self.intensity_ratio)
     self.turn_on_off_state = turn_on_off
 
 

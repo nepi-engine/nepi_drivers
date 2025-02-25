@@ -52,8 +52,8 @@ TEST_NEX_DICT = {
     'class_name': 'SealiteDiscovery',
     'interfaces': ['SERIAL','USBSERIAL'],
     'options_1_dict': {
-        'default_val': '57600',
-        'set_val': '57600'
+        'default_val': '9600',
+        'set_val': '9600'
     },
     'options_2_dict': {
         'default_val': '10',
@@ -63,7 +63,7 @@ TEST_NEX_DICT = {
     'include_ids': [],
     'exclude_ids': ['ttyACM']
 },
-'DEVICE_DICT': {'device_path': '/dev/ttyUSB0','baud_int':57600, 'addr': '001'},
+'DEVICE_DICT': {'device_path': '/dev/ttyUSB0','baud_int':9600, 'addr': '001'},
 'path': '/opt/nepi/ros/lib/nepi_drivers',
 'order': 1,
 'active': True,
@@ -79,21 +79,23 @@ TEST_NEX_DICT = {
 class SealiteDiscovery:
   active_devices_dict = dict()
   node_launch_name = "sealite"
-  baud_int = 57600
+  baud_int = 9600
   addr_str = "001"
   ################################################          
   def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
     nepi_msg.createMsgPublishers(self)
+    nepi_msg.publishMsgWarn(self, "Sealight Light Discovery")
+
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
   def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace,drv_dict):
     self.drv_dict = drv_dict
-    #nepi_msg.publishMsgInfo(self, ":  " + self.log_name + "Got drv_dict : " + str(self.drv_dict))
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
+
     
     # Get required data from drv_dict
     self.includeDevices = self.drv_dict['DISCOVERY_DICT']['include_ids']
@@ -150,11 +152,13 @@ class SealiteDiscovery:
   ################################################
 
   ##########  Device specific calls
-
   def checkForDevice(self,path_str):
+    nepi_msg.publishMsgWarn(self, "Sealight checkForDevice start")###
     found_device = False
-    #nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ":  path_str " + path_str)
+    nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ":  path_str " + path_str)#
     if path_str not in self.active_paths_list:
+      nepi_msg.publishMsgWarn(self, "not in self")###
+
       for baud_int in self.baudrate_list:
         self.baud_int = baud_int
         try:
@@ -173,31 +177,35 @@ class SealiteDiscovery:
           ser_str = (ser_msg + '\r\n')
           # Send Serial String
           #print("")
-          #print("Sending serial message: " + ser_msg)
+          print("Sending serial message: " + ser_msg)
           b=bytearray()
           b.extend(map(ord, ser_str))
           try:
             serial_port.write(b)
-            #print("Waiting for response")
+            print("Waiting for response")
             nepi_ros.sleep(.005)
             bs = serial_port.readline()
             response = bs.decode()
           except Exception as e:
-            #nepi_ros.logerr('%s: Got a serial read/write error (%s)', self.log_name, str(e))
+            nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Got a serial read/write error: " + str(e))
             break
           if len(response) > 2:
             nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Got response: " + response)
             if response[3] == ',':
+              nepi_msg.publishMsgWarn(self, "response[3] == ','")###
+
               self.addr_str = response[0:3]
               try:
                 addr_int = int(addr)
                 nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Found device at address: " + self.addr_str)
+                nepi_msg.printMsgWarn(self.log_name + "found device on path: " + path_str)##
                 found_device = True
                 break # Don't check any more addresses
               except Exception as a:
                 nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Returned device message not valid (" + str(a) + ")")
         # Clean up the serial port
         serial_port.close()
+        nepi_msg.publishMsgWarn(self, found_device)###
     return found_device
 
 
@@ -217,7 +225,7 @@ class SealiteDiscovery:
 
   def launchDeviceNode(self, path_str):
     file_name = self.drv_dict['NODE_DICT']['file_name']
-    node_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + addr_str
+    node_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
     nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ":  launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
     dict_param_name = self.base_namespace + node_name + "/drv_dict"
