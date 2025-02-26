@@ -95,8 +95,22 @@ class SealiteNode(object):
   #######################
   DEFAULT_NODE_NAME='sealite'
 
-  FACTORY_SETTINGS_OVERRIDES = dict( )
 
+
+  CAP_SETTINGS = dict(
+    min_intensity_percent = {"type":"Float","name":"min_intensity_percent","options":["0.0","100.0"]},
+    max_intensity_percent =  {"type":"Float","name":"max_intensity_percent","options":["0.0","100.0"]}
+  )
+
+  FACTORY_SETTINGS = dict(
+    min_intensity_percent = {"type":"Float","name":"min_intensity_percent","value":"0"},
+    max_intensity_percent =  {"type":"Float","name":"max_intensity_percent","value":"50"}
+  )
+
+  FACTORY_SETTINGS_OVERRIDES = dict()
+
+
+  
   #Factory Control Values 
   FACTORY_CONTROLS = dict( standby_enabled = False,
   on_off_state = False,
@@ -112,6 +126,8 @@ class SealiteNode(object):
                         serial_number = "",
                         hw_version = "",
                         sw_version = "")
+
+  settings_dict = FACTORY_SETTINGS
   
   # Initialize some parameters
   serial_num = ""
@@ -219,16 +235,43 @@ class SealiteNode(object):
 
 
   def getCapSettings(self):
-      return nepi_settings.NONE_CAP_SETTINGS
+      return self.CAP_SETTINGS
 
   def getFactorySettings(self):
-      return nepi_settings.NONE_SETTINGS
+    settings = self.getSettings()
+    #Apply factory setting overides
+    for setting_name in settings.keys():
+      if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
+            settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
+    return settings
+
+
 
   def getSettings(self):
-      return nepi_settings.NONE_SETTINGS
+      settings = dict()
+      for setting_name in self.cap_settings.keys():
+        setting = dict()
+        setting["name"] = cap_setting['name']
+        setting["type"] = cap_setting['type']
+        val = None
+        if setting_name == "min_intensity_percent":
+          val = self.getMinIntensityPercent()
+        elif setting_name == "max_intensity_percent":
+          val = self.setMaxIntensityPercent()
+       if val is not None:
+          setting["value"] = str(config_dict[setting_name])
+          settings[setting_name] = setting
+      return settings
+
+
 
   def setSetting(self,setting_name,setting_data):
-    return True
+    success = False
+    if setting_name == "min_intensity_percent":
+      success = self.setMinIntensityPercent(setting_data)
+    elif setting_name == "max_intensity_percent":
+      success = self.setMaxIntensityPercent(setting_data)
+    return success
 
 
   def settingUpdateFunction(self,setting):
@@ -249,6 +292,31 @@ class SealiteNode(object):
       else:
           msg = (self.node_name  + " Setting data" + setting_str + " is None")
       return success, msg
+
+  ##############
+  ### Settings Functions
+
+  def getMinIntensityPercent(self)
+    val = -999
+
+    return val
+
+  def setMinIntensityPercent(self,val)
+    success = False
+
+    return success
+
+
+  def getMaxIntensityPercent(self)
+    val = -999
+    
+    return val
+
+  def seMaxIntensityPercent(self,val)
+    success = False
+
+    return success
+
 
 
   #######################
@@ -392,6 +460,8 @@ class SealiteNode(object):
     if response != None and response != "?":
       success = True
     return success  
+
+
 
 
   #######################
