@@ -80,7 +80,9 @@ TEST_NEX_DICT = {
 
 
 
-
+DEFAULT_MIN = '1'
+DEFAULT_MAX = '50'
+DEFAULT_CURVE = [DEFAULT_MIN,DEFAULT_MAX,'1','5','70','95','4.5']
 
 #########################################
 # Sealite LSX Driver Node Class
@@ -92,24 +94,26 @@ class SealiteNode(object):
 
 
 
+
   #######################
   DEFAULT_NODE_NAME='sealite'
 
-
-
   CAP_SETTINGS = dict(
-    min_intensity_percent = {"type":"Float","name":"min_intensity_percent","options":["0.0","100.0"]},
-    max_intensity_percent =  {"type":"Float","name":"max_intensity_percent","options":["0.0","100.0"]}
+    min_intensity_percent = {"type":"Int","name":"min_intensity_percent","options":["1","100"]},
+    max_intensity_percent =  {"type":"Int","name":"max_intensity_percent","options":["1","100"]}
   )
 
   FACTORY_SETTINGS = dict(
-    min_intensity_percent = {"type":"Float","name":"min_intensity_percent","value":"0"},
-    max_intensity_percent =  {"type":"Float","name":"max_intensity_percent","value":"50"}
+    min_intensity_percent = {"type":"Int","name":"min_intensity_percent","value":str(DEFAULT_MIN)},
+    max_intensity_percent =  {"type":"Int","name":"max_intensity_percent","value": str(DEFAULT_MAX)}
   )
 
   FACTORY_SETTINGS_OVERRIDES = dict()
 
-
+  settingFunctions = dict(
+    min_intensity_percent = {'get':self.getMinIntensityPercent, 'set': self.setMinIntensityPercent}
+    max_intensity_percent = {'get':self.getMaxIntensityPercent, 'set': self.setMaxIntensityPercent}
+  )
   
   #Factory Control Values 
   FACTORY_CONTROLS = dict( standby_enabled = False,
@@ -151,6 +155,8 @@ class SealiteNode(object):
   lsx_if = None
 
   addr_str = ""
+
+  cur_curve = DEFAULT_CURVE
 
   ### LXS Driver NODE Initialization
   ################################################
@@ -251,26 +257,22 @@ class SealiteNode(object):
       settings = dict()
       for setting_name in self.cap_settings.keys():
         setting = dict()
-        setting["name"] = cap_setting['name']
-        setting["type"] = cap_setting['type']
+        setting["name"] = setting_name
+        setting["type"] = self.cap_settings['type']
         val = None
-        if setting_name == "min_intensity_percent":
-          val = self.getMinIntensityPercent()
-        elif setting_name == "max_intensity_percent":
-          val = self.setMaxIntensityPercent()
-       if val is not None:
-          setting["value"] = str(config_dict[setting_name])
-          settings[setting_name] = setting
+        if name in self.settingFunctions.keys():
+          val = self.settingFunctions[name]['get']()
+        if val is not None:
+            setting["value"] = str(val)
+            settings[setting_name] = setting
       return settings
 
 
 
-  def setSetting(self,setting_name,setting_data):
+  def setSetting(self,setting_name,val):
     success = False
-    if setting_name == "min_intensity_percent":
-      success = self.setMinIntensityPercent(setting_data)
-    elif setting_name == "max_intensity_percent":
-      success = self.setMaxIntensityPercent(setting_data)
+    if setting_name in self.settingFunctions.keys():
+      val = self.settingFunctions[name]['set'](val)
     return success
 
 
@@ -296,26 +298,75 @@ class SealiteNode(object):
   ##############
   ### Settings Functions
 
-  def getMinIntensityPercent(self)
-    val = -999
 
+  def getMinIntensityPercent(self):
+    success = False
+    val = '-999'
+    ser_msg= ('!' + self.addr_str + ':CURV?')
+    response = self.send_msg(ser_msg)
+    print(response)
+     if response != None and response != "?":
+      response_parts = response.split(',')
+      if len(response_parts) == 7:
+        val = response_parts[0]
+        self.cur_curv = response_parts
+        success = True
     return val
 
-  def setMinIntensityPercent(self,val)
+  def setMinIntensityPercent(self,val):
+    cur_curv = self.cur_curve
+    cur_max = cur_curv[1]
+    print(val)
     success = False
-
+    if int(val) < int(cur_max):
+      cur_curv[0] = val
+      ser_msg= ('!' + self.addr_str + ':CURV=')
+      for item in cur_curv:
+        ser_msg.append(item)
+      response = self.send_msg(ser_msg)
+      print(response)
+      if response != None and response != "?":
+        response_parts = response.split(',')
+        if len(response_parts) == 7:
+          self.cur_curv = response_parts
+          success = True
+    print(success)
     return success
 
 
-  def getMaxIntensityPercent(self)
-    val = -999
-    
+  def getMaxIntensityPercent(self):
+    success = False
+    val = '-999'
+    ser_msg= ('!' + self.addr_str + ':CURV?')
+    response = self.send_msg(ser_msg)
+    print(response)
+     if response != None and response != "?":
+      response_parts = response.split(',')
+      if len(response_parts) == 7:
+        val = response_parts[1]
+        self.cur_curv = response_parts
+        success = True
     return val
 
-  def seMaxIntensityPercent(self,val)
+  def seMaxIntensityPercent(self,val):
+    cur_curv = self.cur_curve
+    cur_min = cur_curv[0]
     success = False
-
+    if int(val) > int(cur_min):
+      cur_curv[1] = val
+      ser_msg= ('!' + self.addr_str + ':CURV=')
+      for item in cur_curv:
+        ser_msg.append(item)
+      response = self.send_msg(ser_msg)
+      print(response)
+      response_parts = response.split(',')
+      if len(response_parts) == 7:
+        self.cur_curv = response_parts
+        success = True
+    print(success)          
     return success
+
+
 
 
 
