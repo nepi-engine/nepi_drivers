@@ -53,6 +53,7 @@ TEST_NEX_DICT = {
     'file_name': 'idx_genicam_discovery.py',
     'module_name': 'idx_genicam_discovery',
     'class_name': 'GenicamCamDiscovery',
+    'method': 'AUTO', 
     'interfaces': ['USB','IP'],
     'options_1_dict': {
         'default_option': 'None',
@@ -62,9 +63,7 @@ TEST_NEX_DICT = {
         'default_option': 'None',
         'set_option': 'None'
     },
-    'method': 'AUTO', 
-    'include_ids': [],
-    'exclude_ids': []
+
 },
 'DEVICE_DICT': {'model':'0','serial_number': '1'},
 'path': '/opt/nepi/ros/lib/nepi_drivers',
@@ -87,7 +86,10 @@ class GenicamCamDiscovery:
    ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
   drv_dict = dict()
-  deviceList = []                
+  deviceList = []           
+
+  includeDevices = []
+  excludedDevices = []    
   def __init__(self):
     #### APP NODE INIT SETUP ####
     nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
@@ -99,8 +101,7 @@ class GenicamCamDiscovery:
     # Get required drv driver dict info
     self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
     #nepi_msg.publishMsgWarn(self,"Nex_Dict: " + str(self.drv_dict))
-    self.includeDevices = self.drv_dict['DISCOVERY_DICT']['include_ids']
-    self.excludedDevices = self.drv_dict['DISCOVERY_DICT']['exclude_ids']
+
 
     self.genicam_harvester = Harvester()
     

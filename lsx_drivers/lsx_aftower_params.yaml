@@ -17,11 +17,8 @@ DISCOVERY_DICT:
   class_name: AfTowerLightDiscovery
   process: CALL
   method: AUTO
-  include_ids:
-  - '29987'
-  exclude_ids: []
   interfaces:
-  - USBSERIAL
+  - SERIAL
   option_1_dict:
     name: BaudRate
     options:

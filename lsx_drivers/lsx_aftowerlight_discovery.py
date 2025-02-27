@@ -47,6 +47,7 @@ TEST_NEX_DICT = {
     'file_name': 'lsx_aftowerlight_discovery.py',
     'module_name': 'lsx_aftowerlight_discovery',
     'class_name': 'AfTowerLightDiscovery',
+    'method': 'AUTO', 
     'interfaces': ['USB'],
     'options_1_dict': {
         'default_val': '9600',
@@ -56,9 +57,6 @@ TEST_NEX_DICT = {
         'default_val': 'None',
         'set_val': 'None'
     },
-    'method': 'AUTO', 
-    'include_ids': ['29987'],
-    'exclude_ids': []
 },
 'DEVICE_DICT': {'device_path': '/dev/ttyUSB0'},
 'path': '/opt/nepi/ros/lib/nepi_drivers',
@@ -70,6 +68,9 @@ TEST_NEX_DICT = {
 class AfTowerLightDiscovery:
   active_devices_dict = dict()
   node_launch_name = "af_tower_light"
+
+  includeDevices = ['29987']
+  excludedDevices = []
   ################################################          
   def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
@@ -88,10 +89,6 @@ class AfTowerLightDiscovery:
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
     
-    # Get required data from drv_dict
-    self.includeDevices = self.drv_dict['DISCOVERY_DICT']['include_ids']
-    self.excludedDevices = self.drv_dict['DISCOVERY_DICT']['exclude_ids']
-
     baudrate_list = []
     baudrate_options = self.drv_dict["DISCOVERY_DICT"]['option_1_dict']['options']
     baudrate_sel = self.drv_dict["DISCOVERY_DICT"]['option_1_dict']['set_val']

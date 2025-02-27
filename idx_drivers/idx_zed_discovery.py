@@ -50,6 +50,7 @@ TEST_NEX_DICT = {
     'file_name': 'idx_zed_discovery.py',
     'module_name': 'idx_zed_discovery',
     'class_name': 'ZEDCamDiscovery',
+    'method': 'AUTO', 
     'interfaces': ['USB'],
     'options_1_dict': {
         'default_val': 'HD720',
@@ -59,9 +60,7 @@ TEST_NEX_DICT = {
         'default_val': '15',
         'set_val': '15'
     },
-    'method': 'AUTO', 
-    'include_ids': ['ZED 2','ZED 2i','ZED-M'],
-    'exclude_ids': []
+
 },
 'DEVICE_DICT': {'zed_type': 'zed2','res_val': 3},
 'path': '/opt/nepi/ros/lib/nepi_drivers',
@@ -83,7 +82,10 @@ class ZedCamDiscovery:
   )
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"                                   
-  deviceList = []                
+  deviceList = []       
+
+  includeDevices = ['ZED 2','ZED 2i','ZED-M']
+  excludedDevices = []         
   def __init__(self):
     #### APP NODE INIT SETUP ####
     nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
@@ -95,8 +97,7 @@ class ZedCamDiscovery:
     # Get required drv driver dict info
     self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
     #nepi_msg.publishMsgWarn(self,"Drv_Dict: " + str(self.drv_dict))
-    self.includeDevices = self.drv_dict['DISCOVERY_DICT']['include_ids']
-    self.excludedDevices = self.drv_dict['DISCOVERY_DICT']['exclude_ids']
+
     res_str = self.drv_dict['DISCOVERY_DICT']['option_1_dict']['set_val']
     if res_str in self.RES_DICT.keys():
       self.res_val = self.RES_DICT[res_str]

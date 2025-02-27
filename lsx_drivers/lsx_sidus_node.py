@@ -35,7 +35,7 @@ from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_drv
 from nepi_sdk import nepi_settings
 
-PKG_NAME = 'LSX_SEALITE' # Use in display menus
+PKG_NAME = 'LSX_SIDUS' # Use in display menus
 FILE_TYPE = 'NODE'
 
 
@@ -43,11 +43,11 @@ FILE_TYPE = 'NODE'
 TEST_NEX_DICT = {
 'group': 'LSX',
 'group_id': 'SEALITE',
-'pkg_name': 'LSX_SEALITE',
+'pkg_name': 'LSX_SIDUS',
 'NODE_DICT': {
-    'file_name': 'lsx_sealite_node.py',
-    'module_name': 'lsx_sealite_node',
-    'class_name': 'SealiteNode',
+    'file_name': 'lsx_sidus_node.py',
+    'module_name': 'lsx_sidus_node',
+    'class_name': 'SidusNode',
 },
 'DRIVER_DICT': {
     'file_name': '' ,
@@ -55,9 +55,9 @@ TEST_NEX_DICT = {
     'class_name':  ''
 },
 'DISCOVERY_DICT': {
-    'file_name': 'lsx_sealite_discovery.py',
-    'module_name': 'lsx_sealite_discovery',
-    'class_name': 'SealiteDiscovery',
+    'file_name': 'lsx_sidus_discovery.py',
+    'module_name': 'lsx_sidus_discovery',
+    'class_name': 'SidusDiscovery',
     'interfaces': ['SERIAL','USBSERIAL'],
     'options_1_dict': {
         'default_val': '57600',
@@ -81,14 +81,13 @@ TEST_NEX_DICT = {
 
 
 DEFAULT_MIN = '1'
-DEFAULT_MAX = '50'
-DEFAULT_CURVE = [DEFAULT_MIN,DEFAULT_MAX,'1','5','70','95','4.5']
+DEFAULT_MAX = '128'
 
 #########################################
-# Sealite LSX Driver Node Class
+# Sidus LSX Driver Node Class
 #########################################
 
-class SealiteNode(object):
+class SidusNode(object):
   ### LXS Driver Settings
   # Set driver capability parameters
 
@@ -96,23 +95,23 @@ class SealiteNode(object):
 
 
   #######################
-  DEFAULT_NODE_NAME='sealite'
+  DEFAULT_NODE_NAME='sidus'
 
   CAP_SETTINGS = dict(
-    min_intensity_percent = {"type":"Int","name":"min_intensity_percent","options":["1","100"]},
-    max_intensity_percent =  {"type":"Int","name":"max_intensity_percent","options":["1","100"]}
+    min_intensity = {"type":"Int","name":"min_intensity","options":["0","255"]},
+    max_intensity =  {"type":"Int","name":"max_intensity","options":["0","250"]}
   )
 
   FACTORY_SETTINGS = dict(
-    min_intensity_percent = {"type":"Int","name":"min_intensity_percent","value":str(DEFAULT_MIN)},
-    max_intensity_percent =  {"type":"Int","name":"max_intensity_percent","value": str(DEFAULT_MAX)}
+    min_intensity = {"type":"Int","name":"min_intensity","value":str(DEFAULT_MIN)},
+    max_intensity =  {"type":"Int","name":"max_intensity","value": str(DEFAULT_MAX)}
   )
 
   FACTORY_SETTINGS_OVERRIDES = dict()
 
   settingFunctions = dict(
-    min_intensity_percent = {'get':getMinIntensityPercent, 'set': setMinIntensityPercent}
-    max_intensity_percent = {'get':getMaxIntensityPercent, 'set': setMaxIntensityPercent}
+    min_intensity = {'get':getMinIntensity, 'set': setMinIntensity}
+    max_intensity = {'get':getMaxIntensity, 'set': setMaxIntensity}
   )
   
   #Factory Control Values 
@@ -156,7 +155,8 @@ class SealiteNode(object):
 
   addr_str = ""
 
-  cur_curve = DEFAULT_CURVE
+  cur_min_str = '0'
+  cur_max_str = '255'
 
   ### LXS Driver NODE Initialization
   ################################################
@@ -220,7 +220,7 @@ class SealiteNode(object):
                   reports_power = False
                  )
     
-      # Start an sealite activity check process that kills node after some number of failed comms attempts
+      # Start an sidus activity check process that kills node after some number of failed comms attempts
       nepi_msg.publishMsgInfo(self,"Starting an activity check process")
       nepi_ros.start_timer_process(nepi_ros.duration(0.2), self.check_timer_callback)
       # Initialization Complete
@@ -300,28 +300,28 @@ class SealiteNode(object):
   ### Settings Functions
 
 
-  def getMinIntensityPercent(self):
+  def getMinIntensity(self):
     success = False
-    val = '-999'
+    val_str = '-999'
     ser_msg= ('!' + self.addr_str + ':CURV?')
     response = self.send_msg(ser_msg)
     print(response)
      if response != None and response != "?":
       response_parts = response.split(',')
       if len(response_parts) == 7:
-        val = response_parts[0]
+        val_str = response_parts[0]
         self.cur_curv = response_parts
         success = True
-    return val
+    return val_str
 
-  def setMinIntensityPercent(self,val):
+  def setMinIntensity(self,val_str):
     cur_curv = self.cur_curve
     cur_max = cur_curv[1]
-    print(val)
+    print(val_str)
     success = False
-    if int(val) < int(cur_max):
-      cur_curv[0] = val
-      ser_msg= ('!' + self.addr_str + ':CURV=')
+    if int(val_str) < int(cur_max):
+      cur_curv[0] = val_str
+      ser_msg= ('!' + self.addr_str + 'LMX')
       for item in cur_curv:
         ser_msg.append(item)
       response = self.send_msg(ser_msg)
@@ -335,34 +335,31 @@ class SealiteNode(object):
     return success
 
 
-  def getMaxIntensityPercent(self):
+  def getMaxIntensity(self):
     success = False
-    val = '-999'
-    ser_msg= ('!' + self.addr_str + ':CURV?')
+    val_str = '-999'
+    ser_msg= ("&ALMX0000R")
     response = self.send_msg(ser_msg)
     print(response)
-     if response != None and response != "?":
-      response_parts = response.split(',')
-      if len(response_parts) == 7:
-        val = response_parts[1]
-        self.cur_curv = response_parts
-        success = True
-    return val
+     if len(response) == 10:
+      if response[0:4] == '&ALM' and response[9]:
+          val_str = str(int(response[6:9]))
+          self.cur_max_str = val_str
+          success = True
+    return val_str
 
-  def setMaxIntensityPercent(self,val):
-    cur_curv = self.cur_curve
-    cur_min = cur_curv[0]
+  def setMaxIntensity(self,val_str):
+    cur_min = self.cur_min_str
     success = False
-    if int(val) > int(cur_min):
-      cur_curv[1] = val
-      ser_msg= ('!' + self.addr_str + ':CURV=')
-      for item in cur_curv:
-        ser_msg.append(item)
+    if int(val_str) > int(cur_min):
+      zero_prefix_len = 4-len(val_str)
+      for z in range(zero_prefix_len):
+        val_str = ('0' + val_str)
+      ser_msg= ('&ALMX' + val_str + "W")
       response = self.send_msg(ser_msg)
+      if ser_msg == 
+        self.cur_max_str = val_str
       print(response)
-      response_parts = response.split(',')
-      if len(response_parts) == 7:
-        self.cur_curv = response_parts
         success = True
     print(success)          
     return success
@@ -653,7 +650,7 @@ class SealiteNode(object):
       self.serial_port.close()
       
 if __name__ == '__main__':
-  SealiteNode()
+  SidusNode()
 
 
 

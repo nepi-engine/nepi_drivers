@@ -50,6 +50,7 @@ TEST_DRV_DICT = {
     'file_name': 'idx_v4l2_discovery.py',
     'module_name': 'idx_v4l2_discovery',
     'class_name': 'V4L2CamDiscovery',
+    'method': 'AUTO', 
     'interfaces': ['USB'],
     'options_1_dict': {
         'default_option': 'None',
@@ -59,9 +60,7 @@ TEST_DRV_DICT = {
         'default_option': 'None',
         'set_option': 'None'
     },
-    'method': 'AUTO', 
-    'include_ids': [],
-    'exclude_ids': ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M']
+
 },
 'DEVICE_DICT': {'device_path': '/dev/video0'},
 'path': '/opt/nepi/ros/lib/nepi_drivers',
@@ -80,7 +79,10 @@ class V4L2CamDiscovery:
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
   drv_dict = dict()                        
-  deviceList = []                
+  deviceList = []         
+
+  includeDevices = []
+  excludedDevices = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X']           
   def __init__(self):
     #### NODE INIT SETUP ####
     nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)

@@ -17,8 +17,6 @@ DISCOVERY_DICT:
   class_name: ArdupilotDiscovery
   process: CALL
   method: AUTO
-  include_ids: []
-  exclude_ids:
   - ttyACM
   interfaces:
   - IP

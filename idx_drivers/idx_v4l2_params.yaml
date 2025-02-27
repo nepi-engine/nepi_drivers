@@ -20,12 +20,6 @@ DISCOVERY_DICT:
   class_name: V4L2CamDiscovery
   process: LAUNCH
   method: AUTO
-  include_ids: []
-  exclude_ids:
-  - msm_vidc_vdec
-  - ZED 2
-  - ZED 2i
-  - ZED-M
   interfaces:
   - USB
   option_1_dict:

@@ -20,8 +20,6 @@ DISCOVERY_DICT:
   class_name: GenicamCamDiscovery
   process: LAUNCH
   method: AUTO
-  include_ids: []
-  exclude_ids: []
   interfaces:
   - USB
   - IP

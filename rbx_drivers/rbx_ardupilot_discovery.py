@@ -56,6 +56,7 @@ TEST_DRV_DICT = {
     'file_name': 'rbx_ardupilot_discovery.py',
     'module_name': 'rbx_ardupilot_discovery',
     'class_name': 'ArdupilotDiscovery',
+    'method': 'AUTO', 
     'interfaces': ['IP','USBSERIAL','SERIAL'],
     'options_1_dict': {
         'default_val': 'Serial',
@@ -65,9 +66,6 @@ TEST_DRV_DICT = {
         'default_val': 'True',
         'set_val': 'True'
     },
-    'method': 'AUTO', 
-    'include_ids': [],
-    'exclude_ids': ['ttyACM']
 },
 'DEVICE_DICT': {'device_path': '/dev/ttyUSB0'},
 'path': '/opt/nepi/ros/lib/nepi_drivers',
@@ -90,6 +88,9 @@ class ArdupilotDiscovery:
   ip_addr_list = ['192.168.179.5'] #['127.0.0.1']
   ip_udp_port_list = ['14550']
   ip_tcp_port_list = ['14550']
+
+  includeDevices = []
+  excludedDevices = ['ttyACM']
   ################################################          
   def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
@@ -105,8 +106,7 @@ class ArdupilotDiscovery:
     self.base_namespace = base_namespace
     
     # Get required data from drv_dict
-    self.includeDevices = self.drv_dict['DISCOVERY_DICT']['include_ids']
-    self.excludedDevices = self.drv_dict['DISCOVERY_DICT']['exclude_ids']
+
     
     connection_type = self.drv_dict["DISCOVERY_DICT"]['option_1_dict']['set_val']
     #nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ":  Connectionb Type: " + connection_type)

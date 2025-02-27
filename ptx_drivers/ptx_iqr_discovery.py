@@ -45,6 +45,7 @@ TEST_DRV_DICT = {
     'file_name': 'ptx_iqr_discovery.py',
     'module_name': 'ptx_iqr_discovery',
     'class_name': 'IqrPanTiltDiscovery',
+    'method': 'AUTO', 
     'interfaces': ['USB'],
     'options_1_dict': {
         'default_val': 'None',
@@ -54,9 +55,6 @@ TEST_DRV_DICT = {
         'default_val': 'None',
         'set_val': 'None'
     },
-    'method': 'AUTO', 
-    'include_ids': ['ttyACM'],
-    'exclude_ids': []
 },
 'DEVICE_DICT': {},
 'path': '/opt/nepi/ros/lib/nepi_drivers',
@@ -68,6 +66,9 @@ TEST_DRV_DICT = {
 class IqrPanTiltDiscovery:
   active_devices_dict = dict()
   node_launch_name = "iqr_pan_tilt"
+
+  includeDevices = ['ttyACM']
+  excludedDevices = []
   ################################################          
   def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
@@ -83,8 +84,7 @@ class IqrPanTiltDiscovery:
     self.base_namespace = base_namespace
     
     # Get required data from drv_dict
-    self.includeDevices = self.drv_dict['DISCOVERY_DICT']['include_ids']
-    self.excludedDevices = self.drv_dict['DISCOVERY_DICT']['exclude_ids']
+
 
     ### Purge Unresponsive Connections
     path_purge_list = []

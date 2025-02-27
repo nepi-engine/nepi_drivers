@@ -17,9 +17,6 @@ DISCOVERY_DICT:
   class_name: IqrPanTiltDiscovery
   process: CALL
   method: AUTO
-  include_ids:
-  - ttyACM
-  exclude_ids: []
   interfaces:
   - USB
   option_1_dict:
