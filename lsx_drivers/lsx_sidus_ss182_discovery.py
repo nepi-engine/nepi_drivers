@@ -28,67 +28,33 @@ from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_drv
 from nepi_sdk import nepi_msg
 
-PKG_NAME = 'LSX_SEALITE' # Use in display menus
+PKG_NAME = 'LSX_SIDUS_SS182' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
 
-
-TEST_NEX_DICT = {
-'group': 'LSX',
-'group_id': 'SEALITE',
-'pkg_name': 'LSX_SEALITE',
-'NODE_DICT': {
-    'file_name': 'lsx_sealite_node.py',
-    'module_name': 'lsx_sealite_node',
-    'class_name': 'SealiteNode',
-},
-'DRIVER_DICT': {
-    'file_name': '' ,
-    'module_name': '' ,
-    'class_name':  ''
-},
-'DISCOVERY_DICT': {
-    'file_name': 'lsx_sealite_discovery.py',
-    'module_name': 'lsx_sealite_discovery',
-    'class_name': 'SealiteDiscovery',
-    'interfaces': ['SERIAL'],
-    'method': 'AUTO',
-    'options_1_dict': {
-        'default_val': '9600',
-        'set_val': '9600'
-    },
-    'options_2_dict': {
-        'default_val': '10',
-        'set_val': '10'
-    },
  
-},
-'DEVICE_DICT': {'device_path': '/dev/ttyUSB0','baud_int':9600, 'addr': '001'},
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'order': 1,
-'active': True,
-'msg': ""
-}
-
-
 #########################################
 # Sealite Discover Method
 #########################################
 
+
 ### Function to try and connect to device and also monitor and clean up previously connected devices
-class SealiteDiscovery:
+class SidusSS182Discovery:
+
   active_devices_dict = dict()
   node_launch_name = "sealite"
+  baudrate_list = []
+  baud_str = '9600'
   baud_int = 9600
   addr_str = "001"
 
   includeDevices = []
   excludedDevices = ['ttyACM']
+
   ################################################          
   def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
     nepi_msg.createMsgPublishers(self)
     nepi_msg.publishMsgWarn(self, "Sealight Light Discovery")
-
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
@@ -98,20 +64,32 @@ class SealiteDiscovery:
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
 
-    
-    baudrate_list = []
-    baudrate_options = self.drv_dict["DISCOVERY_DICT"]['option_1_dict']['options']
-    baudrate_sel = self.drv_dict["DISCOVERY_DICT"]['option_1_dict']['set_val']
-    if baudrate_sel != "All":
-      baudrate_list.append(int(baudrate_sel))
-    else:
-      for baudrate in baudrate_options:
-        if baudrate != "All":
-          baudrate_list.append(int(baudrate))
-    self.baudrate_list = baudrate_list
+    ########################
+    # Get discovery options
+    try:
+      #Snepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Starting discovery with drv_dict " + str(drv_dict))#
+      baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
+      baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
+      baudrate_list = []
+      if baudrate_sel != "All":
+        baudrate_list.append(baudrate_sel)
+      else:
+        for baudrate in baudrate_options:
+          if baudrate != "All":
+            baudrate_list.append(baudrate)
+      self.baudrate_list = baudrate_list
 
-    addr_search_range = int(self.drv_dict["DISCOVERY_DICT"]['option_2_dict']['set_val'])
-    self.addr_search_list = list(range(1,addr_search_range+1))
+      start_addr = int(drv_dict['DISCOVERY_DICT']['OPTIONS']['start_addr']['value'])
+      stop_addr = int(drv_dict['DISCOVERY_DICT']['OPTIONS']['stop_addr']['value'])
+      addr_range = stop_addr - start_addr
+      if addr_range > 0:
+        self.addr_search_list = list(range(start_addr,stop_addr+1))
+      else:
+        self.addr_search_list = [start_addr]
+    except Exception as e:
+      nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ": Failed to load options " + str(e))#
+      return None
+    ########################
 
 
     # Create path search options
@@ -151,19 +129,18 @@ class SealiteDiscovery:
 
   ##########  Device specific calls
   def checkForDevice(self,path_str):
-    nepi_msg.publishMsgWarn(self, "Sealight checkForDevice start")###
+    #nepi_msg.publishMsgWarn(self, "Sealight checkForDevice start")###
     found_device = False
     nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ":  path_str " + path_str)#
     if path_str not in self.active_paths_list:
-      nepi_msg.publishMsgWarn(self, "not in self")###
-
-      for baud_int in self.baudrate_list:
-        self.baud_int = baud_int
+      for baud_str in self.baudrate_list:
+        self.baud_str = baud_str
+        self.baud_int = int(baud_str)
         try:
           # Try and open serial port
-          serial_port = serial.Serial(path_str,baud_int,timeout = 1)
+          serial_port = serial.Serial(path_str,self.baud_int,timeout = 1)
         except Exception as e:
-          nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Unable to open serial port " + path_str + " with baudrate: " + str(baud_int) + "(" + str(e) + ")")
+          nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
           continue
         for addr in self.addr_search_list:
           addr_str = str(addr)
@@ -175,12 +152,12 @@ class SealiteDiscovery:
           ser_str = (ser_msg + '\r\n')
           # Send Serial String
           #print("")
-          print("Sending serial message: " + ser_msg)
+          #print("Sending serial message: " + ser_msg)
           b=bytearray()
           b.extend(map(ord, ser_str))
           try:
             serial_port.write(b)
-            print("Waiting for response")
+            #print("Waiting for response")
             nepi_ros.sleep(.005)
             bs = serial_port.readline()
             response = bs.decode()
@@ -188,22 +165,19 @@ class SealiteDiscovery:
             nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Got a serial read/write error: " + str(e))
             break
           if len(response) > 2:
-            nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Got response: " + response)
+            #nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Got response: " + response)
             if response[3] == ',':
-              nepi_msg.publishMsgWarn(self, "response[3] == ','")###
-
               self.addr_str = response[0:3]
               try:
                 addr_int = int(addr)
+                nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Found device at path: " + path_str)
                 nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Found device at address: " + self.addr_str)
-                nepi_msg.printMsgWarn(self.log_name + "found device on path: " + path_str)##
                 found_device = True
                 break # Don't check any more addresses
               except Exception as a:
                 nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Returned device message not valid (" + str(a) + ")")
         # Clean up the serial port
         serial_port.close()
-        nepi_msg.publishMsgWarn(self, found_device)###
     return found_device
 
 
@@ -227,9 +201,12 @@ class SealiteDiscovery:
     nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ":  launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
     dict_param_name = self.base_namespace + node_name + "/drv_dict"
+    # Try and load save node params
+    nepi_drv.checkLoadConfigFile(node_name)
     #nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ":  launching node: " + str(self.drv_dict))
+    self.drv_dict['DEVICE_DICT'] = dict()
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
-    self.drv_dict['DEVICE_DICT']['baud_int'] = self.baud_int
+    self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str
     self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
     nepi_ros.set_param(self,dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, node_name, device_path = path_str)

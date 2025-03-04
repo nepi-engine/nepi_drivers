@@ -1,36 +1,17 @@
-description: Driver package for generic GenICam camera devices
-group: IDX
-group_id: GENICAM
-NODE_DICT:
+driver:
+  pkg_name: IDX_GENICAM
+  display_name: Generic Genicam camera driver
   description: Driver package for generic GenICam camera devices
-  class_name: GenicamCamNode
-  group: IDX
+  type: IDX
   group_id: GENICAM
-  driver_pkg_name: IDX_GENICAM
-  discovery_pkg_name: IDX_GENICAM
-  pkg_name: IDX_GENICAM
-  file_name: idx_genicam_node.py
-  module_name: idx_genicam_node
-DRIVER_DICT:
-  class_name: GenicamCamDriver
-  pkg_name: IDX_GENICAM
-  file_name: idx_genicam_driver.py
-  module_name: idx_genicam_driver
-DISCOVERY_DICT:
-  class_name: GenicamCamDiscovery
-  process: LAUNCH
-  method: AUTO
-  interfaces:
-  - USB
-  - IP
-  option_1_dict:
-    name: None
-    options: []
-    default_val: None
-  option_2_dict:
-    name: None
-    options: []
-    default_val: None
-  pkg_name: IDX_GENICAM
-  file_name: idx_genicam_discovery.py
-  module_name: idx_genicam_discovery
+  NODE_DICT:
+    file_name: idx_genicam_node.py
+    class_name: GENICAMCamNode
+  DRIVER_DICT:
+    file_name: idx_genicam_driver.py
+    class_name: GENICAMCamDriver
+  DISCOVERY_DICT:
+    file_name: idx_genicam_discovery.py
+    class_name: GENICAMCamDiscovery
+    process: LAUNCH
+    OPTIONS: None

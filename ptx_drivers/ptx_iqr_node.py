@@ -16,46 +16,26 @@
 # - mailto:nepi@numurus.com
 #
 
-PKG_NAME = 'PTX_IQR' # Use in display menus
+PKG_NAME = 'PTX_IQR' 
 FILE_TYPE = 'NODE'
 
-
 TEST_DRV_DICT = {
-'group': 'PTX',
+'type': 'PTX',
 'group_id': 'IQR',
-'pkg_name': 'PTX_IQR',
 'NODE_DICT': {
     'file_name': 'ptx_iqr_node.py',
-    'module_name': 'ptx_iqr_node',
     'class_name': 'IqrPanTiltNode',
 },
 'DRIVER_DICT': {
-    'file_name': '' ,
-    'module_name': '' ,
-    'class_name':  ''
+    'file_name': 'None' ,
+    'class_name':  'None'
 },
 'DISCOVERY_DICT': {
     'file_name': 'ptx_iqr_discovery.py',
-    'module_name': 'ptx_iqr_discovery',
     'class_name': 'IqrPanTiltDiscovery',
-    'interfaces': ['USB'],
-    'options_1_dict': {
-        'default_val': 'None',
-        'set_val': 'None'
-    },
-    'options_2_dict': {
-        'default_val': 'None',
-        'set_val': 'None'
-    },
     'method': 'AUTO', 
-    'include_ids': ['iqr_pan_tilt'],
-    'exclude_ids': []
 },
 'DEVICE_DICT': {},
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'order': 1,
-'active': True,
-'msg': ""
 }
 
 

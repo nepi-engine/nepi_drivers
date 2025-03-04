@@ -24,44 +24,8 @@ import time
 from nepi_sdk import nepi_drv
 from nepi_sdk import nepi_msg
 
-PKG_NAME = 'PTX_IQR' # Use in display menus
+PKG_NAME = 'PTX_IQR' 
 FILE_TYPE = 'DISCOVERY'
-
-TEST_DRV_DICT = {
-'group': 'PTX',
-'group_id': 'IQR',
-'pkg_name': 'PTX_IQR',
-'NODE_DICT': {
-    'file_name': 'ptx_iqr_node.py',
-    'module_name': 'ptx_iqr_node',
-    'class_name': 'IqrPanTiltNode',
-},
-'DRIVER_DICT': {
-    'file_name': '' ,
-    'module_name': '' ,
-    'class_name':  ''
-},
-'DISCOVERY_DICT': {
-    'file_name': 'ptx_iqr_discovery.py',
-    'module_name': 'ptx_iqr_discovery',
-    'class_name': 'IqrPanTiltDiscovery',
-    'method': 'AUTO', 
-    'interfaces': ['USB'],
-    'options_1_dict': {
-        'default_val': 'None',
-        'set_val': 'None'
-    },
-    'options_2_dict': {
-        'default_val': 'None',
-        'set_val': 'None'
-    },
-},
-'DEVICE_DICT': {},
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'order': 1,
-'active': True,
-'msg': ""
-}
 
 class IqrPanTiltDiscovery:
   active_devices_dict = dict()
@@ -74,9 +38,10 @@ class IqrPanTiltDiscovery:
     self.log_name = PKG_NAME.lower() + "_discovery" 
     nepi_msg.createMsgPublishers(self) 
 
+ 
   ##########  DRV Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
-  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict = TEST_DRV_DICT):
+  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict):
     self.drv_dict = drv_dict
     #nepi_msg.printMsg(self.log_name + "Got drv_dict : " + str(self.drv_dict))
     self.available_paths_list = available_paths_list

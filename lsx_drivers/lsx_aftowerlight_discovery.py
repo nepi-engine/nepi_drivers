@@ -25,47 +25,11 @@ from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_drv
 
-PKG_NAME = 'LSX_AFTOWER' # Use in display menus
+PKG_NAME = 'LSX_AFTOWERLIGHT'
 FILE_TYPE = 'DISCOVERY'
 
-
-TEST_NEX_DICT = {
-'group': 'LSX',
-'group_id': 'AFTOWER',
-'pkg_name': 'LSX_AFTOWER',
-'NODE_DICT': {
-    'file_name': 'lsx_aftowerlight_node.py',
-    'module_name': 'lsx_aftowerlight_node',
-    'class_name': 'AfTowerLightNode',
-},
-'DRIVER_DICT': {
-    'file_name': '' ,
-    'module_name': '' ,
-    'class_name':  ''
-},
-'DISCOVERY_DICT': {
-    'file_name': 'lsx_aftowerlight_discovery.py',
-    'module_name': 'lsx_aftowerlight_discovery',
-    'class_name': 'AfTowerLightDiscovery',
-    'method': 'AUTO', 
-    'interfaces': ['USB'],
-    'options_1_dict': {
-        'default_val': '9600',
-        'set_val': '9600'
-    },
-    'options_2_dict': {
-        'default_val': 'None',
-        'set_val': 'None'
-    },
-},
-'DEVICE_DICT': {'device_path': '/dev/ttyUSB0'},
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'order': 1,
-'active': True,
-'msg': ""
-}
-
 class AfTowerLightDiscovery:
+
   active_devices_dict = dict()
   node_launch_name = "af_tower_light"
 
@@ -79,7 +43,6 @@ class AfTowerLightDiscovery:
     nepi_msg.publishMsgInfo(self, "AF Tower Light Discovery")
 
 
-
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
   def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict = TEST_NEX_DICT):
@@ -89,17 +52,16 @@ class AfTowerLightDiscovery:
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
     
-    baudrate_list = []
-    baudrate_options = self.drv_dict["DISCOVERY_DICT"]['option_1_dict']['options']
-    baudrate_sel = self.drv_dict["DISCOVERY_DICT"]['option_1_dict']['set_val']
-    if baudrate_sel != "All":
-      baudrate_list.append(int(baudrate_sel))
-    else:
-      for baudrate in baudrate_options:
-        if baudrate != "All":
-          baudrate_list.append(int(baudrate))
-    self.baudrate_list = baudrate_list
-    
+    ########################
+    # Get discovery options
+    try:
+      #Snepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Starting discovery with drv_dict " + str(drv_dict))#
+      baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
+      self.baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
+    except Exception as e:
+      nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ": Failed to load options " + str(e))#
+      return None
+    ########################
 
     # Create path search options    
     self.path_list = []
@@ -133,8 +95,7 @@ class AfTowerLightDiscovery:
   ##########  Device specific calls
 
   def checkForDevice(self,path_str):
-    nepi_msg.publishMsgWarn(self, "Sealight checkForDevice end")###
-
+    #nepi_msg.publishMsgWarn(self, log_name + " checkForDevice")###
     found_device = False
     #nepi_msg.printMsgWarn(self.log_name + "path_str " + path_str)
     if path_str.find('ttyUSB') != -1:
@@ -146,8 +107,6 @@ class AfTowerLightDiscovery:
         if str(usb_dict[path_str]['product_id']) in self.includeDevices:
           #nepi_msg.printMsgWarn(self.log_name + "found device on path: " + path_str)
           found_device = True
-          nepi_msg.publishMsgWarn(self, found_device)###
-
     return found_device
 
 
@@ -175,7 +134,9 @@ class AfTowerLightDiscovery:
     #Setup required param server drv_dict for discovery node
     dict_param_name = self.base_namespace + node_name + "/drv_dict"
     nepi_msg.publishMsgInfo(self, ":  " + self.log_name + "launching node: " + str(self.drv_dict))
+    self.drv_dict['DEVICE_DICT'] = dict()
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
+    self.drv_dict['DEVICE_DICT']['baud_rate'] = self.baud_rate
     nepi_ros.set_param(self,dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, node_name, device_path = path_str)
     if success:

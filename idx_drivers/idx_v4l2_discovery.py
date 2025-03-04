@@ -27,62 +27,33 @@ import time
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_save
 
 PKG_NAME = 'IDX_V4L2' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
 
-
-TEST_DRV_DICT = {
-'group': 'IDX',
-'group_id': 'V4L2',
-'pkg_name': 'IDX_V4L2',
-'NODE_DICT': {
-    'file_name': 'idx_v4l2_node.py',
-    'module_name': 'idx_v4l2_node',
-    'class_name': 'V4l2CamNode',
-},
-'DRIVER_DICT': {
-    'file_name': 'idx_v4l2_driver.py' ,
-    'module_name': 'idx_v4l2_driver' ,
-    'class_name':  'V4l2CamDriver'
-},
-'DISCOVERY_DICT': {
-    'file_name': 'idx_v4l2_discovery.py',
-    'module_name': 'idx_v4l2_discovery',
-    'class_name': 'V4L2CamDiscovery',
-    'method': 'AUTO', 
-    'interfaces': ['USB'],
-    'options_1_dict': {
-        'default_option': 'None',
-        'set_option': 'None'
-    },
-    'options_2_dict': {
-        'default_option': 'None',
-        'set_option': 'None'
-    },
-
-},
-'DEVICE_DICT': {'device_path': '/dev/video0'},
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'order': 1,
-'active': True,
-'msg': ""
-}
-                             
 class V4L2CamDiscovery:
 
+  CAP_SETTINGS = nepi_settings.NONE_CAP_SETTINGS
 
-  NEPI_DEFAULT_CFG_PATH = '/opt/nepi/ros/etc/'
+  FACTORY_SETTINGS = nepi_settings.NONE_SETTINGS
+
+  current_settings = FACTORY_SETTINGS
+  
+  includeDevices = []
+  excludedDevices = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X']     
+
+  settings_if = None
+
+  NEPI_DEFAULT_CFG_PATH = '/opt/nepi/ros/etc/nepi_drivers'
+  NEPI_DEFAULT_USER_CFG_PATH = 'mnt/nepi_storage/user_cfg/ros'
   CHECK_INTERVAL_S = 3.0
-
 
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
   drv_dict = dict()                        
   deviceList = []         
-
-  includeDevices = []
-  excludedDevices = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X']           
+  
   def __init__(self):
     #### NODE INIT SETUP ####
     nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
@@ -91,18 +62,24 @@ class V4L2CamDiscovery:
     nepi_msg.createMsgPublishers(self)
     nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
     ##############################
-    # Get required nex driver dict info
-    self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_DRV_DICT) 
-    #nepi_msg.publishMsgWarn(self,"Drv_Dict: " + str(self.drv_dict))
-    self.includeDevices = self.drv_dict['DISCOVERY_DICT']['include_ids']
-    self.excludedDevices = self.drv_dict['DISCOVERY_DICT']['exclude_ids']
+
+    ########################
+    # Get discovery options
+    try:
+      self.drv_dict = nepi_ros.get_param(self,'~drv_dict',dict())
+      nepi_msg.publishMsgWarn(self,"Initial Driver Dict: " + str(self.drv_dict))
+    except Exception as e:
+      nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ": Failed to load options " + str(e))#
+      nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
+      return
+    ########################
 
     nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
-
     # Now start the node
     nepi_ros.spin()
 
-
+  #**********************
+  # Discovery functions
 
   def detectAndManageDevices(self, timer): # Extra arg since this is a Timer callback
     # First grab the current list of known V4L2 devices
@@ -219,7 +196,6 @@ class V4L2CamDiscovery:
           device_node_namespace = nepi_ros.get_base_namespace() + device_node_name
           nepi_msg.publishMsgInfo(self,"Initiating new V4L2 node " + device_node_namespace)
 
-          self.checkLoadConfigFile(node_name = device_node_name)
 
           # Now start the node via rosrun
           # rosrun nepi_drivers_idx v4l2_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
@@ -227,8 +203,11 @@ class V4L2CamDiscovery:
           if dtype not in self.excludedDevices:
             #Setup required param server drv_dict for discovery node
             self.drv_dict['DEVICE_DICT'] = {'device_path': path}
-            dict_param_name = device_node_name + "/drv_dict"
+            dict_param_name = os.path.join(self.base_namespace,device_node_name + "/drv_dict")
             nepi_ros.set_param(self,dict_param_name,self.drv_dict)
+            # Try and load save node params
+            nepi_drv.checkLoadConfigFile(device_node_name)
+            
             file_name = self.drv_dict['NODE_DICT']['file_name']
             nepi_msg.publishMsgInfo(self,"Starting new V4L2 node with drv_dict " +str(self.drv_dict))
             #Try and launch node
@@ -264,25 +243,9 @@ class V4L2CamDiscovery:
     nepi_msg.publishMsgWarn(self,"cannot check run status of unknown node " + node_namespace)
     return False
   
-  def checkLoadConfigFile(self, node_name):
-    folder_name = "drivers/" + node_name 
-    config_folder = os.path.join(self.NEPI_DEFAULT_CFG_PATH, folder_name)
-    if not os.path.isdir(config_folder):
-      nepi_msg.publishMsgWarn(self,'No config folder found for ' + node_name + '... creating one at ' + config_folder)
-      os.makedirs(name = config_folder, mode = 0o775)
-      return
-    
-    config_file = os.path.join(config_folder, node_name + ".yaml")
-    node_namespace = nepi_ros.get_base_namespace() + node_name
-    if os.path.exists(config_file):
-      nepi_msg.publishMsgInfo(self,"Loading parameters from " + config_file + " to " + node_namespace)
-      #rosparam.load_file(filename = config_file, default_namespace = node_namespace)
-      #rosparam.load_file(filename = config_file, default_namespace = node_name)
-      # Seems programmatic rosparam.load_file is not working at all, so use the command-line version instead
-      rosparam_load_cmd = ['rosparam', 'load', config_file, node_namespace]
-      subprocess.run(rosparam_load_cmd)
-    else:
-      nepi_msg.publishMsgWarn(self,"No config file found for " + node_name + " in " + self.NEPI_DEFAULT_CFG_PATH)
+
+
+
 
   def short_name(self,name):
     split = name.split("_")

@@ -1,42 +1,27 @@
-description: Driver package for StereoLab Zed stereo camera devices
-group: IDX
-group_id: ZED
-NODE_DICT:
+driver:
+  pkg_name: IDX_ZED
+  display_name: Generic USB camera driver
   description: Driver package for StereoLab Zed stereo camera devices
-  class_name: ZedCamNode
-  group: IDX
-  group_id: ZED
-  driver_pkg_name: None
-  discovery_pkg_name: IDX_ZED
-  pkg_name: IDX_ZED
-  file_name: idx_zed_node.py
-  module_name: idx_zed_node
-DRIVER_DICT:
-  pkg_name: None
-DISCOVERY_DICT:
-  class_name: ZedCamDiscovery
-  process: LAUNCH
-  method: AUTO
-  include_ids:
-  - ZED 2
-  - ZED 2i
-  - ZED-M
-  exclude_ids: []
-  interfaces:
-  - USB
-  option_1_dict:
-    name: Resolution (Req Reboot)
-    options:
-    - HD2K
-    - HD1080
-    - HD720
-    - VGA
-    default_val: HD720
-  option_2_dict:
-    name: Framerate (Req Reboot)
-    options:
-    - 15
-    default_val: 15
-  pkg_name: IDX_ZED
-  file_name: idx_zed_discovery.py
-  module_name: idx_zed_discovery
+  type: IDX
+  group_id: None
+  NODE_DICT:
+    file_name: idx_zed_node.py
+    class_name: ZedCamNode
+  DRIVER_DICT:
+    file_name: None
+    class_name: None
+  DISCOVERY_DICT:
+    file_name: idx_zed_discovery.py
+    class_name: ZedCamDiscovery
+    process: LAUNCH
+    OPTIONS:
+      baud_rate:
+        type: Discrete
+        options:
+          - HD2K
+          - HD1080
+          - HD720
+          - VGA
+        default: HD720
+        value: HD720
+

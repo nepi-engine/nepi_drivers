@@ -1,33 +1,23 @@
-description: Driver package for adafruit usb tower light
-group: LSX
-group_id: AFTOWER
-NODE_DICT:
-  description: Driver package for adafruit usb tower light
-  class_name: AfTowerLightNode
-  group: LSX
-  group_id: AFTOWER
-  driver_pkg_name: None
-  discovery_pkg_name: LSX_AFTOWER
-  pkg_name: LSX_AFTOWER
-  file_name: lsx_aftowerlight_node.py
-  module_name: lsx_aftowerlight_node
-DRIVER_DICT:
-  pkg_name: None
-DISCOVERY_DICT:
-  class_name: AfTowerLightDiscovery
-  process: CALL
-  method: AUTO
-  interfaces:
-  - SERIAL
-  option_1_dict:
-    name: BaudRate
-    options:
-    - '9600'
-    default_val: '9600'
-  option_2_dict:
-    name: None
-    options: []
-    default_val: None
-  pkg_name: LSX_AFTOWER
-  file_name: lsx_aftowerlight_discovery.py
-  module_name: lsx_aftowerlight_discovery
+driver:
+  pkg_name: LSX_AFTOWERLIGHT
+  display_name: Adafruit Tower Light
+  description: Adafruit Tri-Color USB Controlled Tower Light with Buzzer
+  type: LSX
+  group_id: None
+  NODE_DICT:
+    file_name: lsx_aftowerlight_node.py
+    class_name: AfTowerLightNode
+  DRIVER_DICT:
+    file_name: None
+    class_name: None
+  DISCOVERY_DICT:
+    file_name: lsx_aftowerlight_discovery.py
+    class_name: AfTowerLightDiscovery
+    process: CALL
+    OPTIONS:
+      baud_rate:
+        type: Discrete
+        options:
+          - '9600'
+        default: '9600'
+        value: '9600'

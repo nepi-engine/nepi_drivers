@@ -58,41 +58,18 @@ PKG_NAME = 'IDX_ZED' # Use in display menus
 FILE_TYPE = 'NODE'
 
 TEST_DRV_DICT = {
-'group': 'IDX',
-'group_id': 'ZED',
-'pkg_name': 'IDX_ZED',
+'type': 'IDX',
+'group_id': 'None',
+'usr_cfg_path': '/mnt/nepi_storage/user_cfg/ros',
 'NODE_DICT': {
     'file_name': 'idx_zed_node.py',
-    'module_name': 'idx_zed_node',
     'class_name': 'ZedCamNode',
 },
 'DRIVER_DICT': {
-    'file_name': '' ,
-    'module_name': '' ,
-    'class_name':  ''
-},
-'DISCOVERY_DICT': {
-    'file_name': 'idx_zed_discovery.py',
-    'module_name': 'idx_zed_discovery',
-    'class_name': 'ZEDCamDiscovery',
-    'interfaces': ['USB'],
-    'options_1_dict': {
-        'default_val': 'HD720',
-        'set_val': 'HD720'
-    },
-    'options_2_dict': {
-        'default_val': '15',
-        'set_val': '15'
-    },
-    'method': 'AUTO', 
-    'include_ids': ['ZED 2','ZED 2i','ZED-M'],
-    'exclude_ids': ['msm_vidc_vdec']
+    'file_name': 'idx_zed_driver.py' ,
+    'class_name':  'ZedCamDriver'
 },
 'DEVICE_DICT': {'zed_type': 'zed2','res_val': 3},
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'order': 1,
-'active': True,
-'msg': ""
 }
 
 

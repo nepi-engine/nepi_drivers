@@ -35,42 +35,22 @@ from nepi_sdk import nepi_drv
 from nepi_sdk import nepi_settings
 
 
-PKG_NAME = 'LSX_AFTOWER' # Use in display menus
+PKG_NAME = 'LSX_AFTOWERLIGHT'
 FILE_TYPE = 'NODE'
 
-
 TEST_NEX_DICT = {
-'group': 'LSX',
-'group_id': 'AFTOWER',
-'pkg_name': 'LSX_AFTOWER',
 'NODE_DICT': {
     'file_name': 'lsx_aftowerlight_node.py',
-    'module_name': 'lsx_aftowerlight_node',
     'class_name': 'AfTowerLightNode',
 },
 'DRIVER_DICT': {
-    'file_name': '' ,
-    'module_name': '' ,
-    'class_name':  ''
+    'file_name': 'None' ,
+    'class_name':  'None'
 },
-'DISCOVERY_DICT': {
-    'file_name': 'lsx_aftowerlight_discovery.py',
-    'module_name': 'lsx_aftowerlight_discovery',
-    'class_name': 'AfTowerLightDiscovery',
-    'interfaces': ['USB'],
-    'options_1_dict': {
-        'default_val': '9600',
-        'set_val': '9600'
-    },
-    'options_2_dict': {
-        'default_val': 'None',
-        'set_val': 'None'
-    },
-    'method': 'AUTO', 
-    'include_ids': ['29987'],
-    'exclude_ids': []
+'DEVICE_DICT': {
+  'device_path': '/dev/ttyUSB0',
+  'baud_rate': '9600'
 },
-'DEVICE_DICT': {'device_path': '/dev/ttyUSB0'},
 'path': '/opt/nepi/ros/lib/nepi_drivers',
 'order': 1,
 'active': True,
@@ -155,8 +135,9 @@ class AfTowerLightNode(object):
       self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
       #nepi_msg.publishMsgWarn(self,"AFTOWER_NODE: " + str(self.drv_dict))
       self.ser_port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
-      self.ser_buad_int = self.drv_dict['DISCOVERY_DICT']['option_1_dict']['set_val'] 
-      nepi_msg.publishMsgInfo(self,"Connecting to Device on port " + self.ser_port_str + " with buad " + self.ser_buad_int)
+      ser_baud_str = self.drv_dict['DEVICE_DICT']['baud_rate'] 
+      self.ser_baud_int = int(ser_baud_str)
+      nepi_msg.publishMsgInfo(self,"Connecting to Device on port " + self.ser_port_str + " with baud " + ser_baud_str)
       ################################################
       ### Try and connect to device
       self.connected = self.connect()
@@ -189,8 +170,8 @@ class AfTowerLightNode(object):
 
 
 
-
       self.lsx_if = ROSLSXDeviceIF(
+
                   device_info = self.device_info_dict, 
                   getStatusFunction = self.getStatus,
                   capSettings = self.cap_settings,
@@ -205,7 +186,7 @@ class AfTowerLightNode(object):
                   setColorFunction = self.setColorOption,
                   kelvin_limits_list = None, #self.kelvin_limits, 
                   setKelvinFunction =None, #self.setKelvinVal,
-                  supportsBlinking = True,
+                  blinkOnOffFunction = None,
                   enableStrobeFunction = None, #self.setStrobeEnable,
                   reports_temp = False, 
                   reports_power = False
@@ -276,6 +257,8 @@ class AfTowerLightNode(object):
     status_msg.on_off_state = self.on_off_state
     status_msg.strobe_state = self.strobe_state
     status_msg.intensity_ratio = self.intensity_ratio
+    status_msg.blink_state = False
+    status_msg.blink_interval = 0
     status_msg.color_setting = self.current_color
     status_msg.kelvin_setting = int(self.kelvin_val)
     status_msg.temp_c = int(self.temp_c)
@@ -312,55 +295,18 @@ class AfTowerLightNode(object):
           if cur_state == True:
             CUR_ON = self.on_off_dict[self.current_color][0]
             self.send_msg(CUR_ON)
-  '''
-  ### The rest are just for testing
-
-  def setStandby(self,standby_val):
-    success = False
-    self.standby_enabled = standby_val
-    success = True
-    return success 
-
-  def setKelvinVal(self, kelvin_val):
-    success = False
-    self.kelvin_val = kelvin_val
-    success = True
-    return success  
-
-  def setIntensityRatio(self,intensity_ratio):
-    success = False
-    if intensity_ratio < 0:
-      intensity_ratio = 0
-    elif intensity_ratio > 1:
-      intensity_ratio = 1
-    success = self.setIntensityFunction(intensity_ratio)
-    if success:
-      self.intensity_ratio = intensity_ratio
-
-  def setIntensityFunction(self,intensity_ratio):
-    success = False
-    self.intensity_ratio = intensity_ratio
-    success = True
-    return success  
-
-  def setStrobeEnable(self,strobe_enable_val):
-    success = False
-    self.strobe_state = strobe_enable_val
-    success = True
-    return success  
-  '''
-
+  
   #######################
   ### Class Functions
 
 
-  ### Function to try and connect to device at given port and buadrate
+  ### Function to try and connect to device at given port and baudrate
   def connect(self):
     success = False
     check_ser_port = self.check_port(self.ser_port_str)
     if check_ser_port == True:
       try: 
-        self.serial_port = serial.Serial(self.ser_port_str,self.ser_buad_int,timeout = 0.1)
+        self.serial_port = serial.Serial(self.ser_port_str,self.ser_baud_int,timeout = 0.1)
         #nepi_msg.publishMsgWarn(self,"Serial port open")
         success = True
       except:

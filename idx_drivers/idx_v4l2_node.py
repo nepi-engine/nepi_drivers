@@ -34,44 +34,19 @@ from nepi_sdk import nepi_settings
 PKG_NAME = 'IDX_V4L2' # Use in display menus
 FILE_TYPE = 'NODE'
 
-
-
-TEST_NEX_DICT = {
-'group': 'IDX',
-'group_id': 'V4L2',
-'pkg_name': 'IDX_V4L2',
+TEST_DRV_DICT = {
+'type': 'IDX',
+'group_id': 'None',
+'path': '/opt/nepi/ros/lib/nepi_drivers',
 'NODE_DICT': {
     'file_name': 'idx_v4l2_node.py',
-    'module_name': 'idx_v4l2_node',
     'class_name': 'V4l2CamNode',
 },
 'DRIVER_DICT': {
     'file_name': 'idx_v4l2_driver.py' ,
-    'module_name': 'idx_v4l2_driver' ,
     'class_name':  'V4l2CamDriver'
 },
-'DISCOVERY_DICT': {
-    'file_name': 'idx_v4l2_discovery.py',
-    'module_name': 'idx_v4l2_discovery',
-    'class_name': 'V4L2CamDiscovery',
-    'interfaces': ['USB'],
-    'options_1_dict': {
-        'default_option': 'None',
-        'set_option': 'None'
-    },
-    'options_2_dict': {
-        'default_option': 'None',
-        'set_option': 'None'
-    },
-    'method': 'AUTO', 
-    'include_ids': [],
-    'exclude_ids': ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M']
-},
 'DEVICE_DICT': {'device_path': '/dev/video0'},
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'order': 1,
-'active': True,
-'msg': ""
 }
 
 class V4l2CamNode:
@@ -136,11 +111,11 @@ class V4l2CamNode:
         nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
         ##############################
         # Get required drv driver dict info
-        self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
+        self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_DRV_DICT) 
         #nepi_msg.publishMsgWarn(self,"Drv_Dict: " + str(self.drv_dict))
         self.driver_path = self.drv_dict['path']
         self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
-        self.driver_module = self.drv_dict['DRIVER_DICT']['module_name']
+        self.driver_module = self.driver_file.split('.')[0]
         self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
         
         self.device_path = self.drv_dict['DEVICE_DICT']['device_path']

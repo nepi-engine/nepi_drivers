@@ -50,8 +50,6 @@ PKG_NAME = 'RBX_ARDUPILOT' # Use in display menus
 FILE_TYPE = 'NODE'
 
 
-
-
 #########################################
 # Node Class
 #########################################

@@ -1,35 +1,17 @@
-description: Driver package for generic USB camera devices
-group: IDX
-group_id: V4L2
-NODE_DICT:
+driver:
+  pkg_name: IDX_V4L2
+  display_name: Generic USB Camera
   description: Driver package for generic USB camera devices
-  class_name: V4l2CamNode
-  group: IDX
-  group_id: V4L2
-  driver_pkg_name: IDX_V4L2
-  discovery_pkg_name: IDX_V4L2
-  pkg_name: IDX_V4L2
-  file_name: idx_v4l2_node.py
-  module_name: idx_v4l2_node
-DRIVER_DICT:
-  class_name: V4l2CamDriver
-  pkg_name: IDX_V4L2
-  file_name: idx_v4l2_driver.py
-  module_name: idx_v4l2_driver
-DISCOVERY_DICT:
-  class_name: V4L2CamDiscovery
-  process: LAUNCH
-  method: AUTO
-  interfaces:
-  - USB
-  option_1_dict:
-    name: None
-    options: []
-    default_val: None
-  option_2_dict:
-    name: None
-    options: []
-    default_val: None
-  pkg_name: IDX_V4L2
-  file_name: idx_v4l2_discovery.py
-  module_name: idx_v4l2_discovery
+  type: IDX
+  group_id: None
+  NODE_DICT:
+    file_name: idx_v4l2_node.py
+    class_name: V4l2CamNode
+  DRIVER_DICT:
+    file_name: idx_v4l2_driver.py
+    class_name: V4l2CamDriver
+  DISCOVERY_DICT:
+    file_name: idx_v4l2_discovery.py
+    class_name: V4L2CamDiscovery
+    process: LAUNCH
+    OPTIONS: None

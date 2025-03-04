@@ -35,83 +35,55 @@ from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_drv
 from nepi_sdk import nepi_settings
 
-PKG_NAME = 'LSX_SIDUS' # Use in display menus
+
+PKG_NAME = 'LSX_SIDUS_SS182' # Use in display menus
 FILE_TYPE = 'NODE'
 
-
-
 TEST_NEX_DICT = {
-'group': 'LSX',
-'group_id': 'SEALITE',
-'pkg_name': 'LSX_SIDUS',
 'NODE_DICT': {
-    'file_name': 'lsx_sidus_node.py',
-    'module_name': 'lsx_sidus_node',
-    'class_name': 'SidusNode',
+    'file_name': 'lsx_sidus_ss182_node.py',
+    'class_name': 'SidusSS182Node',
 },
 'DRIVER_DICT': {
-    'file_name': '' ,
-    'module_name': '' ,
-    'class_name':  ''
+    'file_name': 'None' ,
+    'class_name':  'None'
 },
-'DISCOVERY_DICT': {
-    'file_name': 'lsx_sidus_discovery.py',
-    'module_name': 'lsx_sidus_discovery',
-    'class_name': 'SidusDiscovery',
-    'interfaces': ['SERIAL','USBSERIAL'],
-    'options_1_dict': {
-        'default_val': '57600',
-        'set_val': '57600'
-    },
-    'options_2_dict': {
-        'default_val': '10',
-        'set_val': '10'
-    },
-    'method': 'AUTO', 
-    'include_ids': [],
-    'exclude_ids': ['ttyACM']
+'DEVICE_DICT': {
+  'device_path': '/dev/ttyUSB0',
+  'baud_rate': '9600', 
+  'addr': '001'
 },
-'DEVICE_DICT': {'device_path': '/dev/ttyUSB0','baud_int':57600, 'addr': '001'},
 'path': '/opt/nepi/ros/lib/nepi_drivers',
 'order': 1,
 'active': True,
 'msg': ""
 }
 
-
-
-DEFAULT_MIN = '1'
 DEFAULT_MAX = '128'
 
 #########################################
-# Sidus LSX Driver Node Class
+# Sealite LSX Driver Node Class
 #########################################
 
-class SidusNode(object):
+class SidusSS182Node(object):
   ### LXS Driver Settings
   # Set driver capability parameters
 
-
-
-
   #######################
-  DEFAULT_NODE_NAME='sidus'
+  DEFAULT_NODE_NAME='sidus_ss182'
 
   CAP_SETTINGS = dict(
-    min_intensity = {"type":"Int","name":"min_intensity","options":["0","255"]},
-    max_intensity =  {"type":"Int","name":"max_intensity","options":["0","250"]}
+    max_intensity =  {"type":"Int","name":"max_intensity","options":["0","255"]}
   )
 
   FACTORY_SETTINGS = dict(
-    min_intensity = {"type":"Int","name":"min_intensity","value":str(DEFAULT_MIN)},
     max_intensity =  {"type":"Int","name":"max_intensity","value": str(DEFAULT_MAX)}
   )
 
   FACTORY_SETTINGS_OVERRIDES = dict()
 
   settingFunctions = dict(
-    min_intensity = {'get':getMinIntensity, 'set': setMinIntensity}
-    max_intensity = {'get':getMaxIntensity, 'set': setMaxIntensity}
+    max_intensity = {'get':'getMaxIntensity', 'set': 'setMaxIntensity'}
   )
   
   #Factory Control Values 
@@ -155,8 +127,7 @@ class SidusNode(object):
 
   addr_str = ""
 
-  cur_min_str = '0'
-  cur_max_str = '255'
+  cur_curve = DEFAULT_CURVE
 
   ### LXS Driver NODE Initialization
   ################################################
@@ -172,15 +143,16 @@ class SidusNode(object):
     # Get required drv driver dict info
     self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
     #nepi_msg.publishMsgWarn(self,"Nex_Dict: " + str(self.drv_dict))
-    self.ser_port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
-    self.ser_buad_int = self.drv_dict['DEVICE_DICT']['baud_int'] 
+    self.port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
+    self.baud_str = self.drv_dict['DEVICE_DICT']['baud_str'] 
+    self.baud_int = int(self.baud_str)
     self.addr_str = self.drv_dict['DEVICE_DICT']['addr_str'] 
     # Address string must be three char long
     zero_prefix_len = 3-len(self.addr_str)
     for z in range(zero_prefix_len):
       self.addr_str = ('0' + self.addr_str)  
     ################################################  
-    nepi_msg.publishMsgInfo(self,"Connecting to Device on port " + self.ser_port_str + " with buad " + str(self.ser_buad_int))
+    nepi_msg.publishMsgInfo(self,"Connecting to Device on port " + self.port_str + " with baud " + self.baud_str)
     ### Try and connect to device
     self.connected = self.connect() 
     if self.connected:
@@ -212,26 +184,26 @@ class SidusNode(object):
                   settingUpdateFunction=self.settingUpdateFunction,
                   getSettingsFunction=self.getSettings,
                   factoryControls = self.FACTORY_CONTROLS,
-                  standbyEnableFunction = self.setStandby,
+                  standbyEnableFunction = None,
                   turnOnOffFunction = self.turnOnOff,
                   setIntensityRatioFunction = self.setIntensityRatio, 
-                  supportsBlinking = True,
+                  blinkOnOffFunction = None,
                   reports_temp = True, 
                   reports_power = False
                  )
     
-      # Start an sidus activity check process that kills node after some number of failed comms attempts
+      # Start an sealite activity check process that kills node after some number of failed comms attempts
       nepi_msg.publishMsgInfo(self,"Starting an activity check process")
       nepi_ros.start_timer_process(nepi_ros.duration(0.2), self.check_timer_callback)
       # Initialization Complete
-      self.lsx_if.publishMsg(" Initialization Complete")
+      nepi_msg.publishMsgInfo(self,"Initialization Complete")
       #Set up node shutdown
       nepi_ros.on_shutdown(self.cleanup_actions)
       # Spin forever (until object is detected)
       nepi_ros.spin()
     else:
-      self.lsx_if.publishMsg(" Shutting down node")
-      self.lsx_if.publishMsg(" Specified serial port not available")
+      nepi_msg.publishMsgInfo(self,"Shutting down node")
+      nepi_msg.publishMsgInfo(self,"Specified serial port not available")
       nepi_ros.signal_shutdown("Serial port not available")   
 
 
@@ -256,13 +228,16 @@ class SidusNode(object):
   def getSettings(self):
       settings = dict()
       for setting_name in self.cap_settings.keys():
+        cap_setting = self.cap_settings[setting_name]
         setting = dict()
         setting["name"] = setting_name
-        setting["type"] = self.cap_settings['type']
+        setting["type"] = cap_setting['type']
         val = None
-        if name in self.settingFunctions.keys():
-          val = self.settingFunctions[name]['get'](self)
-          val = [name]['get']()
+        if setting_name in self.settingFunctions.keys():
+          function_str_name = self.settingFunctions[setting_name]['get']
+          #nepi_msg.publishMsgInfo(self,"Calling get setting function " + function_str_name)
+          get_function = globals()[function_str_name]
+          val = get_function(self)
         if val is not None:
             setting["value"] = str(val)
             settings[setting_name] = setting
@@ -273,23 +248,25 @@ class SidusNode(object):
   def setSetting(self,setting_name,val):
     success = False
     if setting_name in self.settingFunctions.keys():
-      val = self.settingFunctions[name]['set'](self,val)
+          function_str_name = self.settingFunctions[setting_name]['set']
+          #nepi_msg.publishMsgInfo(self,"Calling set setting function " + function_str_name)
+          set_function = globals()[function_str_name]
+          success = set_function(self,val)
     return success
 
 
   def settingUpdateFunction(self,setting):
       success = False
       setting_str = str(setting)
-      [setting_name, s_type, data] = nepi_ros.get_data_from_setting(setting)
+      [setting_name, s_type, data] = nepi_settings.get_data_from_setting(setting)
       if data is not None:
           setting_data = data
           found_setting = False
-          for cap_setting in self.cap_settings:
-              if setting_name in cap_setting:
-                  found_setting = True
-                  success, msg = self.setSetting(setting_name,setting_data)
-                  if success:
-                      msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
+          if setting_name in self.cap_settings.keys():
+              found_setting = True
+              success, msg = self.setSetting(setting_name,setting_data)
+              if success:
+                  msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
           if found_setting is False:
               msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                 
       else:
@@ -299,49 +276,13 @@ class SidusNode(object):
   ##############
   ### Settings Functions
 
-
-  def getMinIntensity(self):
-    success = False
-    val_str = '-999'
-    ser_msg= ('!' + self.addr_str + ':CURV?')
-    response = self.send_msg(ser_msg)
-    print(response)
-     if response != None and response != "?":
-      response_parts = response.split(',')
-      if len(response_parts) == 7:
-        val_str = response_parts[0]
-        self.cur_curv = response_parts
-        success = True
-    return val_str
-
-  def setMinIntensity(self,val_str):
-    cur_curv = self.cur_curve
-    cur_max = cur_curv[1]
-    print(val_str)
-    success = False
-    if int(val_str) < int(cur_max):
-      cur_curv[0] = val_str
-      ser_msg= ('!' + self.addr_str + 'LMX')
-      for item in cur_curv:
-        ser_msg.append(item)
-      response = self.send_msg(ser_msg)
-      print(response)
-      if response != None and response != "?":
-        response_parts = response.split(',')
-        if len(response_parts) == 7:
-          self.cur_curv = response_parts
-          success = True
-    print(success)
-    return success
-
-
   def getMaxIntensity(self):
     success = False
     val_str = '-999'
     ser_msg= ("&ALMX0000R")
     response = self.send_msg(ser_msg)
     print(response)
-     if len(response) == 10:
+    if len(response) == 10:
       if response[0:4] == '&ALM' and response[9]:
           val_str = str(int(response[6:9]))
           self.cur_max_str = val_str
@@ -349,15 +290,14 @@ class SidusNode(object):
     return val_str
 
   def setMaxIntensity(self,val_str):
-    cur_min = self.cur_min_str
     success = False
-    if int(val_str) > int(cur_min):
+    if int(val_str) > int(0):
       zero_prefix_len = 4-len(val_str)
       for z in range(zero_prefix_len):
         val_str = ('0' + val_str)
       ser_msg= ('&ALMX' + val_str + "W")
       response = self.send_msg(ser_msg)
-      if ser_msg == 
+      if ser_msg == response
         self.cur_max_str = val_str
       print(response)
         success = True
@@ -387,6 +327,8 @@ class SidusNode(object):
     status_msg.standby_state = self.standby_state
     status_msg.intensity_ratio = self.intensity_ratio
     status_msg.strobe_state = self.strobe_state
+    status_msg.blink_state = False
+    status_msg.blink_interval = 0
     status_msg.temp_c = self.temp_c
     status_msg.power_w = 0
     return(status_msg)
@@ -395,7 +337,7 @@ class SidusNode(object):
   def update_status_values(self):
     success = True
     # Update standby status
-    #lsx_if.publishMsg(" Updating standby status")
+    #nepi_msg.publishMsgInfo(self,"Updating standby status")
     ser_msg= ('!' + self.addr_str + ':STBY?')
     response = self.send_msg(ser_msg)
     if response != None and response != "?":
@@ -444,7 +386,8 @@ class SidusNode(object):
     response = self.send_msg(ser_msg)
     if response != None and response != "?":
       try:
-        self.temp_c = int(float(response))
+        temp_c = int(float(response))
+        success = True
         #nepi_msg.publishMsgInfo(self,"Temp Deg C: " + str(self.temp_c))
       except Exception as t:
         self.temp_c = 255
@@ -454,27 +397,27 @@ class SidusNode(object):
     else:
       self.temp_c = 255
       success = False
+    if temp_c < 0 or temp_c > 255:
+      temp_c = 255
+    self.temp_c = temp_c
     return success
 
   #######################
   ### LSX IF Interface Functions
-  def setStandby(self,standby_val):
-    success = False
-    if standby_val == True:
-      ser_msg= ('!' + self.addr_str + ':STBY=1')
-    else:
-      ser_msg= ('!' + self.addr_str + ':STBY=0')
-    response = self.send_msg(ser_msg)
-    if response != None and response != "?":
-      success = True
-    return success 
 
   def turnOnOff(self,turn_on_off):
+    self.on_off_state = turn_on_off
     if turn_on_off == False:
-      self.setIntensityRatio(0)
+      self.setIntensityFunction(0)
     else:
-      self.setIntensityRatio(self.intensity_ratio)
-    self.turn_on_off_state = turn_on_off
+      self.setIntensityFunction(self.intensity_ratio)
+    
+  def blinkOnOff(self,blink_on_off):
+    self.on_off_state = turn_on_off
+    if turn_on_off == False:
+      self.setIntensityFunction(0)
+    else:
+      self.setIntensityFunction(self.intensity_ratio)
 
 
   def setIntensityRatio(self,intensity_ratio):
@@ -488,7 +431,7 @@ class SidusNode(object):
       self.intensity_ratio = intensity_ratio
 
   def setIntensityFunction(self,intensity_ratio):
-    level_val = int(100*intensity_ratio)
+    level_val = int(100*intensity_ratio) * int(self.on_off_state)
     level_str = str(level_val)
     zero_prefix_len = 3-len(level_str)
     for z in range(zero_prefix_len):
@@ -550,19 +493,19 @@ class SidusNode(object):
       self.self_check_counter = self.self_check_counter + 1 # increment counter
     #print("Current failed comms count: " + str(self.self_check_counter))
     if self.self_check_counter > self.self_check_count:  # Crashes node if set above limit??
-      nepi_msg.publishMsgWarn(self,"Shutting down device: " +  self.addr_str + " on port " + self.ser_port_str)
+      nepi_msg.publishMsgWarn(self,"Shutting down device: " +  self.addr_str + " on port " + self.port_str)
       nepi_msg.publishMsgWarn(self,"Too many comm failures")
       nepi_ros.signal_shutdown("To many comm failures")   
    
-  ### Function to try and connect to device at given port and buadrate
+  ### Function to try and connect to device at given port and baudrate
   def connect(self):
     success = False
-    port_check = self.check_port(self.ser_port_str)
+    port_check = self.check_port(self.port_str)
     if port_check is True:
       try:
         # Try and open serial port
-        nepi_msg.publishMsgInfo(self,"Opening serial port " + self.ser_port_str + " with buadrate: " + str(self.ser_buad_int))
-        self.serial_port = serial.Serial(self.ser_port_str,self.ser_buad_int,timeout = 0.1)
+        nepi_msg.publishMsgInfo(self,"Opening serial port " + self.port_str + " with baudrate: " + self.baud_str)
+        self.serial_port = serial.Serial(self.port_str,self.baud_int,timeout = 0.1)
         nepi_msg.publishMsgInfo(self,"Serial port opened")
         # Send Message
         nepi_msg.publishMsgInfo(self,"Requesting info for device: " + self.addr_str)
@@ -593,7 +536,7 @@ class SidusNode(object):
         else:
           nepi_msg.publishMsgWarn(self,"Device returned invalid response")
       except Exception as e:
-        nepi_msg.publishMsgWarn(self,"Something went wrong with connect function at serial port at: " + self.ser_port_str + "(" + str(e) + ")" )
+        nepi_msg.publishMsgWarn(self,"Something went wrong with connect function at serial port at: " + self.port_str + "(" + str(e) + ")" )
     else:
       nepi_msg.publishMsgWarn(self,"serial port not active")
     return success
@@ -650,7 +593,7 @@ class SidusNode(object):
       self.serial_port.close()
       
 if __name__ == '__main__':
-  SidusNode()
+  SealiteNode()
 
 
 

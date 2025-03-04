@@ -34,41 +34,19 @@ PKG_NAME = 'IDX_GENICAM' # Use in display menus
 FILE_TYPE = 'NODE'
 
 TEST_DRV_DICT = {
-'group': 'IDX',
-'group_id': 'GENICAM',
-'pkg_name': 'IDX_GENICAM',
+'type': 'IDX',
+'group_id': 'None',
+'path': '/opt/nepi/ros/lib/nepi_drivers',
+'usr_cfg_path': '/mnt/nepi_storage/user_cfg/ros',
 'NODE_DICT': {
     'file_name': 'idx_genicam_node.py',
-    'module_name': 'idx_genicam_node',
     'class_name': 'GenicamCamNode',
 },
 'DRIVER_DICT': {
     'file_name': 'idx_genicam_driver.py' ,
-    'module_name': 'idx_genicam_driver' ,
     'class_name':  'GenicamCamDriver'
 },
-'DISCOVERY_DICT': {
-    'file_name': 'idx_genicam_discovery.py',
-    'module_name': 'idx_genicam_discovery',
-    'class_name': 'GenicamCamDiscovery',
-    'interfaces': ['USB','IP'],
-    'options_1_dict': {
-        'default_option': 'None',
-        'set_option': 'None'
-    },
-    'options_2_dict': {
-        'default_option': 'None',
-        'set_option': 'None'
-    },
-    'method': 'AUTO', 
-    'include_ids': [],
-    'exclude_ids': []
-},
 'DEVICE_DICT': {'model':'0','serial_number': '1'},
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'order': 1,
-'active': True,
-'msg': ""
 }
 
 

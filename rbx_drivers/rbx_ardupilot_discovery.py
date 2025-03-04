@@ -38,45 +38,6 @@ PKG_NAME = 'RBX_ARDUPILOT' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
 
 
-TEST_DRV_DICT = {
-'group': 'RBX',
-'group_id': 'ARDUPILOT',
-'pkg_name': 'RBX_ARDUPILOT',
-'NODE_DICT': {
-    'file_name': 'rbx_ardupilot_node.py',
-    'module_name': 'rbx_ardupilot_node',
-    'class_name': 'ArdupilotNode',
-},
-'DRIVER_DICT': {
-    'file_name': '' ,
-    'module_name': '' ,
-    'class_name':  ''
-},
-'DISCOVERY_DICT': {
-    'file_name': 'rbx_ardupilot_discovery.py',
-    'module_name': 'rbx_ardupilot_discovery',
-    'class_name': 'ArdupilotDiscovery',
-    'method': 'AUTO', 
-    'interfaces': ['IP','USBSERIAL','SERIAL'],
-    'options_1_dict': {
-        'default_val': 'Serial',
-        'set_val': 'Serial'
-    },
-    'options_2_dict': {
-        'default_val': 'True',
-        'set_val': 'True'
-    },
-},
-'DEVICE_DICT': {'device_path': '/dev/ttyUSB0'},
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'order': 1,
-'active': True,
-'msg': ""
-}
-
-
-
-
 #########################################
 # Sealite Discover Method
 #########################################
@@ -98,7 +59,7 @@ class ArdupilotDiscovery:
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
-  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict = TEST_DRV_DICT):
+  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict):
     self.drv_dict = drv_dict
     #nepi_msg.printMsg(self.log_name + "Got drv_dict : " + str(self.drv_dict))
     self.available_paths_list = available_paths_list
@@ -107,13 +68,18 @@ class ArdupilotDiscovery:
     
     # Get required data from drv_dict
 
-    
-    connection_type = self.drv_dict["DISCOVERY_DICT"]['option_1_dict']['set_val']
-    #nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ":  Connectionb Type: " + connection_type)
-    self.enable_fake_gps = self.drv_dict["DISCOVERY_DICT"]['option_2_dict']['set_val'] == 'True'
-    #nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ":  Connectionb Type: " + connection_type)
+    ########################
+    # Get discovery options
+    try:
+      #Snepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Starting discovery with drv_dict " + str(drv_dict))#
+      connection_type = drv_dict['DISCOVERY_DICT']['OPTIONS']['connection']['value']
+      self.enable_fake_gps = drv_dict['DISCOVERY_DICT']['OPTIONS']['fake_gps']['value']
+    except Exception as e:
+      nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ": Failed to load options " + str(e))#
+      return None
+    ########################
 
-    
+
     ### Purge Unresponsive Connections
     path_purge_list = []
     for path_str in self.active_devices_dict:

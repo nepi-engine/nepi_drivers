@@ -24,68 +24,31 @@ import os
 import subprocess
 import time
 
+
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_save
 
 PKG_NAME = 'IDX_ZED' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
 
 
-TEST_NEX_DICT = {
-'group': 'IDX',
-'group_id': 'ZED',
-'pkg_name': 'IDX_ZED',
-'NODE_DICT': {
-    'file_name': 'idx_zed_node.py',
-    'module_name': 'idx_zed_node',
-    'class_name': 'ZedCamNode',
-},
-'DRIVER_DICT': {
-    'file_name': '' ,
-    'module_name': '' ,
-    'class_name':  ''
-},
-'DISCOVERY_DICT': {
-    'file_name': 'idx_zed_discovery.py',
-    'module_name': 'idx_zed_discovery',
-    'class_name': 'ZEDCamDiscovery',
-    'method': 'AUTO', 
-    'interfaces': ['USB'],
-    'options_1_dict': {
-        'default_val': 'HD720',
-        'set_val': 'HD720'
-    },
-    'options_2_dict': {
-        'default_val': '15',
-        'set_val': '15'
-    },
-
-},
-'DEVICE_DICT': {'zed_type': 'zed2','res_val': 3},
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'order': 1,
-'active': True,
-'msg': ""
-}
-
 class ZedCamDiscovery:
-  NEPI_DEFAULT_CFG_PATH = '/opt/nepi/ros/etc/'
-  CHECK_INTERVAL_S = 5.0
-  DEVICE_DICT = dict()
 
-  RES_DICT = dict(
-    HD2K = 0,
-    HD1080 = 1,
-    HD720 = 3,
-    VGA = 5
-  )
+  FRAMERATE = 5
+  
+  settings_if = None
+
+  NEPI_DEFAULT_CFG_PATH = '/opt/nepi/ros/etc/nepi_drivers'
+  NEPI_DEFAULT_USER_CFG_PATH = 'mnt/nepi_storage/user_cfg/ros'
+  CHECK_INTERVAL_S = 3.0
+
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"                                   
   deviceList = []       
 
-  includeDevices = ['ZED 2','ZED 2i','ZED-M']
-  excludedDevices = []         
+       
   def __init__(self):
     #### APP NODE INIT SETUP ####
     nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
@@ -94,26 +57,31 @@ class ZedCamDiscovery:
     nepi_msg.createMsgPublishers(self)
     nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
     ##############################
-    # Get required drv driver dict info
-    self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
-    #nepi_msg.publishMsgWarn(self,"Drv_Dict: " + str(self.drv_dict))
 
-    res_str = self.drv_dict['DISCOVERY_DICT']['option_1_dict']['set_val']
-    if res_str in self.RES_DICT.keys():
-      self.res_val = self.RES_DICT[res_str]
-    else:
-      self.res_val = 3
-
-    fr_str = self.drv_dict['DISCOVERY_DICT']['option_2_dict']['set_val']
+    ########################
+    # Get discovery options
     try:
-      self.fr_val = int(fr_str)
+      self.drv_dict = nepi_ros.get_param(self,'~drv_dict',dict())
+      nepi_msg.publishMsgWarn(self,"Initial Driver Dict: " + str(self.drv_dict))
+      res_val = 3
+      if 'resolution' in self.drv_dict['DISCOVERY_DICT']['OPTIONS']:
+        res_str = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['resolution']['value']
+        if res_str in self.RES_DICT.keys():
+          self.res_val = self.RES_DICT[res_str]
     except Exception as e:
-      self.fr_val = 5
-    
+      nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ": Failed to load options " + str(e))#
+      nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
+      return None
+    ########################
+
     nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
 
     # Now start the node
     nepi_ros.spin()
+
+  #**********************
+  # Discovery functions
+
 
   def detectAndManageDevices(self, timer): # Extra arg since this is a Timer callback
     # First grab the current list of known V4L2 devices
@@ -234,16 +202,17 @@ class ZedCamDiscovery:
           device_node_namespace = nepi_ros.get_base_namespace() + device_node_name
           nepi_msg.publishMsgInfo(self,"Initiating new Zed node " + device_node_namespace)
 
-          self.checkLoadConfigFile(node_name = device_node_name)
-
           # Now start the node via rosrun
           # rosrun nepi_drivers_idx zed_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
           nepi_msg.publishMsgInfo(self,"Launching node " + device_node_name)
           if dtype in self.includeDevices:
             #Setup required param server drv_dict for discovery node
-            self.drv_dict['DEVICE_DICT']={'zed_type': root_name, 'res_val': self.res_val, 'fr_val': self.fr_val}
+            self.drv_dict['DEVICE_DICT']={'zed_type': root_name, 'res_val': self.res_val, 'FRAMERATE': self.FRAMERATE}
             dict_param_name = device_node_name + "/drv_dict"
             nepi_ros.set_param(self,dict_param_name,self.drv_dict)
+            # Try and load save node params
+            nepi_drv.checkLoadConfigFile(device_node_name)
+
             file_name = self.drv_dict['NODE_DICT']['file_name']
             #Try and launch node
             self.DEVICE_DICT[path] = {'device_class': root_name, 'device_path': path, 'device_type': dtype, 
@@ -299,26 +268,6 @@ class ZedCamDiscovery:
     nepi_msg.publishMsgWarn(self,"cannot check run status of unknown node " + node_namespace)
     return False
   
-  def checkLoadConfigFile(self, node_name):
-    folder_name = "drivers/" + node_name 
-    config_folder = os.path.join(self.NEPI_DEFAULT_CFG_PATH, folder_name)
-    if not os.path.isdir(config_folder):
-      nepi_msg.publishMsgWarn(self,'No config folder found for ' + node_name + '... creating one at ' + config_folder)
-      os.makedirs(name = config_folder, mode = 0o775)
-      return
-    
-    config_file = os.path.join(config_folder, node_name + ".yaml")
-    node_namespace = nepi_ros.get_base_namespace() + node_name
-    if os.path.exists(config_file):
-      nepi_msg.publishMsgInfo(self,"Loading parameters from " + config_file + " to " + node_namespace)
-      #rosparam.load_file(filename = config_file, default_namespace = node_namespace)
-      #rosparam.load_file(filename = config_file, default_namespace = node_name)
-      # Seems programmatic rosparam.load_file is not working at all, so use the command-line version instead
-      rosparam_load_cmd = ['rosparam', 'load', config_file, node_namespace]
-      subprocess.run(rosparam_load_cmd)
-    else:
-      nepi_msg.publishMsgWarn(self,"No config file found for " + node_name + " in " + self.NEPI_DEFAULT_CFG_PATH)
-
   def short_name(self,name):
     split = name.split("_")
     if len(split) > 3:

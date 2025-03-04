@@ -245,7 +245,7 @@ install(DIRECTORY ptx_drivers/iqr_ros_pan_tilt/include
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 set( NEPI_DRIVERS_SHARE_FOLDER 
   # Must hard-coded 
-  /opt/nepi/ros/share/nepi_drivers/params
+  /opt/nepi/ros/lib/nepi_drivers
 )
 
 install(DIRECTORY idx_drivers/
