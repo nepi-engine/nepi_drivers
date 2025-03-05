@@ -36,19 +36,29 @@ FILE_TYPE = 'DISCOVERY'
 
 class ZedCamDiscovery:
 
-  FRAMERATE = 5
+  FRAMERATE = 15
   
   settings_if = None
 
   NEPI_DEFAULT_CFG_PATH = '/opt/nepi/ros/etc/nepi_drivers'
   NEPI_DEFAULT_USER_CFG_PATH = 'mnt/nepi_storage/user_cfg/ros'
   CHECK_INTERVAL_S = 3.0
-
+  DEVICE_DICT = dict()
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"                                   
   deviceList = []       
 
        
+  RES_DICT = dict(
+    HD2K = 0,
+    HD1080 = 1,
+    HD720 = 3,
+    VGA = 5
+  )
+
+  includeDevices = ['ZED 2','ZED 2i','ZED-M']
+  excludedDevices = []         
+
   def __init__(self):
     #### APP NODE INIT SETUP ####
     nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
@@ -207,7 +217,7 @@ class ZedCamDiscovery:
           nepi_msg.publishMsgInfo(self,"Launching node " + device_node_name)
           if dtype in self.includeDevices:
             #Setup required param server drv_dict for discovery node
-            self.drv_dict['DEVICE_DICT']={'zed_type': root_name, 'res_val': self.res_val, 'FRAMERATE': self.FRAMERATE}
+            self.drv_dict['DEVICE_DICT']={'zed_type': root_name, 'res_val': self.res_val, 'framerate': self.FRAMERATE}
             dict_param_name = device_node_name + "/drv_dict"
             nepi_ros.set_param(self,dict_param_name,self.drv_dict)
             # Try and load save node params

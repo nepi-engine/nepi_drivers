@@ -5,10 +5,10 @@ driver:
   type: PTX
   group_id: ONVIF
   NODE_DICT:
-    file_name: ptx_onvif_sidusss109ht_node.py
+    file_name: ptx_onvif_sidus_ss109ht_node.py
     class_name: OnvifSidusSsPanTiltNode
   DRIVER_DICT:
-    file_name: ptx_onvif_sidusss109ht_driver.py
+    file_name: ptx_onvif_sidus_ss109ht_driver.py
     class_name: SidusSS109HT_PTZ
   DISCOVERY_DICT:
     file_name: None

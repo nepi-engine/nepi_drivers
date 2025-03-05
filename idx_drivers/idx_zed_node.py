@@ -210,7 +210,7 @@ class ZedCamNode(object):
         # Connect to Zed node
         self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
         self.res_val = self.drv_dict['DEVICE_DICT']['res_val']
-        self.fr_val = self.drv_dict['DEVICE_DICT']['fr_val']
+        self.framerate = self.drv_dict['DEVICE_DICT']['framerate']
         ZED_BASE_NAMESPACE = nepi_ros.get_base_namespace() + self.zed_type + "/zed_node/"
 
 
@@ -237,7 +237,7 @@ class ZedCamNode(object):
               cfg = yaml.load(f, Loader=yaml.FullLoader)
             #nepi_msg.publishMsgWarn(self,"Updating zed param config with resolution " + str(self.res_val))
             cfg['general']['resolution'] = self.res_val
-            cfg['general']['grab_frame_rate'] = self.fr_val
+            cfg['general']['grab_frame_rate'] = self.framerate
             nepi_msg.publishMsgWarn(self,"Updating zed param file: " + zed_params_path + " with cfg " + str(cfg))
             with open(zed_params_path, "w") as f:
                 cfg = yaml.dump(
@@ -355,7 +355,7 @@ class ZedCamNode(object):
           self.factory_controls['max_range_m'] = self.ZED_MAX_RANGE_M_OVERRIDES[self.zed_type]
         
         self.current_controls = self.factory_controls # Updateded during initialization
-        self.current_fps = self.fr_val # Should be updateded when settings read
+        self.current_fps = self.framerate # Should be updateded when settings read
 
         # Initialize settings
         self.cap_settings = self.getCapSettings()

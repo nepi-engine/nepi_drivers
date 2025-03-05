@@ -1,6 +1,6 @@
 driver:
   pkg_name: IDX_ZED
-  display_name: Generic USB camera driver
+  display_name: Zed Stereo Camera
   description: Driver package for StereoLab Zed stereo camera devices
   type: IDX
   group_id: None
@@ -15,7 +15,7 @@ driver:
     class_name: ZedCamDiscovery
     process: LAUNCH
     OPTIONS:
-      baud_rate:
+      resolution:
         type: Discrete
         options:
           - HD2K

@@ -33,17 +33,8 @@ PKG_NAME = 'IDX_V4L2' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
 
 class V4L2CamDiscovery:
-
-  CAP_SETTINGS = nepi_settings.NONE_CAP_SETTINGS
-
-  FACTORY_SETTINGS = nepi_settings.NONE_SETTINGS
-
-  current_settings = FACTORY_SETTINGS
-  
   includeDevices = []
   excludedDevices = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X']     
-
-  settings_if = None
 
   NEPI_DEFAULT_CFG_PATH = '/opt/nepi/ros/etc/nepi_drivers'
   NEPI_DEFAULT_USER_CFG_PATH = 'mnt/nepi_storage/user_cfg/ros'
@@ -76,6 +67,7 @@ class V4L2CamDiscovery:
 
     nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
     # Now start the node
+    nepi_msg.publishMsgInfo(self,"Initialization Complete")
     nepi_ros.spin()
 
   #**********************

@@ -1,4 +1,4 @@
-hold_driver:
+driver:
   pkg_name: LSX_SIDUS_SS182
   display_name: Sidus SS182 LED
   description: Sidus SS182 LED Serial Driver Interface

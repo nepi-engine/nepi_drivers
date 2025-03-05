@@ -135,7 +135,7 @@ class AfTowerLightNode(object):
       self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
       #nepi_msg.publishMsgWarn(self,"AFTOWER_NODE: " + str(self.drv_dict))
       self.ser_port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
-      ser_baud_str = self.drv_dict['DEVICE_DICT']['baud_rate'] 
+      ser_baud_str = self.drv_dict['DEVICE_DICT']['baud_rate_str'] 
       self.ser_baud_int = int(ser_baud_str)
       nepi_msg.publishMsgInfo(self,"Connecting to Device on port " + self.ser_port_str + " with baud " + ser_baud_str)
       ################################################
