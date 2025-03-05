@@ -41,9 +41,12 @@ TEST_DRV_DICT = {
 'NODE_DICT': {
     'file_name': 'idx_genicam_node.py',
     'class_name': 'GenicamCamNode',
+    'module_name': 'idx_genicam_node',
+
 },
 'DRIVER_DICT': {
     'file_name': 'idx_genicam_driver.py' ,
+    'module_name': 'idx_genicam_driver' ,
     'class_name':  'GenicamCamDriver'
 },
 'DEVICE_DICT': {'model':'0','serial_number': '1'},
