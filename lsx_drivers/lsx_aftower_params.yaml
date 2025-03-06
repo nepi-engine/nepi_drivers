@@ -1,6 +1,6 @@
 driver:
   pkg_name: LSX_AFTOWERLIGHT
-  display_name: Adafruit Tower Light
+  display_name: Adafruit TowerLight LED
   description: Adafruit Tri-Color USB Controlled Tower Light with Buzzer
   type: LSX
   group_id: None

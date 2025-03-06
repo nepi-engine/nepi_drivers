@@ -162,48 +162,7 @@ catkin_install_python(PROGRAMS
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-catkin_install_python(PROGRAMS
-  idx_drivers/idx_genicam_node.py
-  idx_drivers/idx_genicam_discovery.py 
-  idx_drivers/idx_genicam_driver.py     
-  idx_drivers/idx_v4l2_node.py              
-  idx_drivers/idx_v4l2_discovery.py
-  idx_drivers/idx_v4l2_driver.py
-  idx_drivers/idx_zed_node.py
-  idx_drivers/idx_zed_discovery.py
-  idx_drivers/idx_onvif_generic_node.py 
-  idx_drivers/idx_onvif_econroutecam_node.py
-  idx_drivers/idx_onvif_econroutecam_driver.py
-  idx_drivers/idx_onvif_generic_driver.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
 
-
-catkin_install_python(PROGRAMS
-  ptx_drivers/ptx_iqr_discovery.py
-  ptx_drivers/ptx_iqr_node.py
-  ptx_drivers/ptx_onvif_generic_driver.py
-  ptx_drivers/ptx_onvif_generic_node.py 
-  ptx_drivers/ptx_onvif_sidusss109ht_driver.py 
-  ptx_drivers/ptx_onvif_sidusss109ht_node.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-
-catkin_install_python(PROGRAMS
-  lsx_drivers/lsx_aftowerlight_node.py
-  lsx_drivers/lsx_aftowerlight_discovery.py
-  lsx_drivers/lsx_sealite_node.py
-  lsx_drivers/lsx_sealite_discovery.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-
-catkin_install_python(PROGRAMS
-  rbx_drivers/rbx_ardupilot_node.py
-  rbx_drivers/rbx_ardupilot_discovery.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
 
 ## Mark executables and/or libraries for installation
 install(TARGETS ${PROJECT_NAME}
@@ -250,26 +209,42 @@ set( NEPI_DRIVERS_SHARE_FOLDER
 
 install(DIRECTORY idx_drivers/
   DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER} 
+  FILES_MATCHING PATTERN "*.py"
+)
+
+install(DIRECTORY idx_drivers/
+  DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER} 
   FILES_MATCHING PATTERN "*.yaml"
-  PATTERN ".py" EXCLUDE
+)
+
+install(DIRECTORY lsx_drivers/
+  DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER}  
+  FILES_MATCHING PATTERN "*.py"
 )
 
 install(DIRECTORY lsx_drivers/
   DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER}  
   FILES_MATCHING PATTERN "*.yaml"
-  PATTERN ".py" EXCLUDE
+)
+
+install(DIRECTORY ptx_drivers/
+  DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER}  
+  FILES_MATCHING PATTERN "*.py"
 )
 
 install(DIRECTORY ptx_drivers/
   DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER}  
   FILES_MATCHING PATTERN "*.yaml"
-  PATTERN ".py" EXCLUDE
+)
+
+install(DIRECTORY rbx_drivers/
+  DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER}  
+  FILES_MATCHING PATTERN "*.py"
 )
 
 install(DIRECTORY rbx_drivers/
   DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER}  
   FILES_MATCHING PATTERN "*.yaml"
-  PATTERN ".py" EXCLUDE
 )
 
 

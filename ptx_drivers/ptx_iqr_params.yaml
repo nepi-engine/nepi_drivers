@@ -1,6 +1,6 @@
 driver:
   pkg_name: PTX_IQR
-  display_name: IQR Pan Tilt
+  display_name: IQR PanTilt
   description: Driver package for IQR USB pan tilt devices
   type: PTX
   group_id: None

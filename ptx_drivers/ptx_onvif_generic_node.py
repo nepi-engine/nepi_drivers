@@ -68,7 +68,7 @@ class OnvifPanTiltNode:
             nepi_ros.signal_shutdown("Failed to read drv_dict from param server for node " + self.node_name + " with exception: " + str(e))
         self.driver_path = self.drv_dict['path']
         self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
-        self.driver_module = self.drv_dict['DRIVER_DICT']['module_name']
+        self.driver_module = self.driver_file.split('.')[0]
         self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
 
 

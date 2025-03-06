@@ -71,7 +71,7 @@ class ArdupilotDiscovery:
     ########################
     # Get discovery options
     try:
-      #Snepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Starting discovery with drv_dict " + str(drv_dict))#
+      #nepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Starting discovery with drv_dict " + str(drv_dict))#
       connection_type = drv_dict['DISCOVERY_DICT']['OPTIONS']['connection']['value']
       self.enable_fake_gps = drv_dict['DISCOVERY_DICT']['OPTIONS']['fake_gps']['value']
     except Exception as e:
@@ -98,7 +98,7 @@ class ArdupilotDiscovery:
     #nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ": Running discovery for type: " + connection_type)
 
     # RUN SERIAL PROCESSES
-    if connection_type == 'Serial':
+    if connection_type == 'SERIAL':
       self.path_list = []
       ports = serial.tools.list_ports.comports()
       for loc, desc, hwid in sorted(ports):

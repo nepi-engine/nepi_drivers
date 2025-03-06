@@ -1,6 +1,6 @@
 driver:
   pkg_name: IDX_ONVIF_EconRoute
-  display_name: Econ Route Camera
+  display_name: EconRC ONVIF Camera
   description: Driver package for Econ Route Cam Onvif camera devices
   type: IDX
   group_id: ONVIF

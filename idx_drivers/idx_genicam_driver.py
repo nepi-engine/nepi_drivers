@@ -37,21 +37,7 @@ from genicam.genapi import EAccessMode
 PKG_NAME = 'IDX_GENICAM' # Use in display menus
 FILE_TYPE = 'DRIVER'
 
-TEST_DRV_DICT = {
-'type': 'IDX',
-'group_id': 'None',
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'usr_cfg_path': '/mnt/nepi_storage/user_cfg/ros',
-'NODE_DICT': {
-    'file_name': 'idx_genicam_node.py',
-    'class_name': 'GenicamCamNode',
-},
-'DRIVER_DICT': {
-    'file_name': 'idx_genicam_driver.py' ,
-    'class_name':  'GenicamCamDriver'
-},
-'DEVICE_DICT': {'model':'0','serial_number': '1'},
-}
+
 
 
 

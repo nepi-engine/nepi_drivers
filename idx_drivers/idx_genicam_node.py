@@ -33,26 +33,6 @@ from nepi_sdk import nepi_drv
 PKG_NAME = 'IDX_GENICAM' # Use in display menus
 FILE_TYPE = 'NODE'
 
-TEST_DRV_DICT = {
-'type': 'IDX',
-'group_id': 'None',
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'usr_cfg_path': '/mnt/nepi_storage/user_cfg/ros',
-'NODE_DICT': {
-    'file_name': 'idx_genicam_node.py',
-    'class_name': 'GenicamCamNode',
-    'module_name': 'idx_genicam_node',
-
-},
-'DRIVER_DICT': {
-    'file_name': 'idx_genicam_driver.py' ,
-    'module_name': 'idx_genicam_driver' ,
-    'class_name':  'GenicamCamDriver'
-},
-'DEVICE_DICT': {'model':'0','serial_number': '1'},
-}
-
-
 class GenicamCamNode:
     FACTORY_SETTINGS_OVERRIDES = dict( BalanceWhiteAuto = 'Continuous',
                                       ColorCorrectionMode = 'Auto',
@@ -104,11 +84,11 @@ class GenicamCamNode:
         nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
         ##############################
         # Get required drv driver dict info
-        self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_DRV_DICT) 
-        #nepi_msg.publishMsgWarn(self,"Drv_Dict: " + str(self.drv_dict))
+        self.drv_dict = nepi_ros.get_param(self,'~drv_dict',dict()) 
+        nepi_msg.publishMsgWarn(self,"Drv_Dict: " + str(self.drv_dict))
         self.driver_path = self.drv_dict['path']
         self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
-        self.driver_module = self.drv_dict['DRIVER_DICT']['module_name']
+        self.driver_module = self.driver_file.split(".")[0]
         self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
         
         model = self.drv_dict['DEVICE_DICT']['model']
@@ -126,6 +106,8 @@ class GenicamCamNode:
                 # Only log the error every 30 seconds -- don't want to fill up log in the case that the camera simply isn't attached.
                 nepi_msg.publishMsgErr(self,"Failed to instantiate driver - " + str(e) + ")")
                 sys.exit(-1)
+                return
+                
         ################################################
         genicam_cfg_file_mappings = nepi_ros.get_param(self,"~genicam_mappings", {})
         if not self.driver.isConnected():

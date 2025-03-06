@@ -1,6 +1,6 @@
 driver:
   pkg_name: LSX_DEEPSEA_SEALITE
-  display_name: Deepsea Sealite
+  display_name: Deepsea Sealite LED
   description: Deepsea Sealite LED Serial Driver Interface
   type: LSX
   group_id: None

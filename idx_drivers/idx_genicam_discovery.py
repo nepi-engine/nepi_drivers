@@ -73,7 +73,7 @@ class GenicamCamDiscovery:
     # Get discovery options
     try:
       self.drv_dict = nepi_ros.get_param(self,'~drv_dict',dict())
-      nepi_msg.publishMsgWarn(self,"Initial Driver Dict: " + str(self.drv_dict))
+      nepi_msg.publishMsgInfo(self,"Initial Driver Dict: " + str(self.drv_dict))
     except Exception as e:
       nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ": Failed to load options " + str(e))#
       nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")

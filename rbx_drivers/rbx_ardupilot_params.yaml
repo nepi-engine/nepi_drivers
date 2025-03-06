@@ -11,7 +11,7 @@ driver:
     file_name: None
     class_name: None
   DISCOVERY_DICT:
-    file_name: rbx_ardupilot_disovery.py
+    file_name: rbx_ardupilot_discovery.py
     class_name: ArdupilotDiscovery
     process: CALL
     OPTIONS:

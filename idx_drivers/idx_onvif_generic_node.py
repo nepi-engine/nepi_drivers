@@ -94,7 +94,7 @@ class OnvifCamNode:
             nepi_ros.signal_shutdown("Failed to read drv_dict from param server for node " + self.node_name + " with exception: " + str(e))
         self.driver_path = self.drv_dict['path']
         self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
-        self.driver_module = self.drv_dict['DRIVER_DICT']['module_name']
+        self.driver_module = self.driver_file.split('.')[0]
         self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
 
 
@@ -120,9 +120,8 @@ class OnvifCamNode:
 
         nepi_msg.publishMsgInfo(self,"Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
         [success, msg, self.driver_class] = nepi_drv.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
-        
+        driver_constructed = False
         if success:
-            driver_constructed = False
             attempts = 0
             while not nepi_ros.is_shutdown() and driver_constructed == False and attempts < 5 and not nepi_ros.is_shutdown():
                 try:
