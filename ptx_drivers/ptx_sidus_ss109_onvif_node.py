@@ -26,11 +26,11 @@ from nepi_sdk.device_if_ptx import ROSPTXActuatorIF
 
 from ptx_onvif_generic_node import OnvifPanTiltNode
 
-PKG_NAME = 'PTX_ONVIF_SIDUS_SS109HT' # Use in display menus
+PKG_NAME = 'PTX_SIDUS_SS109_ONVIF' # Use in display menus
 FILE_TYPE = 'NODE'
 
 
-class OnvifSidusSsPanTiltNode(OnvifPanTiltNode):
+class SidusSsPanTiltOnvifNode(OnvifPanTiltNode):
     pass
 
 if __name__ == '__main__':

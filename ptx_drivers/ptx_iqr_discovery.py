@@ -36,7 +36,10 @@ class IqrPanTiltDiscovery:
   ################################################          
   def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
-    nepi_msg.createMsgPublishers(self) 
+    nepi_msg.createMsgPublishers(self)
+    time.sleep(1)
+    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Starting Initialization")
+    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Initialization Complete")
 
  
   ##########  DRV Standard Discovery Function

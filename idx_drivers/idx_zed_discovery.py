@@ -79,14 +79,14 @@ class ZedCamDiscovery:
         if res_str in self.RES_DICT.keys():
           self.res_val = self.RES_DICT[res_str]
     except Exception as e:
-      nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ": Failed to load options " + str(e))#
+      nepi_msg.publishMsgWarn(self, "Failed to load options " + str(e))#
       nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
       return None
     ########################
 
     nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
 
-    # Now start the node
+    nepi_msg.publishMsgInfo(self,"Initialization Complete")
     nepi_ros.spin()
 
   #**********************

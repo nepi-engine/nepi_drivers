@@ -26,7 +26,7 @@ from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_drv
 from nepi_sdk import nepi_msg
 
-PKG_NAME = 'LSX_SIDUS_SS182' # Use in display menus
+PKG_NAME = 'PTX_KIST_KTP20' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
 
  
@@ -36,7 +36,7 @@ FILE_TYPE = 'DISCOVERY'
 
 
 ### Function to try and connect to device and also monitor and clean up previously connected devices
-class SidusSS182Discovery:
+class KistKPT20Discoveryy:
 
   active_devices_dict = dict()
   node_launch_name = "sealite"
@@ -87,7 +87,7 @@ class SidusSS182Discovery:
       else:
         self.addr_search_list = [start_addr]
     except Exception as e:
-      nepi_msg.publishMsgWarn(self,  ":" + self.log_name + ": Failed to load options " + str(e))#
+      nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ": Failed to load options " + str(e))#
       return None
     ########################
 
@@ -117,8 +117,8 @@ class SidusSS182Discovery:
         if path_str.find(id) != -1 or path_str in self.active_paths_list:
           valid_path = False
       if valid_path:
-        #nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Looking for path: " + path_str)
-        #nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": In path_list: " + str(self.active_paths_list))
+        #nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Looking for path: " + path_str)
+        #nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": In path_list: " + str(self.active_paths_list))
         found = self.checkForDevice(path_str)
         if found:
           success = self.launchDeviceNode(path_str)
@@ -131,7 +131,7 @@ class SidusSS182Discovery:
   def checkForDevice(self,path_str):
     #nepi_msg.publishMsgWarn(self, "Sealight checkForDevice start")###
     found_device = False
-    nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ":  path_str " + path_str)#
+    nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ":  path_str " + path_str)#
     if path_str not in self.active_paths_list:
       for baud_str in self.baudrate_list:
         self.baud_str = baud_str
@@ -140,7 +140,7 @@ class SidusSS182Discovery:
           # Try and open serial port
           serial_port = serial.Serial(path_str,self.baud_int,timeout = 1)
         except Exception as e:
-          nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
+          nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
           continue
         for addr in self.addr_search_list:
           addr_str = str(addr)
@@ -162,20 +162,20 @@ class SidusSS182Discovery:
             bs = serial_port.readline()
             response = bs.decode()
           except Exception as e:
-            nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Got a serial read/write error: " + str(e))
+            nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Got a serial read/write error: " + str(e))
             break
           if len(response) > 2:
-            #nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Got response: " + response)
+            #nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Got response: " + response)
             if response[3] == ',':
               self.addr_str = response[0:3]
               try:
                 addr_int = int(addr)
-                nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at path: " + path_str)
-                nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at address: " + self.addr_str)
+                nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Found device at path: " + path_str)
+                nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Found device at address: " + self.addr_str)
                 found_device = True
                 break # Don't check any more addresses
               except Exception as a:
-                nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Returned device message not valid (" + str(a) + ")")
+                nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ": Returned device message not valid (" + str(a) + ")")
         # Clean up the serial port
         serial_port.close()
     return found_device
@@ -186,7 +186,7 @@ class SidusSS182Discovery:
     if path_str not in self.available_paths_list:
       active = False
     if active == False:
-      nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": No longer detecting device on : " + path_str)
+      nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "No longer detecting device on : " + path_str)
       if path_str in self.active_devices_dict.keys():
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
@@ -198,12 +198,12 @@ class SidusSS182Discovery:
   def launchDeviceNode(self, path_str):
     file_name = self.drv_dict['NODE_DICT']['file_name']
     node_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
-    nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ":  launching node: " + node_name)
+    nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ":  launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
     dict_param_name = self.base_namespace + node_name + "/drv_dict"
     # Try and load save node params
     nepi_drv.checkLoadConfigFile(node_name)
-    #nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ":  launching node: " + str(self.drv_dict))
+    #nepi_msg.publishMsgInfo(self, ":  " + self.log_name + ":  launching node: " + str(self.drv_dict))
     self.drv_dict['DEVICE_DICT'] = dict()
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
     self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str

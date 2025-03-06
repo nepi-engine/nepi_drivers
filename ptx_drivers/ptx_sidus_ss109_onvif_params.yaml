@@ -1,0 +1,17 @@
+driver:
+  pkg_name: PTX_SIDUS_SS109_ONVIF
+  display_name: SIDUS SS109 ONVIF PanTilt
+  description: Driver package for SIDUS SS109 ONVIF pan tilt devices
+  type: PTX
+  group_id: ONVIF
+  NODE_DICT:
+    file_name: ptx_sidus_ss109_onvif_node.py
+    class_name: SidusSsPanTiltOnvifNode
+  DRIVER_DICT:
+    file_name: ptx_sidus_ss109_onvif_driver.py
+    class_name: SidusSS109_PTZ
+  DISCOVERY_DICT:
+    file_name: None
+    class_name: None
+    process: None
+    OPTIONS: None

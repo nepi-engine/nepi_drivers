@@ -38,25 +38,6 @@ from nepi_sdk import nepi_settings
 PKG_NAME = 'LSX_AFTOWERLIGHT'
 FILE_TYPE = 'NODE'
 
-TEST_NEX_DICT = {
-'NODE_DICT': {
-    'file_name': 'lsx_aftowerlight_node.py',
-    'class_name': 'AfTowerLightNode',
-},
-'DRIVER_DICT': {
-    'file_name': 'None' ,
-    'class_name':  'None'
-},
-'DEVICE_DICT': {
-  'device_path': '/dev/ttyUSB0',
-  'baud_rate': '9600'
-},
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'order': 1,
-'active': True,
-'msg': ""
-}
-
 
 #########################################
 # Sealite LSX Driver Node Class

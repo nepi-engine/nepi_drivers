@@ -39,26 +39,6 @@ from nepi_sdk import nepi_settings
 PKG_NAME = 'LSX_SIDUS_SS182' # Use in display menus
 FILE_TYPE = 'NODE'
 
-TEST_NEX_DICT = {
-'NODE_DICT': {
-    'file_name': 'lsx_sidus_ss182_node.py',
-    'class_name': 'SidusSS182Node',
-},
-'DRIVER_DICT': {
-    'file_name': 'None' ,
-    'class_name':  'None'
-},
-'DEVICE_DICT': {
-  'device_path': '/dev/ttyUSB0',
-  'baud_rate': '9600', 
-  'addr': '001'
-},
-'path': '/opt/nepi/ros/lib/nepi_drivers',
-'order': 1,
-'active': True,
-'msg': ""
-}
-
 DEFAULT_MAX = '128'
 
 #########################################

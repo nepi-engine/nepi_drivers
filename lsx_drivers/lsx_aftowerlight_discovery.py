@@ -40,8 +40,8 @@ class AfTowerLightDiscovery:
     self.log_name = PKG_NAME.lower() + "_discovery" 
     nepi_msg.createMsgPublishers(self)
     time.sleep(1)
-    nepi_msg.publishMsgInfo(self, "AF Tower Light Discovery")
-
+    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Starting Initialization")
+    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Initialization Complete")
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
@@ -59,7 +59,7 @@ class AfTowerLightDiscovery:
       baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
       self.baud_rate = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
     except Exception as e:
-      nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ": Failed to load options " + str(e))#
+      nepi_msg.publishMsgWarn(self, ":" + self.log_name + ": Failed to load options " + str(e))#
       return None
     ########################
 
@@ -118,7 +118,7 @@ class AfTowerLightDiscovery:
     elif self.checkForDevice(path_str) == False:
       active = False
     if active == False:
-      nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "No longer detecting device on : " + path_str)
+      nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": No longer detecting device on : " + path_str)
       if path_str in self.active_devices_dict.keys():
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']

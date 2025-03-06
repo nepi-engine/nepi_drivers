@@ -65,7 +65,8 @@ class GenicamCamDiscovery:
     self.node_name = nepi_ros.get_node_name()
     self.base_namespace = nepi_ros.get_base_namespace()
     nepi_msg.createMsgPublishers(self)
-    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+    time.sleep(1)
+    nepi_msg.publishMsgInfo(self, "Starting Initialization")
     ##############################
 
 
@@ -75,7 +76,7 @@ class GenicamCamDiscovery:
       self.drv_dict = nepi_ros.get_param(self,'~drv_dict',dict())
       nepi_msg.publishMsgInfo(self,"Initial Driver Dict: " + str(self.drv_dict))
     except Exception as e:
-      nepi_msg.publishMsgWarn(self, ":  " + self.log_name + ": Failed to load options " + str(e))#
+      nepi_msg.publishMsgWarn(self, "Failed to load options " + str(e))#
       nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
       return
     ########################
@@ -87,7 +88,8 @@ class GenicamCamDiscovery:
 
 
     nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
-    
+
+    nepi_msg.publishMsgInfo(self, "Initialization Complete")
     nepi_ros.spin()
 
   #**********************

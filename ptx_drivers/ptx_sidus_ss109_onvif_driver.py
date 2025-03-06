@@ -22,7 +22,7 @@ import requests
 from xml.etree import ElementTree as ET
 from requests.auth import HTTPDigestAuth
 
-PKG_NAME = 'PTX_ONVIF_SIDUS_SS109HT' # Use in display menus
+PKG_NAME = 'PTX_SIDUS_SS109_ONVIF' # Use in display menus
 FILE_TYPE = 'DRIVER'
 
 
@@ -31,7 +31,7 @@ DEVICE_SERVICE_PATH = "/onvif/device_service"
 SERVICES_PATH = "/onvif/services"
 MEDIA_SERVICE_PATH = "/onvif/Media"
 
-class SidusSS109HT_PTZ(object):
+class SidusSS109_PTZ(object):
     PT_DIRECTION_POSITIVE = 1
     PT_DIRECTION_NEGATIVE = -1
     PT_DIRECTION_NONE = 0

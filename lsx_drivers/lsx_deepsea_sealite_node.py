@@ -54,9 +54,6 @@ class SealiteNode(object):
   ### LXS Driver Settings
   # Set driver capability parameters
 
-
-
-
   #######################
   DEFAULT_NODE_NAME='sealite'
 
@@ -455,6 +452,7 @@ class SealiteNode(object):
       self.setIntensityFunction(0)
     else:
       self.setIntensityFunction(self.intensity_ratio)
+    return success 
 
 
   def setIntensityRatio(self,intensity_ratio):
@@ -466,6 +464,7 @@ class SealiteNode(object):
     success = self.setIntensityFunction(intensity_ratio)
     if success:
       self.intensity_ratio = intensity_ratio
+    return success 
 
   def setIntensityFunction(self,intensity_ratio):
     level_val = int(100*intensity_ratio) * int(self.on_off_state)
