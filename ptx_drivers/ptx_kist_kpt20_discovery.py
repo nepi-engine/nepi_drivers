@@ -41,26 +41,23 @@ FILE_TYPE = 'DISCOVERY'
 
 
 ### Function to try and connect to device and also monitor and clean up previously connected devices
-class KistKPT20Discoveryy:
+class KistKPT20Discovery:
 
   CONFIGS_DICT = {
-      '1:160' = False,
-      '1:160-HR' = True,
-      '1:120' = False,
-      '1:120-HR' = True
+      '1:160' : False,
+      '1:160-HR' : True,
+      '1:120' : False,
+      '1:120-HR' : True
   }
 
   high_res = False
 
   active_devices_dict = dict()
-  node_launch_name = "sealite"
+  node_launch_name = "kist_kpt20"
   baudrate_list = []
-  baud_str = '9600'
-  baud_int = 9600
-  addr_str = "001"
 
   includeDevices = []
-  excludedDevices = ['ttyACM']
+  excludedDevices = []
 
   letters_list = []
 
@@ -72,10 +69,6 @@ class KistKPT20Discoveryy:
     nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Starting Initialization")
     nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Initialization Complete")
     self.letters_list = list(string.ascii_uppercase)
-
-
-
-
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
@@ -100,14 +93,16 @@ class KistKPT20Discoveryy:
             baudrate_list.append(baudrate)
       self.baudrate_list = baudrate_list
 
-      start_addr = int(drv_dict['DISCOVERY_DICT']['OPTIONS']['start_addr']['value'])
-      start_ind = self.letters_list.find(start_addr)
-      if start_ind == -1:
+      start_addr = drv_dict['DISCOVERY_DICT']['OPTIONS']['start_addr']['value']
+      try:
+        start_ind = self.letters_list.index(start_addr)
+      except:
         start_ind = 0
-      stop_addr = int(drv_dict['DISCOVERY_DICT']['OPTIONS']['stop_addr']['value'])
-      stop_ind = self.letters_list.find(stop_addr)
-      if stop_ind == -1:
-        stop_ind = start_ind + 1
+      stop_addr = drv_dict['DISCOVERY_DICT']['OPTIONS']['stop_addr']['value']
+      try:
+        stop_ind = self.letters_list.index(stop_addr)
+      except:
+        stop_ind = 0
       addr_range = stop_ind - start_ind
       if addr_range > 0:
         self.addr_search_list = list(self.letters_list[start_ind,stop_ind + 1])
@@ -148,7 +143,7 @@ class KistKPT20Discoveryy:
             return self.active_paths_list
         success = ping_ip(ip_addr)
         if success == True:
-          self.path_list = [ip_addr + ':' ip_port]
+          self.path_list = [ip_addr + ':' + ip_port]
         else:
           return self.active_paths_list
 
@@ -196,12 +191,12 @@ class KistKPT20Discoveryy:
           if self.connection == 'Serial':
             serial_port = serial.Serial(path_str,self.baud_int,timeout = 1)
           elif self.connection == 'TCP-Server':
-            serial_port = serial.serial_for_url('socket://'path_str, timeout=1)
+            serial_port = serial.serial_for_url('socket://' + path_str, timeout=1)
         except Exception as e:
           nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
           continue
         for addr_str in self.addr_search_list:
-          if self.high_res == False
+          if self.high_res == False:
             data_str = '0000'
           else:
             data_str = '000000'
@@ -222,7 +217,7 @@ class KistKPT20Discoveryy:
             nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Got a serial read/write error: " + str(e))
             break
           if len(response) > 5:
-            if response[0:5] = ser_msg[0:5]:
+            if response[0:5] == ser_msg[0:5]:
               nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Found device at path: " + path_str)
               nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Found device at address: " + self.addr_str)
               found_device = True

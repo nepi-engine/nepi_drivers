@@ -5,13 +5,13 @@ driver:
   type: LSX
   group_id: None
   NODE_DICT:
-    file_name: lsx_kist_kpt20_node.py
+    file_name: ptx_kist_kpt20_node.py
     class_name: KistKPT20Node
   DRIVER_DICT:
     file_name: None
     class_name: None
   DISCOVERY_DICT:
-    file_name: lsx_kist_kpt20_discovery.py
+    file_name: ptx_kist_kpt20_discovery.py
     class_name: KistKPT20Discovery
     process: CALL
     OPTIONS:
@@ -32,16 +32,16 @@ driver:
         options:
           - 'A'
           - 'Z'
-        default: '1'
-        value: '1'
+        default: 'A'
+        value: 'A'
 
       stop_addr:
         type: 'Int'
         options:
           - 'A'
           - 'Z'
-        default: '10'
-        value: '10'
+        default: 'A'
+        value: 'A'
 
       system_config:
         type: Discrete

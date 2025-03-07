@@ -42,10 +42,10 @@ class KistKPT20Node:
 
 
     CONFIGS_DICT = {
-        '1:160' = {'high_res':False, 'deg_per_step':0.0703125,'max_pos':7498,'min_pos':2502,'home':5000},
-        '1:160-HR' = {'high_res':True, 'deg_per_step':0.000703125,'max_pos':749800,'min_pos':250200,'home':500000},
-        '1:120' = {'high_res':False, 'deg_per_step':0.09375,'max_pos':6873,'min_pos':3127,'home':5000},
-        '1:120-HR' = {'high_res':True, 'deg_per_step':0.0009375,'max_pos':687300,'min_pos':312700,'home':500000}
+        '1:160' : {'high_res':False, 'deg_per_step':0.0703125,'max_pos':7498,'min_pos':2502,'home':5000},
+        '1:160-HR' : {'high_res':True, 'deg_per_step':0.000703125,'max_pos':749800,'min_pos':250200,'home':500000},
+        '1:120' : {'high_res':False, 'deg_per_step':0.09375,'max_pos':6873,'min_pos':3127,'home':5000},
+        '1:120-HR' : {'high_res':True, 'deg_per_step':0.0009375,'max_pos':687300,'min_pos':312700,'home':500000}
     }
 
     config_dict = dict()
@@ -53,19 +53,19 @@ class KistKPT20Node:
     data_len = 4
 
 
-    CAP_SETTINGS = dict(
-        None = {"type":"None","name":"None","options":[""]}
-    )
+    CAP_SETTINGS = {
+        'None' : {"type":"None","name":"None","options":[""]}
+    }
 
-    FACTORY_SETTINGS = dict(
-        None = {"type":"None","name":"None","value":"None"}
-    )
+    FACTORY_SETTINGS = {
+        'None' : {"type":"None","name":"None","options":[""]}
+    }
 
     FACTORY_SETTINGS_OVERRIDES = dict()
 
-    settingFunctions = dict(
-        None = {'get':'getNone', 'set': 'setNone'}
-    )
+    settingFunctions = {
+        'None' : {'get':'getNone', 'set': 'setNone'}
+    }
 
 
     FACTORY_SETTINGS_OVERRIDES = dict( )
@@ -117,7 +117,7 @@ class KistKPT20Node:
             self.high_res = self.config_dict['high_res']
             if self.high_res == True:
                 self.data_len = 6
-        self.connection = drv_dict['DISCOVERY_DICT']['OPTIONS']['connection']['value']
+            self.connection = drv_dict['DISCOVERY_DICT']['OPTIONS']['connection']['value']
         except Exception as e:
             nepi_msg.publishMsgWarn(self, "Failed to load Device Dict " + str(e))#
             nepi_ros.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
@@ -261,8 +261,8 @@ class KistKPT20Node:
                                         defaultSettings = self.default_settings,
                                         capabilities_dict = ptx_capabilities_dict,
                                         stopMovingCb = self.stopMoving,
-                                        moveYawCb = self.moveYaw
-                                        movePitchCb = self.movePitch,,
+                                        moveYawCb = self.moveYaw,
+                                        movePitchCb = self.movePitch,
                                         setSpeedCb = self.setSpeed,
                                         getSpeedCb = self.getSpeed,
                                         getCurrentPositionCb = self.getCurrentPosition,
@@ -463,7 +463,7 @@ class KistKPT20Node:
     def check_timer_callback(self,timer):
         success = False
         # Test message
-        if self.high_res == False
+        if self.high_res == False:
             data_str = '0000'
         else:
             data_str = '000000'
@@ -485,7 +485,7 @@ class KistKPT20Node:
             response = bs.decode()
         # Check for valid response 
         if len(response) > 5:
-            if response[0:5] = ser_msg[0:5]:
+            if response[0:5] == ser_msg[0:5]:
                 success = True
         # Update results and take actions
         if success:
@@ -511,7 +511,7 @@ class KistKPT20Node:
                 if self.connection == 'Serial':
                     serial_port = serial.Serial(path_str,self.baud_int,timeout = 1)
                 elif self.connection == 'TCP-Server':
-                    serial_port = serial.serial_for_url('socket://'path_str, timeout=1)
+                    serial_port = serial.serial_for_url('socket://' + path_str, timeout=1)
                 nepi_msg.publishMsgInfo(self,"Serial port opened")
                 success = True
             except Exception as e:
@@ -522,7 +522,7 @@ class KistKPT20Node:
                     # Send Message
                     nepi_msg.publishMsgInfo(self,"Requesting info for device: " + self.addr_str)
                     # Test message
-                    if self.high_res == False
+                    if self.high_res == False:
                         data_str = '0000'
                     else:
                         data_str = '000000'
@@ -535,7 +535,7 @@ class KistKPT20Node:
                 if success == True:
                     #nepi_msg.publishMsgInfo(self,"Got response message: " + response)
                     if len(response) > 5:
-                        if response[0:5] = ser_msg[0:5]:
+                        if response[0:5] == ser_msg[0:5]:
                             success = True
                             nepi_msg.publishMsgInfo(self,"Connected to device at address: " +  self.addr_str)
                             res_split = response.split(',')
@@ -547,15 +547,11 @@ class KistKPT20Node:
                                 success = True
                         else:
                             nepi_msg.publishMsgWarn(self,"Device returned address: " + ret_addr + " does not match: " +  self.addr_str)
-                        else:
+                    else:
                         nepi_msg.publishMsgWarn(self,"Device returned invalid response")
-                    else:
-                        nepi_msg.publishMsgWarn(self,"Device returned empty response")
-                    else:
-                    nepi_msg.publishMsgWarn(self,"Device returned invalid response")
 
             else:
-            nepi_msg.publishMsgWarn(self,"serial port not active")
+                nepi_msg.publishMsgWarn(self,"serial port not active")
         return success
 
 
@@ -576,7 +572,9 @@ class KistKPT20Node:
                 self.serial_busy = True
                 #print("Sending " + ser_msg + " message")
                 try:
-                self.serial_port.write(b)
+                    self.serial_port.write(b)
+                except Exception as e1:
+                    print("Failed to send message " + str(e1))
                 time.sleep(.01)
                 try:
                     bs = self.serial_port.readline()
@@ -584,12 +582,10 @@ class KistKPT20Node:
                     response = bs.decode()
                     #print("Send response received: " + response[0:-2])
                 except Exception as e1:
-                    print("Failed to recieve message")
-                except Exception as e2:
-                print("Failed to send message")
+                    print("Failed to recieve message " + str(e2))
             else:
                 print("Serial port write timed out on busy state")
-            else:
+        else:
             print("serial port not defined, returning empty string")
         return response
 
@@ -629,13 +625,13 @@ class KistKPT20Node:
         dev_info["Model"] = KPT20
 
         firmware = ""
-        if self.high_res == False
+        if self.high_res == False:
             data_str = '0000'
         else:
             data_str = '000000'
         ser_msg= ('!' + self.addr_str + 'MVR' + data_str + 'R')
         if len(response) > 5:
-            if response[0:5] = ser_msg[0:5]:
+            if response[0:5] == ser_msg[0:5]:
                 try:
                     firmware = response[5:8]
                 except Exception as e:
@@ -667,14 +663,14 @@ class KistKPT20Node:
     def driver_getSpeedRatio(self):
         speedRatio = -999
         success = False
-        if self.high_res == False
+        if self.high_res == False:
             data_str = '0000'
         else:
             data_str = '000000'
         ser_msg= (self.both_str + self.addr_str + 'MVS' + data_str + 'R')
         response = self.send_msg(ser_msg)
         if len(response) > 5:
-            if response[0:5] = ser_msg[0:5]:
+            if response[0:5] == ser_msg[0:5]:
                 try:
                     data_str = response[5:-1]
                     cur_speed = int(data_str)
@@ -699,7 +695,7 @@ class KistKPT20Node:
         response = self.send_msg(ser_msg)
 
         if len(response) > 5:
-            if response[0:5] = ser_msg[0:5]:
+            if response[0:5] == ser_msg[0:5]:
                 success = True
             else:
                 print("Failed to get valid response message from: " + ser_msg)
@@ -716,18 +712,18 @@ class KistKPT20Node:
     def driver_getCurrentPosition(self):
         yaw_deg = -999
         success = False
-        if self.high_res == False
+        if self.high_res == False:
             data_str = '0000'
         else:
             data_str = '000000'
         ser_msg= (self.pan_str + self.addr_str + 'MRL' + data_str + 'R')
         response = self.send_msg(ser_msg)
         if len(response) > 5:
-            if response[0:5] = ser_msg[0:5]:
+            if response[0:5] == ser_msg[0:5]:
                 try:
                     data_str = response[5:-1]
                     yaw_pos = int(data_str)
-                    yaw_deg self.pos2deg(yaw_pos)
+                    yaw_deg = self.pos2deg(yaw_pos)
                 except Exception as e:
                     print("Failed to convert message to int: " + data_str + " " + str(e))
         else:
@@ -735,18 +731,18 @@ class KistKPT20Node:
 
         pitch_deg = -999
         success = False
-        if self.high_res == False
+        if self.high_res == False:
             data_str = '0000'
         else:
             data_str = '000000'
         ser_msg= (self.tilt_str + self.addr_str + 'MRL' + data_str + 'R')
         response = self.send_msg(ser_msg)
         if len(response) > 5:
-            if response[0:5] = ser_msg[0:5]:
+            if response[0:5] == ser_msg[0:5]:
                 try:
                     data_str = response[5:-1]
                     pitch_pos = int(data_str)
-                    pitch_deg self.pos2deg(pitch_pos)
+                    pitch_deg = self.pos2deg(pitch_pos)
                 except Exception as e:
                     print("Failed to convert message to int: " + data_str + " " + str(e))
         else:
@@ -784,11 +780,11 @@ class KistKPT20Node:
 
     def driver_jog(self,axis_str, direction, time_s):
         success = False
-        if self.high_res == False
+        if self.high_res == False:
             data_str = '0000'
         else:
             data_str = '000000'
-        if direction = 1:
+        if direction == 1:
             cmd_str = 'MMF'
         else:
             cmd_str = 'MMB'
