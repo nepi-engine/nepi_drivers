@@ -25,5 +25,5 @@ driver:
         type: 'Bool'
         options: 
           - ''
-        default: True
-        value: True
+        default: 'True'
+        value: 'True'

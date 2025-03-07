@@ -171,6 +171,7 @@ class SidusSS182Discovery:
               try:
                 addr_int = int(addr)
                 nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at path: " + path_str)
+                nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at baudrate: " + baud_str)
                 nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at address: " + self.addr_str)
                 found_device = True
                 return found_device

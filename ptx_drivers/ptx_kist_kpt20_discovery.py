@@ -31,14 +31,10 @@ from nepi_sdk import nepi_msg
 PKG_NAME = 'PTX_KIST_KTP20' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
 
- 
+
 #########################################
 # Discover Method
 #########################################
-
-
-
-
 
 ### Function to try and connect to device and also monitor and clean up previously connected devices
 class KistKPT20Discovery:
@@ -186,6 +182,7 @@ class KistKPT20Discovery:
       for baud_str in self.baudrate_list:
         self.baud_str = baud_str
         self.baud_int = int(baud_str)
+        ################################################
         try:
           # Try and open serial port
           if self.connection == 'Serial':
@@ -195,6 +192,7 @@ class KistKPT20Discovery:
         except Exception as e:
           nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
           continue
+        #################################################
         for addr_str in self.addr_search_list:
           if self.high_res == False:
             data_str = '0000'
@@ -202,6 +200,7 @@ class KistKPT20Discovery:
             data_str = '000000'
           ser_msg= ('!' + addr_str + 'MVR' + data_str + 'R')
           ser_str = (ser_msg + '\r\n')
+        ################################################  
           # Send Serial String
           #print("")
           #print("Sending serial message: " + ser_msg)
@@ -216,13 +215,15 @@ class KistKPT20Discovery:
           except Exception as e:
             nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Got a serial read/write error: " + str(e))
             break
+          #############################################
           if len(response) > 5:
             if response[0:5] == ser_msg[0:5]:
-                nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at path: " + path_str)
-                nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at baudrate: " + baud_str)
-                nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at address: " + self.addr_str)
+              nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at path: " + path_str)
+              nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at baudrate: " + baud_str)
+              nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at address: " + self.addr_str)
               found_device = True
               return found_device
+          ##############################################
         # Clean up the serial port
         serial_port.close()
     return found_device
@@ -281,3 +282,4 @@ class KistKPT20Discovery:
       except Exception as e:
           print(f"An error occurred: {e}")
           return False
+
