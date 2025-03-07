@@ -30,7 +30,7 @@ PKG_NAME = 'LSX_DEEPSEA_SEALITE'
 FILE_TYPE = 'DISCOVERY'
 
 #########################################
-# Sealite Discover Method
+# Discover Method
 #########################################
 
 
@@ -128,7 +128,6 @@ class SealiteDiscovery:
 
   ##########  Device specific calls
   def checkForDevice(self,path_str):
-    #nepi_msg.publishMsgWarn(self, "Sealight checkForDevice start")###
     found_device = False
     nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ":  path_str " + path_str)#
     if path_str not in self.active_paths_list:
@@ -164,15 +163,16 @@ class SealiteDiscovery:
             nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Got a serial read/write error: " + str(e))
             break
           if len(response) > 2:
-            #nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Got response: " + response)
+            nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Got response: " + response)
             if response[3] == ',':
               self.addr_str = response[0:3]
               try:
                 addr_int = int(addr)
                 nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at path: " + path_str)
+                nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at baudrate: " + baud_str)
                 nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at address: " + self.addr_str)
                 found_device = True
-                break # Don't check any more addresses
+                return found_device
               except Exception as a:
                 nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Returned device message not valid (" + str(a) + ")")
         # Clean up the serial port
@@ -200,13 +200,16 @@ class SealiteDiscovery:
     nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ":  launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
     dict_param_name = self.base_namespace + node_name + "/drv_dict"
-    # Try and load save node params
+    # Try to load node saved device config
     nepi_drv.checkLoadConfigFile(node_name)
-    #nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ":  launching node: " + str(self.drv_dict))
+    # Store drv info for node to use
     self.drv_dict['DEVICE_DICT'] = dict()
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
     self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str
     self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
+    #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + str(self.drv_dict))
+    nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Launching node  with path: " + path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str)
+    #nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ":  launching node: " + str(self.drv_dict))
     nepi_ros.set_param(self,dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, node_name, device_path = path_str)
     if success:

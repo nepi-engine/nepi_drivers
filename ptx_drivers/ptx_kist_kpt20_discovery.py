@@ -33,7 +33,7 @@ FILE_TYPE = 'DISCOVERY'
 
  
 #########################################
-# Sealite Discover Method
+# Discover Method
 #########################################
 
 
@@ -218,11 +218,11 @@ class KistKPT20Discovery:
             break
           if len(response) > 5:
             if response[0:5] == ser_msg[0:5]:
-              nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Found device at path: " + path_str)
-              nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Found device at address: " + self.addr_str)
+                nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at path: " + path_str)
+                nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at baudrate: " + baud_str)
+                nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at address: " + self.addr_str)
               found_device = True
-              break # Don't check any more addresses
-
+              return found_device
         # Clean up the serial port
         serial_port.close()
     return found_device
@@ -248,13 +248,15 @@ class KistKPT20Discovery:
     nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
     dict_param_name = self.base_namespace + node_name + "/drv_dict"
-    # Try and load save node params
+    # Try to load node saved device config
     nepi_drv.checkLoadConfigFile(node_name)
-    #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + str(self.drv_dict))
+    # Store drv info for node to use
     self.drv_dict['DEVICE_DICT'] = dict()
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
     self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str
     self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
+    #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + str(self.drv_dict))
+    nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Launching node  with path: " + path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str)
     nepi_ros.set_param(self,dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, node_name, device_path = path_str)
     if success:
