@@ -1,18 +1,18 @@
 driver:
-  pkg_name: PTX_SIDUS_SS109_SERIAL
-  display_name: Sidus SS109 Serial PanTilt
-  description: Sidus SS109 Serial PanTilt Driver Interface
+  pkg_name: PTX_KIST_KTP20
+  display_name: Kist KPT 20 PanTilt
+  description: Kist KPT 20 PanTilt Driver Interface
   type: LSX
   group_id: None
   NODE_DICT:
-    file_name: lsx_sidus_ss109_serial_node.py
-    class_name: SidusSS109SerialNode
+    file_name: lsx_kist_kpt20_node.py
+    class_name: KistKPT20Node
   DRIVER_DICT:
     file_name: None
     class_name: None
   DISCOVERY_DICT:
-    file_name: lsx_sidus_ss109_serial_discovery.py
-    class_name: SidusSS109SerialDiscovery
+    file_name: lsx_kist_kpt20_discovery.py
+    class_name: KistKPT20Discovery
     process: CALL
     OPTIONS:
       baud_rate:
@@ -21,20 +21,56 @@ driver:
           - All
           - '9600'
           - '19200'
+          - '38400'
           - '57600'
+          - '115200'         
         default: All
         value: All
+
       start_addr:
         type: 'Int'
         options:
-          - '1'
-          - '255'
+          - 'A'
+          - 'Z'
         default: '1'
         value: '1'
+
       stop_addr:
         type: 'Int'
         options:
-          - '1'
-          - '255'
+          - 'A'
+          - 'Z'
         default: '10'
         value: '10'
+
+      system_config:
+        type: Discrete
+        options:
+          - '1:160'
+          - '1:160-HR'
+          - '1:120'  
+          - '1:120-HR'  
+        default: '1:160'
+        value: '1:160'
+
+      connection:
+        type: Discrete
+        options:
+          - Serial
+          - TCP-Server         
+        default: TCP-Server
+        value: TCP-Server
+
+      ip_address:
+        type: String
+        options:
+        - ""       
+        default: '192.168.0.5'
+        value: '192.168.0.5'      
+        
+      ip_port:
+        type: String
+        options:
+        - ""       
+        default: '10001'
+        value: '10001'

@@ -40,6 +40,19 @@ FILE_TYPE = 'NODE'
 
 class KistKPT20Node:
 
+
+    CONFIGS_DICT = {
+        '1:160' = {'high_res':False, 'deg_per_step':0.0703125,'max_pos':7498,'min_pos':2502,'home':5000},
+        '1:160-HR' = {'high_res':True, 'deg_per_step':0.000703125,'max_pos':749800,'min_pos':250200,'home':500000},
+        '1:120' = {'high_res':False, 'deg_per_step':0.09375,'max_pos':6873,'min_pos':3127,'home':5000},
+        '1:120-HR' = {'high_res':True, 'deg_per_step':0.0009375,'max_pos':687300,'min_pos':312700,'home':500000}
+    }
+
+    config_dict = dict()
+    high_res = False
+    data_len = 4
+
+
     CAP_SETTINGS = dict(
         None = {"type":"None","name":"None","options":[""]}
     )
@@ -73,6 +86,9 @@ class KistKPT20Node:
     sw_version = "Unknown"
     ptx_if = None
 
+    both_str = '!'
+    pan_str = '#'
+    tilt_str = '$'
 
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
@@ -95,14 +111,18 @@ class KistKPT20Node:
             self.baud_str = self.drv_dict['DEVICE_DICT']['baud_str'] 
             self.baud_int = int(self.baud_str)
             self.addr_str = self.drv_dict['DEVICE_DICT']['addr_str'] 
+
+            system_config = drv_dict['DISCOVERY_DICT']['OPTIONS']['system_config']['value']
+            self.config_dict = self.CONFIGS_DICT[system_config]
+            self.high_res = self.config_dict['high_res']
+            if self.high_res == True:
+                self.data_len = 6
+        self.connection = drv_dict['DISCOVERY_DICT']['OPTIONS']['connection']['value']
         except Exception as e:
             nepi_msg.publishMsgWarn(self, "Failed to load Device Dict " + str(e))#
             nepi_ros.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
             return
-        # Address string must be three char long
-        zero_prefix_len = 3-len(self.addr_str)
-        for z in range(zero_prefix_len):
-            self.addr_str = ('0' + self.addr_str)  
+
         ################################################  
         nepi_msg.publishMsgInfo(self,"Connecting to Device on port " + self.port_str + " with baud " + self.baud_str)
         ### Try and connect to device
@@ -121,7 +141,7 @@ class KistKPT20Node:
             self.factory_settings = self.getFactorySettings()
 
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-            nepi_msg.publishMsgInfo(self,"Launching NEPI LSX (ROS) interface...")
+            nepi_msg.publishMsgInfo(self,"Launching NEPI PTX (ROS) interface...")
             self.device_info_dict["node_name"] = self.node_name
             if self.node_name.find("_") != -1:
                 split_name = self.node_name.rsplit('_', 1)
@@ -141,17 +161,17 @@ class KistKPT20Node:
 
             # Now check with the driver if any of these PTX capabilities are explicitly not present
             if not self.driver_hasAdjustableSpeed():
-                ptx_callback_names["GetSpeed"] = None # Clear the method
-                ptx_callback_names["SetSpeed"] = None # Clear the method
-                ptx_capabilities_dict['has_speed_control'] = False
+                getSpeedCb = None # Clear the method
+                self.setSpeed = None # Clear the method
+                self.has_speed_control = False
             else:
-                ptx_capabilities_dict['has_speed_control'] = True
+                has_speed_control = True
                 
             if not self.driver_reportsPosition():
-                ptx_callback_names["GetCurrentPosition"] = None # Clear the method
+                self.GetCurrentPosition = None # Clear the method
                 
             if not self.driver_hasAbsolutePositioning():
-                ptx_callback_names["GotoPosition"] = None # Clear the method
+                self.GotoPosition = None # Clear the method
             
             self.has_absolute_positioning_and_feedback = self.driver_hasAbsolutePositioning() and self.driver_reportsPosition()
             ptx_capabilities_dict['has_absolute_positioning'] = self.has_absolute_positioning_and_feedback
@@ -164,8 +184,8 @@ class KistKPT20Node:
                 ptx_capabilities_dict['has_waypoints'] = True
                 
             if not self.has_absolute_positioning_and_feedback:
-                ptx_callback_names["SetHomePosition"] = None    
-                ptx_callback_names["SetWaypoint"] = None
+                self.SetHomePosition = None    
+                self.SetWaypoint = None
 
 
             # Launch the PTX interface --  this takes care of initializing all the ptx settings from config. file, subscribing and advertising topics and services, etc.
@@ -227,29 +247,10 @@ class KistKPT20Node:
             #for setting in self.factory_settings:
                 #nepi_msg.publishMsgInfo(self,"" +setting)
 
-            self.speed_ratio = 0.5
             self.home_yaw_deg = 0.0
             self.home_pitch_deg = 0.0
             self.waypoints = {} # Dictionary of dictionaries with numerical key and {waypoint_pitch, waypoint_yaw} dict value
 
-
-
-            ptx_callback_names = {
-                # PTX Standard
-                "StopMoving": ,
-                "MoveYaw": self.moveYaw,
-                "MovePitch": self.movePitch,
-                "SetSpeed": self.setSpeed,
-                "GetSpeed": self.getSpeed,
-                "GetCurrentPosition": self.getCurrentPosition,
-                "GotoPosition": self.gotoPosition,
-                "GoHome": self.goHome,
-                "SetHomePosition": self.setHomePosition,
-                "SetHomePositionHere": self.setHomePositionHere,
-                "GotoWaypoint": self.gotoWaypoint,
-                "SetWaypoint": self.setWaypoint,
-                "SetWaypointHere": self.setWaypointHere
-            }
 
             self.ptx_if = ROSPTXActuatorIF(device_info = self.device_info_dict, 
                                         capSettings = self.cap_settings,
@@ -260,18 +261,18 @@ class KistKPT20Node:
                                         defaultSettings = self.default_settings,
                                         capabilities_dict = ptx_capabilities_dict,
                                         stopMovingCb = self.stopMoving,
-                                        moveYawCb = ptx_callback_names["MoveYaw"],
-                                        movePitchCb = ptx_callback_names["MovePitch"],
-                                        setSpeedCb = ptx_callback_names["SetSpeed"],
-                                        getSpeedCb = ptx_callback_names["GetSpeed"],
-                                        getCurrentPositionCb = ptx_callback_names["GetCurrentPosition"],
-                                        gotoPositionCb = ptx_callback_names["GotoPosition"],
-                                        goHomeCb = ptx_callback_names["GoHome"],
-                                        setHomePositionCb = ptx_callback_names["SetHomePosition"],
-                                        setHomePositionHereCb = ptx_callback_names["SetHomePositionHere"],
-                                        gotoWaypointCb = ptx_callback_names["GotoWaypoint"],
-                                        setWaypointCb = ptx_callback_names["SetWaypoint"],
-                                        setWaypointHereCb = ptx_callback_names["SetWaypointHere"])
+                                        moveYawCb = self.moveYaw
+                                        movePitchCb = self.movePitch,,
+                                        setSpeedCb = self.setSpeed,
+                                        getSpeedCb = self.getSpeed,
+                                        getCurrentPositionCb = self.getCurrentPosition,
+                                        gotoPositionCb = self.gotoPosition,
+                                        goHomeCb = self.goHome,
+                                        setHomePositionCb = self.setHomePosition,
+                                        setHomePositionHereCb = self.setHomePositionHere,
+                                        gotoWaypointCb = self.gotoWaypoint,
+                                        setWaypointCb = self.setWaypoint,
+                                        setWaypointHereCb = self.setWaypointHere)
             nepi_msg.publishMsgInfo(self," ... PTX interface running")
 
             # Start an sealite activity check process that kills node after some number of failed comms attempts
@@ -307,8 +308,8 @@ class KistKPT20Node:
         settings = self.getSettings()
         #Apply factory setting overides
         for setting_name in settings.keys():
-        if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
-                settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
+            if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
+                    settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
         return settings
 
 
@@ -322,13 +323,13 @@ class KistKPT20Node:
             setting["type"] = cap_setting['type']
             val = None
             if setting_name in self.settingFunctions.keys():
-            function_str_name = self.settingFunctions[setting_name]['get']
-            #nepi_msg.publishMsgInfo(self,"Calling get setting function " + function_str_name)
-            get_function = globals()[function_str_name]
-            val = get_function(self)
-            if val is not None:
-                setting["value"] = str(val)
-                settings[setting_name] = setting
+                function_str_name = self.settingFunctions[setting_name]['get']
+                #nepi_msg.publishMsgInfo(self,"Calling get setting function " + function_str_name)
+                get_function = globals()[function_str_name]
+                val = get_function(self)
+                if val is not None:
+                    setting["value"] = str(val)
+                    settings[setting_name] = setting
         return settings
 
 
@@ -388,34 +389,35 @@ class KistKPT20Node:
     def moveYaw(self, direction, duration):
         if self.ptx_if is not None:
             direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
-            self.driver_jog(pan_direction = direction, tilt_direction = self.PT_DIRECTION_NONE, speed_ratio = self.speed_ratio, time_s = duration)
+            self.driver_jog(axis_str = self.pan_str, direction = direction, time_s = duration)
 
     def movePitch(self, direction, duration):
         if self.ptx_if is not None:
             direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
-            self.jog(pan_direction = self.PT_DIRECTION_NONE, tilt_direction = direction, speed_ratio = self.speed_ratio, time_s = duration)
+            self.driver_jog(axis_str = self.tilt_str, direction = direction, time_s = duration)
 
     def setSpeed(self, speed_ratio):
         # TODO: Limits checking and driver unit conversion?
-        self.speed_ratio = speed_ratio
+        self.driver_setSpeedRatio(speed_ratio)
 
     def getSpeed(self):
         # TODO: Driver unit conversion?
-        return self.speed_ratio
+        speed_ratio = self.driver_getSpeedRatio()
+        return speed_ratio
           
 
     def getCurrentPosition(self):
-        current_yaw_deg, current_pitch_deg = self.driver_getCurrentPosition()
+        yaw_deg, pitch_deg = self.driver_getCurrentPosition()
         #print("Got pos degs : " + str([pan_deg, tilt_deg]))
-        return current_yaw_deg, current_pitch_deg
+        return yaw_deg, pitch_deg
         
 
     def gotoPosition(self, yaw_deg, pitch_deg):
-        self.driver_moveToPosition(yaw_deg, pitch_deg, self.speed_ratio)
+        self.driver_moveToPosition(yaw_deg, pitch_deg)
         
     def goHome(self):
         if self.driver_hasAbsolutePositioning() is True and self.ptx_if is not None:
-            self.driver_moveToPosition(self.home_yaw_deg, self.home_pitch_deg, self.speed_ratio)
+            self.driver_moveToPosition(self.home_yaw_deg, self.home_pitch_deg)
 
     def setHomePosition(self, yaw_deg, pitch_deg):
         self.home_yaw_deg = yaw_deg
@@ -423,9 +425,9 @@ class KistKPT20Node:
 
     def setHomePositionHere(self):
         if self.driver_reportsPosition() is True:
-            current_yaw_deg, current_pitch_deg = self.driver_getCurrentPosition()
-            self.home_yaw_deg = current_yaw_deg
-            self.home_pitch_deg = current_pitch_deg 
+            yaw_deg, pitch_deg = self.driver_getCurrentPosition()
+            self.home_yaw_deg = yaw_deg
+            self.home_pitch_deg = pitch_deg 
 
     def gotoWaypoint(self, waypoint_index):
         if self.driver_hasAbsolutePositioning() is True and self.ptx_if is not None:
@@ -433,17 +435,15 @@ class KistKPT20Node:
                 return
             waypoint_yaw_deg = self.waypoints[waypoint_index]['yaw_deg']
             waypoint_pitch_deg = self.waypoints[waypoint_index]['pitch_deg']
-            self.driver_moveToPosition(waypoint_yaw_deg, waypoint_pitch_deg, self.speed_ratio)
+            self.driver_moveToPosition(waypoint_yaw_deg, waypoint_pitch_deg)
     
     def setWaypoint(self, waypoint_index, yaw_deg, pitch_deg):
         self.waypoints[waypoint_index] = {'yaw_deg': yaw_deg, 'pitch_deg': pitch_deg}
         
     def setWaypointHere(self, waypoint_index):
         if self.driver_reportsPosition() and self.ptx_if is not None:
-            current_yaw_deg, current_pitch_deg = self.driver_getCurrentPosition()
-            self.waypoints[waypoint_index] = {'yaw_deg': current_yaw_deg, 'pitch_deg': current_pitch_deg}
-
-
+            yaw_deg, pitch_deg = self.driver_getCurrentPosition()
+            self.waypoints[waypoint_index] = {'yaw_deg': yaw_deg, 'pitch_deg': pitch_deg}
 
         nepi_msg.publishMsgInfo(self,"Waypoint set to current position")
 
@@ -462,119 +462,135 @@ class KistKPT20Node:
 
     def check_timer_callback(self,timer):
         success = False
-        ser_msg= ('!' + self.addr_str + ':INFO?')
+        # Test message
+        if self.high_res == False
+            data_str = '0000'
+        else:
+            data_str = '000000'
+        ser_msg= ('!' + self.addr_str + 'MVR' + data_str + 'R')
         ser_str = (ser_msg + '\r\n')
+
         b=bytearray()
         b.extend(map(ord, ser_str))
-        try:
         while self.serial_busy == True and not nepi_ros.is_shutdown():
             time.sleep(0.01) # Wait for serial port to be available
         self.serial_busy = True
         self.serial_port.write(b)
-        except Exception as e:
-        nepi_msg.publishMsgWarn(self,"Failed to send message")
         time.sleep(.01)
         try:
-        bs = self.serial_port.readline()
+            bs = self.serial_port.readline()
         except Exception as e:
-        nepi_msg.publishMsgWarn(self,"Failed to receive message")
-        self.serial_busy = False
-        response = bs.decode()
+            nepi_msg.publishMsgWarn(self,"Failed to receive message")
+            self.serial_busy = False
+            response = bs.decode()
         # Check for valid response 
-        if response != None and response != "?" and len(response)>4:
-        ret_addr = response[0:3]
-        if ret_addr == self.addr_str:
-            success = True
+        if len(response) > 5:
+            if response[0:5] = ser_msg[0:5]:
+                success = True
         # Update results and take actions
         if success:
-        self.serial_busy = False # Clear the busy indicator
-        self.self_check_counter = 0 # reset comms failure count
+            self.serial_busy = False # Clear the busy indicator
+            self.self_check_counter = 0 # reset comms failure count
         else:
-        self.serial_busy = True # Lock port until valid response
-        self.self_check_counter = self.self_check_counter + 1 # increment counter
+            self.serial_busy = True # Lock port until valid response
+            self.self_check_counter = self.self_check_counter + 1 # increment counter
         #print("Current failed comms count: " + str(self.self_check_counter))
         if self.self_check_counter > self.self_check_count:  # Crashes node if set above limit??
-        nepi_msg.publishMsgWarn(self,"Shutting down device: " +  self.addr_str + " on port " + self.port_str)
-        nepi_msg.publishMsgWarn(self,"Too many comm failures")
-        nepi_ros.signal_shutdown("To many comm failures")   
+            nepi_msg.publishMsgWarn(self,"Shutting down device: " +  self.addr_str + " on port " + self.port_str)
+            nepi_msg.publishMsgWarn(self,"Too many comm failures")
+            nepi_ros.signal_shutdown("To many comm failures")   
     
     ### Function to try and connect to device at given port and baudrate
     def connect(self):
         success = False
         port_check = self.check_port(self.port_str)
         if port_check is True:
-        try:
-            # Try and open serial port
-            nepi_msg.publishMsgInfo(self,"Opening serial port " + self.port_str + " with baudrate: " + self.baud_str)
-            self.serial_port = serial.Serial(self.port_str,self.baud_int,timeout = 0.1)
-            nepi_msg.publishMsgInfo(self,"Serial port opened")
-            # Send Message
-            nepi_msg.publishMsgInfo(self,"Requesting info for device: " + self.addr_str)
-            ser_msg = ('!' + self.addr_str + ':INFO?')
-            #nepi_msg.publishMsgInfo(self,"Sending serial string: " + ser_msg)
-            response = self.send_msg(ser_msg)
-            #nepi_msg.publishMsgInfo(self,"Got response message: " + response)
-            if len(response) > 0:
-            if response != None and response != "?" and response[3] == ",":
-                if len(response) > 4:
-                ret_addr = response[0:3]
-                #nepi_msg.publishMsgInfo(self,"Returned address value: " + ret_addr)
-                if ret_addr == self.addr_str:
-                    nepi_msg.publishMsgInfo(self,"Connected to device at address: " +  self.addr_str)
-                    res_split = response.split(',')
-                    if len(res_split) > 5:
-                    # Update serial, hardware, and software status values
-                    self.serial_num = res_split[2]
-                    self.hw_version = res_split[3]
-                    self.sw_version = res_split[4]
+            try:
+                # Try and open serial port
+                nepi_msg.publishMsgInfo(self,"Opening serial port " + self.port_str + " with baudrate: " + self.baud_str)
+                if self.connection == 'Serial':
+                    serial_port = serial.Serial(path_str,self.baud_int,timeout = 1)
+                elif self.connection == 'TCP-Server':
+                    serial_port = serial.serial_for_url('socket://'path_str, timeout=1)
+                nepi_msg.publishMsgInfo(self,"Serial port opened")
+                success = True
+            except Exception as e:
+                nepi_msg.publishMsgWarn(self,"Something went wrong with connecting to serial port at: " + self.port_str + "(" + str(e) + ")" )
+            if success == True:
+                success = False
+                try:
+                    # Send Message
+                    nepi_msg.publishMsgInfo(self,"Requesting info for device: " + self.addr_str)
+                    # Test message
+                    if self.high_res == False
+                        data_str = '0000'
+                    else:
+                        data_str = '000000'
+                    ser_msg= ('!' + self.addr_str + 'MVR' + data_str + 'R')
+                    #nepi_msg.publishMsgInfo(self,"Sending serial string: " + ser_msg)
+                    response = self.send_msg(ser_msg)
                     success = True
-                else:
-                    nepi_msg.publishMsgWarn(self,"Device returned address: " + ret_addr + " does not match: " +  self.addr_str)
-                else:
-                nepi_msg.publishMsgWarn(self,"Device returned invalid response")
+                except Exception as e:
+                    nepi_msg.publishMsgWarn(self,"Something went wrong with sending message at serial port at: " + self.port_str + "(" + str(e) + ")" )
+                if success == True:
+                    #nepi_msg.publishMsgInfo(self,"Got response message: " + response)
+                    if len(response) > 5:
+                        if response[0:5] = ser_msg[0:5]:
+                            success = True
+                            nepi_msg.publishMsgInfo(self,"Connected to device at address: " +  self.addr_str)
+                            res_split = response.split(',')
+                            if len(res_split) > 5:
+                                # Update serial, hardware, and software status values
+                                self.serial_num = res_split[2]
+                                self.hw_version = res_split[3]
+                                self.sw_version = res_split[4]
+                                success = True
+                        else:
+                            nepi_msg.publishMsgWarn(self,"Device returned address: " + ret_addr + " does not match: " +  self.addr_str)
+                        else:
+                        nepi_msg.publishMsgWarn(self,"Device returned invalid response")
+                    else:
+                        nepi_msg.publishMsgWarn(self,"Device returned empty response")
+                    else:
+                    nepi_msg.publishMsgWarn(self,"Device returned invalid response")
+
             else:
-                nepi_msg.publishMsgWarn(self,"Device returned empty response")
-            else:
-            nepi_msg.publishMsgWarn(self,"Device returned invalid response")
-        except Exception as e:
-            nepi_msg.publishMsgWarn(self,"Something went wrong with connect function at serial port at: " + self.port_str + "(" + str(e) + ")" )
-        else:
-        nepi_msg.publishMsgWarn(self,"serial port not active")
+            nepi_msg.publishMsgWarn(self,"serial port not active")
         return success
 
 
     def send_msg(self,ser_msg):
-        response = None
+        response = ""
         if self.serial_port is not None and not nepi_ros.is_shutdown():
-        ser_str = (ser_msg + '\r\n')
-        b=bytearray()
-        b.extend(map(ord, ser_str))
-        
-        sleep_time = .1
-        timeout = 2
-        timer = 0
-        while self.serial_busy == True and timer < timeout and not nepi_ros.is_shutdown():
-            time.sleep(sleep_time ) # Wait for serial port to be available
-            timer += sleep_time 
-        if timer < timeout:
-            self.serial_busy = True
-            #print("Sending " + ser_msg + " message")
-            try:
-            self.serial_port.write(b)
-            time.sleep(.01)
-            try:
-                bs = self.serial_port.readline()
-                self.serial_busy = False
-                response = bs.decode()
-                #print("Send response received: " + response[0:-2])
-            except Exception as e1:
-                print("Failed to recieve message")
-            except Exception as e2:
-            print("Failed to send message")
-        else:
-            print("Serial port write timed out on busy state")
-        else:
-        print("serial port not defined, returning empty string")
+            ser_str = (ser_msg + '\r\n')
+            b=bytearray()
+            b.extend(map(ord, ser_str))
+            
+            sleep_time = .1
+            timeout = 2
+            timer = 0
+            while self.serial_busy == True and timer < timeout and not nepi_ros.is_shutdown():
+                time.sleep(sleep_time ) # Wait for serial port to be available
+                timer += sleep_time 
+            if timer < timeout:
+                self.serial_busy = True
+                #print("Sending " + ser_msg + " message")
+                try:
+                self.serial_port.write(b)
+                time.sleep(.01)
+                try:
+                    bs = self.serial_port.readline()
+                    self.serial_busy = False
+                    response = bs.decode()
+                    #print("Send response received: " + response[0:-2])
+                except Exception as e1:
+                    print("Failed to recieve message")
+                except Exception as e2:
+                print("Failed to send message")
+            else:
+                print("Serial port write timed out on busy state")
+            else:
+            print("serial port not defined, returning empty string")
         return response
 
     ### Function for checking if port is available
@@ -582,65 +598,112 @@ class KistKPT20Node:
         success = False
         ports = serial.tools.list_ports.comports()
         for loc, desc, hwid in sorted(ports):
-        if loc == port_str:
-            success = True
-        return su
+            if loc == port_str:
+                success = True
+        return success
+
+
         
 
     #######################
     ### Driver Interface Functions
-    '''
-    def setStandby(self,standby_val):
-        success = False
-        if standby_val == True:
-        ser_msg= ('!' + self.addr_str + ':STBY=1')
-        else:
-        ser_msg= ('!' + self.addr_str + ':STBY=0')
-        response = self.send_msg(ser_msg)
-        if response != None and response != "?":
-        success = True
-        return success 
-    '''
+
+    def pos2deg(self, pos):
+        hr = self.high_res
+        dps = self.config_dict['deg_per_step'] 
+        home = self.config_dict['home'] 
+        deg = (pos - home)*dps  
+        return deg
+
+    def deg2pos(self, deg):
+        hr = self.high_res
+        dps = self.config_dict['deg_per_step']
+        home = self.config_dict['home'] 
+        pos = int(pos/dps + home)
+        return pos
+
 
     def driver_getDeviceInfo(self):
         dev_info = dict()
         dev_info["Manufacturer"] = KIST
         dev_info["Model"] = KPT20
-        dev_info["FirmwareVersion"] = ""
+
+        firmware = ""
+        if self.high_res == False
+            data_str = '0000'
+        else:
+            data_str = '000000'
+        ser_msg= ('!' + self.addr_str + 'MVR' + data_str + 'R')
+        if len(response) > 5:
+            if response[0:5] = ser_msg[0:5]:
+                try:
+                    firmware = response[5:8]
+                except Exception as e:
+                    print("Failed to convert message to int: " + data_str + " " + str(e))
+        else:
+             print("Failed to get valid response message from: " + ser_msg)
+        dev_info["FirmwareVersion"] = firmware
+
         dev_info["SerialNum"] = ""
         return dev_info
 
     def driver_getPositionLimitsInDegrees(self):
         limits_dict = dict()
-        limits_dict['max_yaw_hardstop_deg'] = 
-        limits_dict['min_yaw_hardstop_deg'] = 
-        limits_dict['max_pitch_hardstop_deg'] = 
-        limits_dict['min_pitch_hardstop_deg'] = 
-        limits_dict['max_yaw_softstop_deg'] = 
-        limits_dict['min_yaw_softstop_deg'] = 
-        limits_dict['max_pitch_softstop_deg'] = 
-        limits_dict['min_pitch_softstop_deg'] = 
+        limits_dict['max_yaw_hardstop_deg'] = 175
+        limits_dict['min_yaw_hardstop_deg'] = -175
+        limits_dict['max_pitch_hardstop_deg'] = 175
+        limits_dict['min_pitch_hardstop_deg'] = -175
+        limits_dict['max_yaw_softstop_deg'] = 174
+        limits_dict['min_yaw_softstop_deg'] = -174
+        limits_dict['max_pitch_softstop_deg'] = 174
+        limits_dict['min_pitch_softstop_deg'] = -174
         return limits_dict
                 
-
-        
 
     def driver_hasAdjustableSpeed(self):
         hasAdjSpeed = True
         return hasAdjSpeed
 
     def driver_getSpeedRatio(self):
-        max_speed= ?
-        cur_speed= 
-        speedRatio = cur_speed/max_speed
+        speedRatio = -999
+        success = False
+        if self.high_res == False
+            data_str = '0000'
+        else:
+            data_str = '000000'
+        ser_msg= (self.both_str + self.addr_str + 'MVS' + data_str + 'R')
+        response = self.send_msg(ser_msg)
+        if len(response) > 5:
+            if response[0:5] = ser_msg[0:5]:
+                try:
+                    data_str = response[5:-1]
+                    cur_speed = int(data_str)
+                    speedRatio = cur_speed/self.MAX_SPEED
+                except Exception as e:
+                    print("Failed to convert message to int: " + data_str + " " + str(e))
+        else:
+             print("Failed to get valid response message from: " + ser_msg)
         return speedRatio
 
     def driver_setSpeedRatio(self,speedRatio):
         success = False
-        max_speed= ?
-        set_speed_str = str(int(speedRatio * max_speed))
+        try:
+            set_speed_str = str(int(speedRatio * self.MAX_SPEED))
+        except Exception as e:
+            print("Failed to convert message: " + self.speedRatio + " " + str(e))
+        
+        zero_prefix_len = self.data_length-len(set_speed_str)
+        for z in range(zero_prefix_len):
+            data_str = ('0' + set_speed_str)
+        ser_msg= (self.both_str + self.addr_str + 'MSP' + data_str + 'W')
+        response = self.send_msg(ser_msg)
 
-        success = True
+        if len(response) > 5:
+            if response[0:5] = ser_msg[0:5]:
+                success = True
+            else:
+                print("Failed to get valid response message from: " + ser_msg)
+
         return success
 
 
@@ -651,8 +714,43 @@ class KistKPT20Node:
         return reportsPos
 
     def driver_getCurrentPosition(self):
-        yaw_deg =
-        pitch_deg =
+        yaw_deg = -999
+        success = False
+        if self.high_res == False
+            data_str = '0000'
+        else:
+            data_str = '000000'
+        ser_msg= (self.pan_str + self.addr_str + 'MRL' + data_str + 'R')
+        response = self.send_msg(ser_msg)
+        if len(response) > 5:
+            if response[0:5] = ser_msg[0:5]:
+                try:
+                    data_str = response[5:-1]
+                    yaw_pos = int(data_str)
+                    yaw_deg self.pos2deg(yaw_pos)
+                except Exception as e:
+                    print("Failed to convert message to int: " + data_str + " " + str(e))
+        else:
+             print("Failed to get valid response message from: " + ser_msg)
+
+        pitch_deg = -999
+        success = False
+        if self.high_res == False
+            data_str = '0000'
+        else:
+            data_str = '000000'
+        ser_msg= (self.tilt_str + self.addr_str + 'MRL' + data_str + 'R')
+        response = self.send_msg(ser_msg)
+        if len(response) > 5:
+            if response[0:5] = ser_msg[0:5]:
+                try:
+                    data_str = response[5:-1]
+                    pitch_pos = int(data_str)
+                    pitch_deg self.pos2deg(pitch_pos)
+                except Exception as e:
+                    print("Failed to convert message to int: " + data_str + " " + str(e))
+        else:
+             print("Failed to get valid response message from: " + ser_msg)
         return yaw_deg, pitch_deg
 
 
@@ -660,24 +758,49 @@ class KistKPT20Node:
         hasAbsPos = True
         return hasAbsPos
 
-    def driver_moveToPosition(self,yaw_deg, pitch_deg, speed_ratio):
+    def driver_moveToPosition(self,yaw_deg, pitch_deg):
         success = False
-
-        success = True
+        data_str = str(deg2pos(self, yaw_deg))
+        ser_msg= (self.pan_str + self.addr_str + 'MML' + data_str + 'W')
+        response = self.send_msg(ser_msg)  
+        check_1 = data_str == ser_msg
+        
+        data_str = str(deg2pos(self, pitch_deg))
+        ser_msg= (self.tilt_str + self.addr_str + 'MML' + data_str + 'W')
+        response = self.send_msg(ser_msg)  
+        check_2 = data_str == ser_msg
+        success = (check_1 == True and check_2 == True) 
         return success
 
 
     def driver_stopMotion(self):
         success = False
-
-        success = True
+        data_str = str(deg2pos(self, yaw_deg))
+        ser_msg= (self.both_str + self.addr_str + 'MST' + data_str + 'W')
+        response = self.send_msg(ser_msg)  
+        success = data_str == ser_msg
         return success
 
 
-    def driver_jog(self,pan_direction, tilt_direction, speed_ratio, time_s):
+    def driver_jog(self,axis_str, direction, time_s):
         success = False
-
-        success = True
+        if self.high_res == False
+            data_str = '0000'
+        else:
+            data_str = '000000'
+        if direction = 1:
+            cmd_str = 'MMF'
+        else:
+            cmd_str = 'MMB'
+        ser_msg= (axis_str + self.addr_str + cmd_str + data_str + 'W')
+        response = self.send_msg(ser_msg)  
+        success = data_str == ser_msg
+        if success:
+            nepi_ros.sleep(time_s)
+    
+            ser_msg= (axis_str + self.addr_str + 'MST' + data_str + 'W')
+            response = self.send_msg(ser_msg)  
+            success = data_str == ser_msg
         return success
 
 
@@ -687,7 +810,7 @@ class KistKPT20Node:
     def cleanup_actions(self):
         nepi_msg.publishMsgInfo(self,"Shutting down: Executing script cleanup actions")
         if self.serial_port is not None:
-        self.serial_port.close()
+            self.serial_port.close()
 
 
 if __name__ == '__main__':
