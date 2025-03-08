@@ -162,8 +162,8 @@ class SidusSS182Discovery:
             bs = serial_port.readline()
             response = bs.decode()
           except Exception as e:
-            nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Got a serial read/write error: " + str(e))
-            break
+            #nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Got a serial read/write error: " + str(e))
+            continue
           if len(response) > 2:
             #nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Got response: " + response)
             if response[3] == ',':

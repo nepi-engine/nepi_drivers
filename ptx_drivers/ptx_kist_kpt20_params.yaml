@@ -2,7 +2,7 @@ driver:
   pkg_name: PTX_KIST_KTP20
   display_name: Kist KPT 20 PanTilt
   description: Kist KPT 20 PanTilt Driver Interface
-  type: LSX
+  type: PTX
   group_id: None
   NODE_DICT:
     file_name: ptx_kist_kpt20_node.py
