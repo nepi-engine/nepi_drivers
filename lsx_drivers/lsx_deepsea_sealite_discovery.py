@@ -129,7 +129,7 @@ class SealiteDiscovery:
   ##########  Device specific calls
   def checkForDevice(self,path_str):
     found_device = False
-    nepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Running device search with path: " + path_str + " and buadlist " + str(self.baudrate_list))
+    #nepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Running device search with path: " + path_str + " and buadlist " + str(self.baudrate_list))
     if path_str not in self.active_paths_list:
       for baud_str in self.baudrate_list:
         self.baud_str = baud_str
