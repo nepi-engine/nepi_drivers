@@ -131,7 +131,7 @@ class SidusSS182Discovery:
   def checkForDevice(self,path_str):
     #nepi_msg.publishMsgWarn(self, "Sealight checkForDevice start")###
     found_device = False
-    nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ":  path_str " + path_str)#
+    #nepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Running device search with path: " + path_str + " and buadlist " + str(self.baudrate_list))
     if path_str not in self.active_paths_list:
       for baud_str in self.baudrate_list:
         self.baud_str = baud_str
