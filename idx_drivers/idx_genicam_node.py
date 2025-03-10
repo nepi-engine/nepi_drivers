@@ -45,7 +45,7 @@ class GenicamCamNode:
     brightness_ratio = 0.5,
     contrast_ratio =  0.5,
     threshold_ratio =  0.0,
-    resolution_mode = 3, # LOW, MED, HIGH, MAX
+    resolution_mode = 2, # LOW, MED, HIGH, MAX
     framerate_mode = 2, # LOW, MED, HIGH, MAX
     start_range_ratio = None, 
     stop_range_ratio = None,

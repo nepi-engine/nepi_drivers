@@ -67,7 +67,7 @@ class SealiteDiscovery:
     ########################
     # Get discovery options
     try:
-      nepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Starting discovery with drv_dict " + str(drv_dict))#
+      #nepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Starting discovery with drv_dict " + str(drv_dict))#
       baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
       baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
       baudrate_list = []

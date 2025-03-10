@@ -412,14 +412,14 @@ class SealiteNode(object):
       try:
         temp_c = int(float(response))
         success = True
-        #nepi_msg.publishMsgInfo(self,"Temp Deg C: " + str(self.temp_c))
+        #nepi_msg.publishMsgInfo(self,"Temp Deg C: " + str(temp_c))
       except Exception as t:
-        self.temp_c = 255
+        temp_c = 255
         nepi_msg.publishMsgWarn(self,"Temp response was not valid number")
         success = False
-      #nepi_msg.publishMsgInfo(self,"Temp C: " + str(self.temp_c))
+      #nepi_msg.publishMsgInfo(self,"Temp C: " + str(temp_c))
     else:
-      self.temp_c = 255
+      temp_c = 255
       success = False
     if temp_c < 0 or temp_c > 255:
       temp_c = 255

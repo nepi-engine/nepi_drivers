@@ -108,7 +108,7 @@ class ZedCamNode(object):
     brightness_ratio = 0.5,
     contrast_ratio =  0.5,
     threshold_ratio =  0.0,
-    resolution_mode = 3, # LOW, MED, HIGH, MAX
+    resolution_mode = 2, # LOW, MED, HIGH, MAX
     framerate_mode = 2, # LOW, MED, HIGH, MAX
     start_range_ratio = 0.0, 
     stop_range_ratio = 1.0,
@@ -663,7 +663,7 @@ class ZedCamNode(object):
         return status, err_str
         
     def setAutoAdjust(self, enable):
-        ret = self.current_controls["auto_adjust"] = enable
+        self.current_controls["auto_adjust"] = enable
         status = True
         err_str = ""
         return status, err_str
