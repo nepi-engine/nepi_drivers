@@ -174,7 +174,7 @@ class SidusSS182Node(object):
     
       # Start an sealite activity check process that kills node after some number of failed comms attempts
       nepi_msg.publishMsgInfo(self,"Starting an activity check process")
-      nepi_ros.start_timer_process(nepi_ros.duration(0.2), self.check_timer_callback)
+      nepi_ros.start_timer_process(nepi_ros.ros_ros_ros_duration(0.2), self.check_timer_callback)
       # Initialization Complete
       nepi_msg.publishMsgInfo(self,"Initialization Complete")
       #Set up node shutdown

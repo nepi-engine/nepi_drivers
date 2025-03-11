@@ -108,8 +108,8 @@ class ZedCamNode(object):
     brightness_ratio = 0.5,
     contrast_ratio =  0.5,
     threshold_ratio =  0.0,
-    resolution_mode = 2, # LOW, MED, HIGH, MAX
-    framerate_mode = 2, # LOW, MED, HIGH, MAX
+    resolution_mode = 1, # LOW, MED, HIGH, MAX
+    framerate_mode = 1, # LOW, MED, HIGH, MAX
     start_range_ratio = 0.0, 
     stop_range_ratio = 1.0,
     min_range_m = 0.0,
@@ -422,7 +422,7 @@ class ZedCamNode(object):
         nepi_msg.publishMsgInfo(self,"Initialization Complete")
         # Now start zed node check process
         self.attempts = 0
-        nepi_ros.start_timer_process(nepi_ros.duration(1), self.checkZedNodeCb)
+        nepi_ros.start_timer_process(nepi_ros.ros_ros_ros_duration(1), self.checkZedNodeCb)
         rospy.on_shutdown(self.cleanup_actions)
         nepi_ros.spin()
 
@@ -496,7 +496,7 @@ class ZedCamNode(object):
     def color_2d_image_callback(self, image_msg):
         # Check for control framerate adjustment
         last_time = self.cl_img_last_time
-        current_time = nepi_ros.get_rostime()
+        current_time = nepi_ros.ros_ros_time_now()
         controls_enabled = self.current_controls.get("controls_enable")
         fr_mode = self.current_controls.get("framerate_mode")
         need_data = False
@@ -521,7 +521,7 @@ class ZedCamNode(object):
     def bw_2d_image_callback(self, image_msg):
         # Check for control framerate adjustment
         last_time = self.bw_img_last_time
-        current_time = nepi_ros.get_rostime()
+        current_time = nepi_ros.ros_ros_time_now()
         controls_enabled = self.current_controls.get("controls_enable")
         fr_mode = self.current_controls.get("framerate_mode")
         need_data = False
@@ -547,7 +547,7 @@ class ZedCamNode(object):
     def depth_map_callback(self, image_msg):
         # Check for control framerate adjustment
         last_time = self.dm_img_last_time
-        current_time = nepi_ros.get_rostime()
+        current_time = nepi_ros.ros_ros_time_now()
         controls_enabled = self.current_controls.get("controls_enable")
         fr_mode = self.current_controls.get("framerate_mode")
         need_data = False
@@ -563,7 +563,7 @@ class ZedCamNode(object):
         if need_data == True:
           self.dm_img_last_time = current_time
 
-          image_msg.header.stamp = nepi_ros.time_now()
+          image_msg.header.stamp = nepi_ros.ros_ros_time_now()
           self.depth_map_lock.acquire()
           self.depth_map_msg = image_msg
           self.depth_map_lock.release()
@@ -572,7 +572,7 @@ class ZedCamNode(object):
     def depth_image_callback(self, image_msg):
         # Check for control framerate adjustment
         last_time = self.di_img_last_time
-        current_time = nepi_ros.get_rostime()
+        current_time = nepi_ros.ros_ros_time_now()
         controls_enabled = self.current_controls.get("controls_enable")
         fr_mode = self.current_controls.get("framerate_mode")
         need_data = False
@@ -588,7 +588,7 @@ class ZedCamNode(object):
         if need_data == True:
           self.di_img_last_time = current_time
 
-          image_msg.header.stamp = nepi_ros.time_now()
+          image_msg.header.stamp = nepi_ros.ros_ros_time_now()
           self.depth_img_lock.acquire()
           self.depth_img_msg = image_msg
           self.depth_img_lock.release()
@@ -597,7 +597,7 @@ class ZedCamNode(object):
     def pointcloud_callback(self, pointcloud_msg):
         # Check for control framerate adjustment
         last_time = self.pc_last_time
-        current_time = nepi_ros.get_rostime()
+        current_time = nepi_ros.ros_ros_time_now()
         controls_enabled = self.current_controls.get("controls_enable")
         fr_mode = self.current_controls.get("framerate_mode")
         need_data = False
@@ -621,7 +621,7 @@ class ZedCamNode(object):
     def pointcloud_image_callback(self, pointcloud_msg):
         # Check for control framerate adjustment
         last_time = self.pc_img_last_time
-        current_time = nepi_ros.get_rostime()
+        current_time = nepi_ros.ros_ros_time_now()
         controls_enabled = self.current_controls.get("controls_enable")
         fr_mode = self.current_controls.get("framerate_mode")
         need_data = False

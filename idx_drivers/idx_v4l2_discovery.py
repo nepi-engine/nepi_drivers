@@ -65,7 +65,7 @@ class V4L2CamDiscovery:
       return
     ########################
 
-    nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
+    nepi_ros.start_timer_process(nepi_ros.ros_ros_ros_duration(1), self.detectAndManageDevices, oneshot = True)
     # Now start the node
     nepi_msg.publishMsgInfo(self,"Initialization Complete")
     nepi_ros.spin()
@@ -158,7 +158,7 @@ class V4L2CamDiscovery:
         self.stopAndPurgeDeviceNode(node_name)  
 
     nepi_ros.sleep(self.CHECK_INTERVAL_S,100)
-    nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
+    nepi_ros.start_timer_process(nepi_ros.ros_ros_ros_duration(1), self.detectAndManageDevices, oneshot = True)
 
   def startDeviceNode(self, dtype, path, bus):
     # First, get a unique name

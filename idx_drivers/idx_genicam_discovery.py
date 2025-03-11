@@ -87,7 +87,7 @@ class GenicamCamDiscovery:
     self.genicam_harvester.add_file(self.DEFAULT_GENTL_PRODUCER_GIGE)
 
 
-    nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
+    nepi_ros.start_timer_process(nepi_ros.ros_ros_ros_duration(1), self.detectAndManageDevices, oneshot = True)
 
     nepi_msg.publishMsgInfo(self, "Initialization Complete")
     nepi_ros.spin()
@@ -144,7 +144,7 @@ class GenicamCamDiscovery:
         nepi_msg.publishMsgWarn(self,node_namespace + ' is no longer responding to discovery')
         self.stopAndPurgeDeviceNode(node_namespace)
     nepi_ros.sleep(self.CHECK_INTERVAL_S,100)
-    nepi_ros.start_timer_process(nepi_ros.duration(1), self.detectAndManageDevices, oneshot = True)
+    nepi_ros.start_timer_process(nepi_ros.ros_ros_ros_duration(1), self.detectAndManageDevices, oneshot = True)
 
   def startDeviceNode(self, vendor, model, serial_number):
     # TODO: fair to assume uniqueness of device serial numbers?

@@ -337,15 +337,15 @@ class OnvifPanTiltNode:
     def stopMoving(self):
         self.driver.stopMotion()
 
-    def moveYaw(self, direction, duration):
+    def moveYaw(self, direction, ros_ros_ros_duration):
         if self.ptx_if is not None:
             driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.driver.PT_DIRECTION_NEGATIVE
-            self.driver.jog(pan_direction = driver_direction, tilt_direction = self.driver.PT_DIRECTION_NONE, speed_ratio = self.speed_ratio, time_s = duration)
+            self.driver.jog(pan_direction = driver_direction, tilt_direction = self.driver.PT_DIRECTION_NONE, speed_ratio = self.speed_ratio, time_s = ros_ros_ros_duration)
 
-    def movePitch(self, direction, duration):
+    def movePitch(self, direction, ros_ros_ros_duration):
         if self.ptx_if is not None:
             driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.driver.PT_DIRECTION_NEGATIVE
-            self.driver.jog(pan_direction = self.driver.PT_DIRECTION_NONE, tilt_direction = driver_direction, speed_ratio = self.speed_ratio, time_s = duration)
+            self.driver.jog(pan_direction = self.driver.PT_DIRECTION_NONE, tilt_direction = driver_direction, speed_ratio = self.speed_ratio, time_s = ros_ros_ros_duration)
 
     def setSpeed(self, speed_ratio):
         # TODO: Limits checking and driver unit conversion?

@@ -481,8 +481,8 @@ def test_genicam_cam_driver(model, serial_number, harvester, test_camera_control
                 num_successful_frames += 1
                 last_frame = frame
         if last_frame is not None:
-            duration = time.time() - t0
-            fps = num_successful_frames / duration
+            ros_ros_ros_duration = time.time() - t0
+            fps = num_successful_frames / ros_ros_ros_duration
             plt.rcParams["figure.figsize"] = (12, 8)
             plt.imshow(last_frame)
             plt.show()

@@ -565,8 +565,8 @@ void PTXInterface::jogTimedYaw(const nepi_ros_interfaces::SingleAxisTimedMove::C
     const PTXNode::PTX_DIRECTION direction = (reverse == true)? msg->direction : (-1 * msg->direction);
 
     const float speed = currentSpeedRatioToDriverUnits();
-    const float duration_s = (msg->duration_s < 0.0)? 1000000.0f : msg->duration_s;
-    static_cast<PTXNode*>(_parent_node)->moveYaw(direction, speed, duration_s);
+    const float ros_ros_ros_duration_s = (msg->ros_ros_ros_duration_s < 0.0)? 1000000.0f : msg->ros_ros_ros_duration_s;
+    static_cast<PTXNode*>(_parent_node)->moveYaw(direction, speed, ros_ros_ros_duration_s);
     
 }
 
@@ -585,9 +585,9 @@ void PTXInterface::jogTimedPitch(const nepi_ros_interfaces::SingleAxisTimedMove:
     const PTXNode::PTX_DIRECTION direction = (reverse == true)? msg->direction : (-1 * msg->direction);
 
     const float speed = currentSpeedRatioToDriverUnits();
-    const float duration_s = (msg->duration_s < 0.0)? 1000000.0f : msg->duration_s;
+    const float ros_ros_ros_duration_s = (msg->ros_ros_ros_duration_s < 0.0)? 1000000.0f : msg->ros_ros_ros_duration_s;
 
-    static_cast<PTXNode*>(_parent_node)->movePitch(direction, speed, duration_s);
+    static_cast<PTXNode*>(_parent_node)->movePitch(direction, speed, ros_ros_ros_duration_s);
 
 
 }

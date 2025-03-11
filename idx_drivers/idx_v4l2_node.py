@@ -62,8 +62,8 @@ class V4l2CamNode:
     brightness_ratio = 0.5,
     contrast_ratio =  0.5,
     threshold_ratio =  0.0,
-    resolution_mode = 2, # LOW, MED, HIGH, MAX
-    framerate_mode = 2, # LOW, MED, HIGH, MAX
+    resolution_mode = 1, # LOW, MED, HIGH, MAX
+    framerate_mode = 1, # LOW, MED, HIGH, MAX
     start_range_ratio = None, 
     stop_range_ratio = None,
     min_range_m = None,
@@ -548,7 +548,7 @@ class V4l2CamNode:
 
         # Check for control framerate adjustment
         last_time = self.cl_img_last_time
-        current_time = nepi_ros.get_rostime()
+        current_time = nepi_ros.ros_ros_time_now()
         controls_enabled = self.current_controls.get("controls_enable")
         fr_mode = self.current_controls.get("framerate_mode")
         need_data = False
@@ -584,9 +584,9 @@ class V4l2CamNode:
                 self.img_lock.release()
                 return ret, msg, None, None, None
             if timestamp is not None:
-                ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+                ros_timestamp = nepi_ros.ros_time_from_ros_stamp(timestamp)
             else:
-                ros_timestamp = nepi_ros.time_now()
+                ros_timestamp = nepi_ros.ros_ros_time_now()
             # Make a copy for the bw thread to use rather than grabbing a new image
             if self.bw_image_acquisition_running:
                 self.cached_2d_color_image = cv2_img
@@ -617,7 +617,7 @@ class V4l2CamNode:
 
         # Check for control framerate adjustment
         last_time = self.bw_img_last_time
-        current_time = nepi_ros.get_rostime()
+        current_time = nepi_ros.ros_ros_time_now()
         controls_enabled = self.current_controls.get("controls_enable")
         fr_mode = self.current_controls.get("framerate_mode")
         need_data = False
@@ -651,9 +651,9 @@ class V4l2CamNode:
             if self.color_image_acquisition_running is False or self.cached_2d_color_image is None:
                 cv2_img, timestamp, ret, msg = self.driver.getImage()
                 if timestamp is not None:
-                    ros_timestamp = nepi_ros.time_from_timestamp(timestamp)
+                    ros_timestamp = nepi_ros.ros_time_from_ros_stamp(timestamp)
                 else:
-                    ros_timestamp = nepi_ros.time_now()
+                    ros_timestamp = nepi_ros.ros_ros_time_now()
             else:
                 cv2_img = self.cached_2d_color_image.copy()
                 ros_timestamp = self.cached_2d_color_image_timestamp
