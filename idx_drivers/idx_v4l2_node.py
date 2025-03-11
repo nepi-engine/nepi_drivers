@@ -548,7 +548,7 @@ class V4l2CamNode:
 
         # Check for control framerate adjustment
         last_time = self.cl_img_last_time
-        current_time = nepi_ros.ros_ros_time_now()
+        current_time = nepi_ros.ros_time_now()
         controls_enabled = self.current_controls.get("controls_enable")
         fr_mode = self.current_controls.get("framerate_mode")
         need_data = False
@@ -586,7 +586,7 @@ class V4l2CamNode:
             if timestamp is not None:
                 ros_timestamp = nepi_ros.ros_time_from_ros_stamp(timestamp)
             else:
-                ros_timestamp = nepi_ros.ros_ros_time_now()
+                ros_timestamp = nepi_ros.ros_time_now()
             # Make a copy for the bw thread to use rather than grabbing a new image
             if self.bw_image_acquisition_running:
                 self.cached_2d_color_image = cv2_img
@@ -617,7 +617,7 @@ class V4l2CamNode:
 
         # Check for control framerate adjustment
         last_time = self.bw_img_last_time
-        current_time = nepi_ros.ros_ros_time_now()
+        current_time = nepi_ros.ros_time_now()
         controls_enabled = self.current_controls.get("controls_enable")
         fr_mode = self.current_controls.get("framerate_mode")
         need_data = False
@@ -653,7 +653,7 @@ class V4l2CamNode:
                 if timestamp is not None:
                     ros_timestamp = nepi_ros.ros_time_from_ros_stamp(timestamp)
                 else:
-                    ros_timestamp = nepi_ros.ros_ros_time_now()
+                    ros_timestamp = nepi_ros.ros_time_now()
             else:
                 cv2_img = self.cached_2d_color_image.copy()
                 ros_timestamp = self.cached_2d_color_image_timestamp

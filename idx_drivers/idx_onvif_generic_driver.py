@@ -698,6 +698,6 @@ if __name__ == '__main__':
         stop = time.time()
         print(driver.stopImageAcquisition(uri_index))
         cv2.destroyAllWindows()
-        ros_ros_ros_duration_s = stop - start
-        fps = img_count / ros_ros_ros_duration_s
-        print("Captured " + str(img_count) + " images in " + str(ros_ros_ros_duration_s) + "s (" + str(fps) + " FPS)")
+        duration_s = stop - start
+        fps = img_count / duration_s
+        print("Captured " + str(img_count) + " images in " + str(duration_s) + "s (" + str(fps) + " FPS)")

@@ -277,7 +277,7 @@ class KistKPT20Node:
 
             # Start an sealite activity check process that kills node after some number of failed comms attempts
             nepi_msg.publishMsgInfo(self,"Starting an activity check process")
-            nepi_ros.start_timer_process(nepi_ros.ros_ros_ros_duration(0.2), self.check_timer_callback)
+            nepi_ros.start_timer_process(nepi_ros.ros_duration(0.2), self.check_timer_callback)
             # Initialization Complete
             nepi_msg.publishMsgInfo(self,"Initialization Complete")
             #Set up node shutdown
@@ -386,15 +386,15 @@ class KistKPT20Node:
     def stopMoving(self):
         self.driver_stopMotion()
 
-    def moveYaw(self, direction, ros_ros_ros_duration):
+    def moveYaw(self, direction, duration):
         if self.ptx_if is not None:
             direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
-            self.driver_jog(axis_str = self.pan_str, direction = direction, time_s = ros_ros_ros_duration)
+            self.driver_jog(axis_str = self.pan_str, direction = direction, time_s = duration)
 
-    def movePitch(self, direction, ros_ros_ros_duration):
+    def movePitch(self, direction, duration):
         if self.ptx_if is not None:
             direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
-            self.driver_jog(axis_str = self.tilt_str, direction = direction, time_s = ros_ros_ros_duration)
+            self.driver_jog(axis_str = self.tilt_str, direction = direction, time_s = duration)
 
     def setSpeed(self, speed_ratio):
         # TODO: Limits checking and driver unit conversion?
