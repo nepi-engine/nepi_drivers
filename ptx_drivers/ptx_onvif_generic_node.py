@@ -152,6 +152,8 @@ class OnvifPanTiltNode:
             
             self.has_absolute_positioning_and_feedback = self.driver.hasAbsolutePositioning() and self.driver.reportsPosition()
             ptx_capabilities_dict['has_absolute_positioning'] = self.has_absolute_positioning_and_feedback
+            nepi_msg.publishMsgWarn(self,"hasAbsolutePositioning gnode check" + str(self.driver.hasAbsolutePositioning()))
+            nepi_msg.publishMsgWarn(self,"reportsPosition gnode check" + str(self.driver.reportsPosition()))
                     
             if not self.driver.canHome() and not self.has_absolute_positioning_and_feedback:
                 ptx_callback_names["GoHome"] = None
