@@ -41,7 +41,7 @@ from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_nav
 from nepi_sdk import nepi_img
 from nepi_sdk import nepi_pc
-from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_settings
 
 from datetime import datetime
@@ -219,7 +219,7 @@ class ZedCamNode(object):
         zed_wrapper_not_running = True
         try:
           self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=3)
-          zed_wrapper_not_running = nepi_drv.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
+          zed_wrapper_not_running = nepi_drvs.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
           nepi_ros.sleep(2,20)
         except Exception as e:
           pass #nepi_msg.publishMsgInfo(self,str(e))
@@ -271,7 +271,7 @@ class ZedCamNode(object):
         if timer >= timeout or self.zed_dynamic_reconfig_client is None:
           nepi_msg.publishMsgWarn(self,"Failed to connect to zed_node using launch process" + str(zed_ros_wrapper_run_cmd))
           nepi_msg.publishMsgWarn(self,"Killing node named: " + ZED_BASE_NAMESPACE)
-          success = nepi_drv.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
+          success = nepi_drvs.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
           if success:
             time.sleep(2)
           nepi_ros.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")

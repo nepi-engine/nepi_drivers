@@ -28,7 +28,7 @@ from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_img
 from nepi_sdk import nepi_settings
-from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_drvs
 
 PKG_NAME = 'IDX_GENICAM' # Use in display menus
 FILE_TYPE = 'NODE'
@@ -97,7 +97,7 @@ class GenicamCamNode:
         nepi_msg.publishMsgInfo(self,model)
         nepi_msg.publishMsgInfo(self,serial_number)
         nepi_msg.publishMsgInfo(self,"Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
-        [success, msg, self.driver_class] = nepi_drv.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
+        [success, msg, self.driver_class] = nepi_drvs.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
         
         if success:
             try:

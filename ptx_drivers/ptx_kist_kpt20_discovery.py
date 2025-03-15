@@ -25,7 +25,7 @@ import string
 import ipaddress
 
 from nepi_sdk import nepi_ros
-from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_msg
 
 PKG_NAME = 'PTX_KIST_KTP20' # Use in display menus
@@ -38,6 +38,11 @@ FILE_TYPE = 'DISCOVERY'
 
 ### Function to try and connect to device and also monitor and clean up previously connected devices
 class KistKPT20Discovery:
+
+  NODE_LOAD_TIME_SEC = 10
+  launch_time_dict = dict()
+  retry = True
+  dont_retry_list = []
 
   CONFIGS_DICT = {
       '1:160' : False,
@@ -118,8 +123,10 @@ class KistKPT20Discovery:
       nepi_msg.publishMsgWarn(self, ":" + self.log_name + ": Failed to load options " + str(e))#
       return None
 
-
-
+    if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
+      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
+    else:
+      self.retry = True
     ########################
       if self.connection == 'Serial':
         # Create path search options
@@ -137,7 +144,7 @@ class KistKPT20Discovery:
         except Exception as e:
             nepi_msg.publishMsgWarn(self, ":" + self.log_name + ": Not a valid IP port " + ip_port + " " + str(e))#
             return self.active_paths_list
-        success = ping_ip(ip_addr)
+        success = nepi_ros.ping_ip(ip_addr)
         if success == True:
           self.path_list = [ip_addr + ':' + ip_port]
         else:
@@ -239,18 +246,36 @@ class KistKPT20Discovery:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
-        success = nepi_drv.killDriverNode(node_name,sub_process)
+        success = nepi_drvs.killDriverNode(node_name,sub_process)
+
+        # Remove from dont_retry_list
+        launch_id = path_str
+        if launch_id in self.dont_retry_list:
+          self.dont_retry_list.remove(launch_id)
+
     return active
 
 
   def launchDeviceNode(self, path_str):
-    file_name = self.drv_dict['NODE_DICT']['file_name']
-    node_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
-    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + node_name)
+    success = False
+    launch_id = path_str
+
+    # Check if should try to launch
+    launch_check = True
+    if launch_id in self.launch_time_dict.keys():
+      launch_time = self.launch_time_dict[launch_id]
+      cur_time = nepi_ros.get_time()
+      launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
+    if launch_check == False:
+      return False  ###
+
+    ### Start Node Luanch Process
+    device_node_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
+    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + device_node_name)
     #Setup required param server drv_dict for discovery node
-    dict_param_name = self.base_namespace + node_name + "/drv_dict"
+    dict_param_name = self.base_namespace + device_node_name + "/drv_dict"
     # Try to load node saved device config
-    nepi_drv.checkLoadConfigFile(node_name)
+    nepi_drvs.checkLoadConfigFile(device_node_name)
     # Store drv info for node to use
     self.drv_dict['DEVICE_DICT'] = dict()
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
@@ -259,10 +284,22 @@ class KistKPT20Discovery:
     #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + str(self.drv_dict))
     nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Launching node  with path: " + path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str)
     nepi_ros.set_param(self,dict_param_name,self.drv_dict)
-    [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, node_name, device_path = path_str)
+    [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name, device_path = path_str)
+    if success == True:
+      self.active_devices_dict[path_str] = {'node_name': device_node_name, 'sub_process': sub_process}
+
+    # Process luanch results
+    self.launch_time_dict[launch_id] = nepi_ros.get_time()
     if success:
-      self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
-      self.active_paths_list.append(path_str)
+      nepi_msg.publishMsgInfo(self," Launched node: " + device_node_name)
+    else:
+      nepi_msg.publishMsgInfo(self," Failed to lauch node: " + device_node_name + " with msg: " + msg)
+      if self.retry == False:
+        nepi_msg.publishMsgInfo(self," Will not try relaunch for node: " + device_node_name)
+        self.dont_retry_list.append(launch_id)
+      else:
+        nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+    return success
 
   def ping_ip(self,ip_address):
       """

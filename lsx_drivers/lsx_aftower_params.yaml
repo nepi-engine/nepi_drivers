@@ -21,3 +21,6 @@ driver:
           - '9600'
         default: '9600'
         value: '9600'
+      auto_restart:
+        type: Bool
+        default: 'True'

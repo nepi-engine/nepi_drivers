@@ -23,12 +23,17 @@ import serial.tools.list_ports
 
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_msg
-from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_drvs
 
 PKG_NAME = 'LSX_AFTOWERLIGHT'
 FILE_TYPE = 'DISCOVERY'
 
 class AfTowerLightDiscovery:
+
+  NODE_LOAD_TIME_SEC = 10
+  launch_time_dict = dict()
+  retry = True
+  dont_retry_list = []
 
   active_devices_dict = dict()
   node_launch_name = "af_tower_light"
@@ -61,6 +66,11 @@ class AfTowerLightDiscovery:
     except Exception as e:
       nepi_msg.publishMsgWarn(self, ":" + self.log_name + ": Failed to load options " + str(e))#
       return None
+
+    if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
+      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
+    else:
+      self.retry = True
     ########################
 
     # Create path search options    
@@ -99,7 +109,7 @@ class AfTowerLightDiscovery:
     found_device = False
     #nepi_msg.printMsgWarn(self.log_name + "path_str " + path_str)
     if path_str.find('ttyUSB') != -1:
-      usb_dict = nepi_drv.getSerialPortDict()
+      usb_dict = nepi_drvs.getSerialPortDict()
       #nepi_msg.printMsgWarn(self.log_name + "serial_port_dict " + str(usb_dict))
       if path_str in usb_dict.keys():
         #nepi_msg.printMsgWarn(self.log_name + "search ids " + str(self.search_ids))
@@ -123,13 +133,33 @@ class AfTowerLightDiscovery:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
-        success = nepi_drv.killDriverNode(node_name,sub_process)
+        success = nepi_drvs.killDriverNode(node_name,sub_process)
+
+        # Remove from dont_retry_list
+        launch_id = path_str
+        if launch_id in self.dont_retry_list:
+          self.dont_retry_list.remove(launch_id)
+
     return active
 
 
   def launchDeviceNode(self, path_str):
+    success = False
+    launch_id = path_str
+
+    # Check if should try to launch
+    launch_check = True
+    if launch_id in self.launch_time_dict.keys():
+      launch_time = self.launch_time_dict[launch_id]
+      cur_time = nepi_ros.get_time()
+      launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
+    if launch_check == False:
+      return False   ###
+
+    ### Start Node Luanch Process
     file_name = self.drv_dict['NODE_DICT']['file_name']
     node_name = self.node_launch_name + "_" + path_str.split('/')[-1]
+
     nepi_msg.printMsgInfo(self.log_name + "launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
     dict_param_name = self.base_namespace + node_name + "/drv_dict"
@@ -138,9 +168,21 @@ class AfTowerLightDiscovery:
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
     self.drv_dict['DEVICE_DICT']['baud_rate_str'] = self.baud_rate
     nepi_ros.set_param(self,dict_param_name,self.drv_dict)
-    [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, node_name, device_path = path_str)
+    [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, node_name, device_path = path_str)
+    if success == True:
+      self.active_devices_dict[path_str] = {'node_name': device_node_name, 'sub_process': sub_process}
+
+    # Process luanch results
+    self.launch_time_dict[launch_id] = nepi_ros.get_time()
     if success:
-      self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
+      nepi_msg.publishMsgInfo(self," Launched node: " + device_node_name)
+    else:
+      nepi_msg.publishMsgInfo(self," Failed to lauch node: " + device_node_name + " with msg: " + msg)
+      if self.retry == False:
+        nepi_msg.publishMsgInfo(self," Will not try relaunch for node: " + device_node_name)
+        self.dont_retry_list.append(launch_id)
+      else:
+        nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
     return success
 
 

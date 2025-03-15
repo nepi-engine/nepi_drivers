@@ -31,7 +31,7 @@ from mavros_msgs.msg import VehicleInfo
 
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_msg
-from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_drvs
 
 PKG_NAME = 'RBX_ARDUPILOT' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
@@ -43,6 +43,12 @@ FILE_TYPE = 'DISCOVERY'
 
 ### Function to try and connect to device and also monitor and clean up previously connected devices
 class ArdupilotDiscovery:
+
+  NODE_LOAD_TIME_SEC = 10
+  launch_time_dict = dict()
+  retry = True
+  dont_retry_list = []
+
   active_devices_dict = dict()
   baudrate_list = ['57600']
   ip_addr_list = ['192.168.179.5'] #['127.0.0.1']
@@ -51,6 +57,7 @@ class ArdupilotDiscovery:
 
   includeDevices = []
   excludedDevices = ['ttyACM']
+
   ################################################          
   def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
@@ -80,6 +87,11 @@ class ArdupilotDiscovery:
     except Exception as e:
       nepi_msg.publishMsgWarn(self,  ":" + self.log_name + ": Failed to load options " + str(e))#
       return None
+
+    if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
+      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
+    else:
+      self.retry = True
     ########################
 
 
@@ -262,6 +274,12 @@ class ArdupilotDiscovery:
             cleanup_proc.wait(timeout=10) 
           except Exception as e:
             nepi_msg.publishMsgWarn(self,  ":" + self.log_name + ": rosnode cleanup failed " + str(e))
+          
+          # Remove from dont_retry_list
+          launch_id = path_str
+          if launch_id in self.dont_retry_list:
+            self.dont_retry_list.remove(launch_id)
+
       active = purge_node == False
     return active
 
@@ -270,6 +288,18 @@ class ArdupilotDiscovery:
 
   def launchDeviceNode(self,path_str, device_id_str, mav_comp_id, mav_sys_id, fcu_url,gcs_url):
     success = False
+    launch_id = path_str
+
+    # Check if should try to launch
+    launch_check = True
+    if launch_id in self.launch_time_dict.keys():
+      launch_time = self.launch_time_dict[launch_id]
+      cur_time = nepi_ros.get_time()
+      launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
+    if launch_check == False:
+      return False  ###
+
+    ### Start Node Luanch Process
     mav_node_name = "mavlink_" + device_id_str
     mav_node_namespace = self.base_namespace + mav_node_name
     nepi_msg.printMsgInfo(self.log_name + ": Starting mavlink node setup: " + mav_node_name)
@@ -413,6 +443,18 @@ class ArdupilotDiscovery:
 
   def launchSerialDeviceNode(self, path_str, mav_comp_id, mav_sys_id, baud_str):
     success = False
+    launch_id = path_str
+
+    # Check if should try to launch
+    launch_check = True
+    if launch_id in self.launch_time_dict.keys():
+      launch_time = self.launch_time_dict[launch_id]
+      cur_time = nepi_ros.get_time()
+      launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
+    if launch_check == False:
+      return False  ###
+
+    ### Start Node Luanch Process
     if mav_comp_id != None and mav_sys_id != None:
           device_id_str = path_str.split('/')[-1]
           fcu_url = path_str + ':' + baud_str
@@ -442,6 +484,7 @@ class ArdupilotDiscovery:
 
   def launchTcpDeviceNode(self, path_str):
     success = False
+   
     [con_type,ip_addr_str,ip_port_str] = path_str.split("_")
     ip_addr_str_list = ip_addr_str.split('.')
     ip_str_short = ''.join(ip_addr_str_list)
@@ -473,6 +516,18 @@ class ArdupilotDiscovery:
 
   def launchUdpDeviceNode(self, path_str):
     success = False
+    launch_id = path_str
+
+    # Check if should try to launch
+    launch_check = True
+    if launch_id in self.launch_time_dict.keys():
+      launch_time = self.launch_time_dict[launch_id]
+      cur_time = nepi_ros.get_time()
+      launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
+    if launch_check == False:
+      return False  ###
+
+
     [con_type,ip_addr_str,ip_port_str] = path_str.split("_")
     ip_addr_str_list = ip_addr_str.split('.')
     ip_str_short = ''.join(ip_addr_str_list)

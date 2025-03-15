@@ -29,7 +29,7 @@ from nepi_sdk.device_if_idx import ROSIDXSensorIF
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_img
-from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_settings
 
 PKG_NAME = 'IDX_ONVIF_GENERIC' # Use in display menus
@@ -119,7 +119,7 @@ class OnvifCamNode:
 
 
         nepi_msg.publishMsgInfo(self,"Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
-        [success, msg, self.driver_class] = nepi_drv.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
+        [success, msg, self.driver_class] = nepi_drvs.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
         driver_constructed = False
         if success:
             attempts = 0

@@ -15,26 +15,6 @@ driver:
     class_name: SidusSS182Discovery
     process: CALL
     OPTIONS:
-      baud_rate:
-        type: Discrete
-        options:
-          - All
-          - '9600'
-          - '19200'
-          - '57600'
-        default: All
-        value: All
-      start_addr:
-        type: 'Int'
-        options:
-          - '1'
-          - '255'
-        default: '1'
-        value: '1'
-      stop_addr:
-        type: 'Int'
-        options:
-          - '1'
-          - '255'
-        default: '10'
-        value: '10'
+      auto_restart:
+        type: Bool
+        default: 'True'

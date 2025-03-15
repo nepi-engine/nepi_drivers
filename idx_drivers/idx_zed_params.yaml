@@ -23,5 +23,7 @@ driver:
           - HD720
           - VGA
         default: HD720
-        value: HD720
+      auto_restart:
+        type: Bool
+        default: 'True'
 

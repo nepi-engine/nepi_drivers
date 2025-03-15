@@ -14,4 +14,7 @@ driver:
     file_name: None
     class_name: None
     process: None
-    OPTIONS: None
+    OPTIONS:
+      auto_restart:
+        type: Bool
+        default: 'True'

@@ -23,7 +23,7 @@ import serial
 import serial.tools.list_ports
 
 from nepi_sdk import nepi_ros
-from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_msg
 
 PKG_NAME = 'LSX_DEEPSEA_SEALITE'
@@ -36,6 +36,11 @@ FILE_TYPE = 'DISCOVERY'
 
 ### Function to try and connect to device and also monitor and clean up previously connected devices
 class SealiteDiscovery:
+
+  NODE_LOAD_TIME_SEC = 10
+  launch_time_dict = dict()
+  retry = True
+  dont_retry_list = []
 
   active_devices_dict = dict()
   node_launch_name = "sealite"
@@ -89,6 +94,11 @@ class SealiteDiscovery:
     except Exception as e:
       nepi_msg.publishMsgWarn(self,  ":" + self.log_name + ": Failed to load options " + str(e))#
       return None
+
+    if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
+      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
+    else:
+      self.retry = True
     ########################
 
     # Create path search options
@@ -101,8 +111,9 @@ class SealiteDiscovery:
     path_purge_list = []
     for path_str in self.active_devices_dict:
         success = self.checkOnDevice(path_str)
-        if success == False:
-          path_purge_list.append(path_str) 
+        if self.retry == False:
+          if success == False:
+            path_purge_list.append(path_str) 
     # Clean up the active_devices_dict
     for path_str in path_purge_list:
       del  self.active_devices_dict[path_str]
@@ -190,18 +201,37 @@ class SealiteDiscovery:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
-        success = nepi_drv.killDriverNode(node_name,sub_process)
+        success = nepi_drvs.killDriverNode(node_name,sub_process)
+
+        # Remove from dont_retry_list
+        launch_id = path_str
+        if launch_id in self.dont_retry_list:
+          self.dont_retry_list.remove(launch_id)
+  
     return active
 
 
   def launchDeviceNode(self, path_str):
+    success = False
+    launch_id = path_str
+
+    # Check if should try to launch
+    launch_check = True
+    if launch_id in self.launch_time_dict.keys():
+      launch_time = self.launch_time_dict[launch_id]
+      cur_time = nepi_ros.get_time()
+      launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
+    if launch_check == False:
+      return False   ###
+
+    ### Start Node Luanch Process
     file_name = self.drv_dict['NODE_DICT']['file_name']
     node_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
     nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ":  launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
     dict_param_name = self.base_namespace + node_name + "/drv_dict"
     # Try to load node saved device config
-    nepi_drv.checkLoadConfigFile(node_name)
+    nepi_drvs.checkLoadConfigFile(node_name)
     # Store drv info for node to use
     self.drv_dict['DEVICE_DICT'] = dict()
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
@@ -210,8 +240,24 @@ class SealiteDiscovery:
     #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + str(self.drv_dict))
     nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Launching node  with path: " + path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str)
     #nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ":  launching node: " + str(self.drv_dict))
+    self.launch_time_dict[path_str] = nepi_ros.get_time()
     nepi_ros.set_param(self,dict_param_name,self.drv_dict)
-    [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, node_name, device_path = path_str)
+    [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, node_name, device_path = path_str)
+    if success == True:
+      self.active_devices_dict[path_str] = {'node_name': device_node_name, 'sub_process': sub_process}
+
+    # Process luanch results
+    self.launch_time_dict[launch_id] = nepi_ros.get_time()
     if success:
-      self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
-      self.active_paths_list.append(path_str)
+      nepi_msg.publishMsgInfo(self," Launched node: " + device_node_name)
+    else:
+      nepi_msg.publishMsgInfo(self," Failed to lauch node: " + device_node_name + " with msg: " + msg)
+      if self.retry == False:
+        nepi_msg.publishMsgInfo(self," Will not try relaunch for node: " + device_node_name)
+        self.dont_retry_list.append(launch_id)
+      else:
+        nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+    return success
+
+
+    

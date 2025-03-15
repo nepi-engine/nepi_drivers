@@ -38,5 +38,8 @@ driver:
           - '255'
         default: '10'
         value: '10'
+      auto_restart:
+        type: Bool
+        default: 'True'
       
 

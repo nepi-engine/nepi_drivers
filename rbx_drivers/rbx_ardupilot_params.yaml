@@ -27,3 +27,6 @@ driver:
           - ''
         default: 'True'
         value: 'True'
+      auto_restart:
+        type: Bool
+        default: 'True'

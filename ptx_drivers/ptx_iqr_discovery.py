@@ -21,18 +21,26 @@ import os
 import subprocess
 import time
 
-from nepi_sdk import nepi_drv
+from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_msg
 
 PKG_NAME = 'PTX_IQR' 
 FILE_TYPE = 'DISCOVERY'
 
 class IqrPanTiltDiscovery:
+
+  NODE_LOAD_TIME_SEC = 10
+  launch_time_dict = dict()
+  retry = True
+  dont_retry_list = []
+
+
   active_devices_dict = dict()
   node_launch_name = "iqr_pan_tilt"
 
   includeDevices = ['ttyACM']
   excludedDevices = []
+
   ################################################          
   def __init__(self):
     self.log_name = PKG_NAME.lower() + "_discovery" 
@@ -51,8 +59,13 @@ class IqrPanTiltDiscovery:
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
     
+    ##################################
     # Get required data from drv_dict
-
+    if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
+      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
+    else:
+      self.retry = True
+    ###################################
 
     ### Purge Unresponsive Connections
     path_purge_list = []
@@ -100,19 +113,38 @@ class IqrPanTiltDiscovery:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
-        success = nepi_drv.killDriverNode(node_name,sub_process)
+        success = nepi_drvs.killDriverNode(node_name,sub_process)
+
+        # Remove from dont_retry_list
+        launch_id = path_str
+        if launch_id in self.dont_retry_list:
+          self.dont_retry_list.remove(launch_id)
+
     return active
 
 
   def launchDeviceNode(self, path_str):
-    file_name = 'iqr_ros_pan_tilt_node'
-    nepi_msg.publishMsgWarn(self, "launching on path: " + path_str)
-    node_name = 'iqr_pan_tilt_' + path_str.split("ttyACM")[1]
-    nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "***Launching node with name: " + node_name)
-    [success, msg, sub_process] = nepi_drv.launchDriverNode(file_name, node_name, device_path = path_str)
+
+    file_name = self.drv_dict['NODE_DICT']['file_name']
+    device_node_name = 'iqr_pan_tilt_' + path_str.split("ttyACM")[1]
+    nepi_msg.publishMsgWarn(self, "launching on node: " + device_node_name + " on path: " + path_str)
+    nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "***Launching node with name: " + device_node_name)
+    [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name, device_path = path_str)
+
+    # Process luanch results
+    self.launch_time_dict[launch_id] = nepi_ros.get_time()
     if success:
-      self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
+      nepi_msg.publishMsgInfo(self," Launched node: " + device_node_name)
+      self.active_devices_dict[path_str] = {'node_name': device_node_name, 'sub_process': sub_process}
+    else:
+      nepi_msg.publishMsgInfo(self," Failed to lauch node: " + device_node_name + " with msg: " + msg)
+      if self.retry == False:
+        nepi_msg.publishMsgInfo(self," Will not try relaunch for node: " + device_node_name)
+        self.dont_retry_list.append(launch_id)
+      else:
+        nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
     return success
+
     
 
 

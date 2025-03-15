@@ -19,7 +19,6 @@
 
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_msg
-from nepi_sdk import nepi_drv
 from nepi_sdk import nepi_settings
 
 from nepi_sdk.device_if_ptx import ROSPTXActuatorIF

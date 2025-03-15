@@ -31,7 +31,6 @@ from nepi_ros_interfaces.msg import LSXStatus
 
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_msg
-from nepi_sdk import nepi_drv
 from nepi_sdk import nepi_settings
 
 

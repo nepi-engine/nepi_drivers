@@ -14,4 +14,7 @@ driver:
     file_name: idx_genicam_discovery.py
     class_name: GenicamCamDiscovery
     process: LAUNCH
-    OPTIONS: None
+    OPTIONS:
+      auto_restart:
+        type: Bool
+        default: 'True'

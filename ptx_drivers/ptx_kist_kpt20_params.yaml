@@ -74,3 +74,6 @@ driver:
         - ""       
         default: '10001'
         value: '10001'
+      auto_restart:
+        type: Bool
+        default: 'True'
