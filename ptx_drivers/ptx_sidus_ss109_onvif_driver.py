@@ -70,7 +70,7 @@ class SidusSS109_PTZ(object):
 
         soap_device_info = self.soapGetDeviceInformation(self.ip_addr, self.port_str, self.username, self.password)
         self.parseSoapDeviceInfo(soap_device_info.text)
-        #print('Debug: Device Info = ' + str(self.device_info))
+        print('Debug: Device Info = ' + str(self.device_info))
 
 
         self.profile_token, dummy = self.soapGetProfileToken(self.ip_addr, self.port_str, username, password)
