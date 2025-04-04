@@ -23,6 +23,8 @@ import time
 
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_ros
+
 
 PKG_NAME = 'PTX_IQR' 
 FILE_TYPE = 'DISCOVERY'
@@ -124,6 +126,8 @@ class IqrPanTiltDiscovery:
 
 
   def launchDeviceNode(self, path_str):
+    success = False
+    launch_id = path_str
 
     file_name = self.drv_dict['NODE_DICT']['file_name']
     device_node_name = 'iqr_pan_tilt_' + path_str.split("ttyACM")[1]

@@ -336,9 +336,9 @@ class GenericONVIF_NVT(object):
             if '//' in self.rtsp_uris[uri_index]: # Hasn't been updated to the 'secure' version yet
                 uri_pre = self.rtsp_uris[uri_index].split('//')[0]
                 uri_post = self.rtsp_uris[uri_index].split('//')[1]
-                self.secure_uri = uri_pre + self.username + ":" + self.password + "@" + uri_post
+                secure_uri = uri_pre + self.username + ":" + self.password + "@" + uri_post
             else: # If not a standard URL with '//,' assume the secure URI is already set
-                self.secure_uri = self.rtsp_uris[uri_index]
+                secure_uri = self.rtsp_uris[uri_index]
             self.rtsp_caps[uri_index] = cv2.VideoCapture(secure_uri)
             if not self.rtsp_caps[uri_index].isOpened():
                 self.rtsp_caps[uri_index].release()
