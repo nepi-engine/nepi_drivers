@@ -24,7 +24,7 @@ import math
 import threading
 import cv2
 
-from nepi_sdk.device_if_idx import ROSIDXSensorIF
+from nepi_api.device_if_idx import IDXDeviceIF
 
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_msg
@@ -42,21 +42,12 @@ class OnvifCamNode:
                                       Exposure_Mode = "AUTO",
                                       Resolution = "2560:1440" )
 
-    #Factory Control Values 
-    FACTORY_CONTROLS = dict( controls_enable = True,
-    auto_adjust = False,
-    brightness_ratio = 0.5,
-    contrast_ratio =  0.5,
-    threshold_ratio =  0.0,
-    resolution_mode = 1, # LOW, MED, HIGH, MAX
-    framerate_mode = 1, # LOW, MED, HIGH, MAX
-    start_range_ratio = None, 
-    stop_range_ratio = None,
-    min_range_m = None,
-    max_range_m = None,
-    frame_id = None
-    )
  
+    #Factory Control Values 
+    FACTORY_CONTROLS = dict( 
+    frame_id = 'sensor_frame' 
+    )
+
     DEFAULT_CURRENT_FPS = 20 # Will be update later with actual
     
     device_info_dict = dict(node_name = "",
@@ -76,6 +67,8 @@ class OnvifCamNode:
     di_img_last_time = None
     pc_img_last_time = None
     pc_last_time = None
+
+    framerate_ratio = 1.0
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                                                    
@@ -141,19 +134,13 @@ class OnvifCamNode:
             self.logDeviceInfo()        
             # Configurable IDX parameter and data output remapping to support specific camera needs/capabilities
             # Don't edit this table directly -- do it through idx_remapping parameters
-            idx_callback_names = {
-                "Controls" : {
-                    # IDX Standard
-                    "Controls_Enable":  self.setControlsEnable,
-                    "Auto_Adjust":  self.setAutoAdjust,
-                    "Brightness": self.setBrightness,
-                    "Contrast":  self.setContrast,
-                    "Thresholding": self.setThresholding,
-                    "Resolution": self.setResolutionMode,
-                    "Framerate":  self.setFramerateMode,
-                    "Range":  None
-                },
-                "Data" : {
+        idx_callback_names = {
+            "Controls" : {
+                # IDX Standard
+                "Framerate":  self.setFramerateRatio
+            },
+
+            "Data" : {
                     # Data callbacks
                     "Color2DImg": self.getColorImg,
                     "StopColor2DImg": self.stopColorImg,
@@ -201,7 +188,7 @@ class OnvifCamNode:
             self.factory_settings = self.getFactorySettings()
 
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-            nepi_msg.publishMsgInfo(self,"Launching NEPI IDX (ROS) interface...")
+            nepi_msg.publishMsgInfo(self,"Launching NEPI IDX () interface...")
             self.device_info_dict["node_name"] = self.node_name
             if self.node_name.find("_") != -1:
                 split_name = self.node_name.rsplit('_', 1)
@@ -209,21 +196,14 @@ class OnvifCamNode:
                 self.device_info_dict["identifier"] = split_name[1]
             else:
                 self.device_info_dict["sensor_name"] = self.node_name
-            self.idx_if = ROSIDXSensorIF(device_info = self.device_info_dict,
+            self.idx_if = IDXDeviceIF(device_info = self.device_info_dict,
                                         capSettings = self.cap_settings,
                                         factorySettings = self.factory_settings,
                                         settingUpdateFunction=self.settingUpdateFunction,
                                         getSettingsFunction=self.getSettings,
-                                        factoryControls = self.FACTORY_CONTROLS,
+                                        factoryControls = self.factory_controls,
                                         get_rtsp_url = self.getRtspUrl,
-                                        setControlsEnable = idx_callback_names["Controls"]["Controls_Enable"],
-                                        setAutoAdjust= idx_callback_names["Controls"]["Auto_Adjust"],
-                                        setResolutionMode=idx_callback_names["Controls"]["Resolution"], 
-                                        setFramerateMode=idx_callback_names["Controls"]["Framerate"], 
-                                        setContrast=idx_callback_names["Controls"]["Contrast"], 
-                                        setBrightness=idx_callback_names["Controls"]["Brightness"], 
-                                        setThresholding=idx_callback_names["Controls"]["Thresholding"], 
-                                        setRange=idx_callback_names["Controls"]["Range"], 
+                                        setFramerateRatio=idx_callback_names["Controls"]["Framerate"], 
                                         getFramerate = self.getFramerate,
                                         getColor2DImg=idx_callback_names["Data"]["Color2DImg"], 
                                         stopColor2DImgAcquisition=idx_callback_names["Data"]["StopColor2DImg"],
@@ -237,12 +217,10 @@ class OnvifCamNode:
                                         stopPointcloudAcquisition=idx_callback_names["Data"]["StopPointcloud"],
                                         getPointcloudImg=idx_callback_names["Data"]["PointcloudImg"], 
                                         stopPointcloudImgAcquisition=idx_callback_names["Data"]["StopPointcloudImg"],
-                                        getGPSMsg=idx_callback_names["Data"]["GPS"],
-                                        getOdomMsg=idx_callback_names["Data"]["Odom"],
-                                        getHeadingMsg=idx_callback_names["Data"]["Heading"])
+                                        getNavPoseDictFunction = None)
             nepi_msg.publishMsgInfo(self," ... IDX interface running")
             # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
-            self.idx_if.updateFromParamServer()
+            self.idx_if.initConfig()
 
             # Now start the node
             nepi_ros.spin()
@@ -442,85 +420,38 @@ class OnvifCamNode:
             string = str(controls_dict[key])
             nepi_msg.publishMsgInfo(self,key + " " + string)
                 
-    
-    def setControlsEnable(self, enable):
-        self.current_controls["controls_enable"] = enable
-        status = True
-        err_str = ""
-        return status, err_str
         
-    def setAutoAdjust(self, enable):
-        ret = self.current_controls["auto_adjust"] = enable
+    def setFramerateRatio(self, ratio):
+        if ratio < 0.1:
+            ratio = 0.1
+        if ratio > .99:
+            ratio = 1.0
+        self.framerate_ratio = ratio
+        #print('Set FR Mode: ' +  str(self.current_controls["framerate_ratio"]))
         status = True
         err_str = ""
         return status, err_str
 
-    def setBrightness(self, ratio):
-        if ratio > 1:
-            ratio = 1
-        elif ratio < 0:
-            ratio = 0
-        self.current_controls["brightness_ratio"] = ratio
-        status = True
-        err_str = ""
-        return status, err_str
-
-    def setContrast(self, ratio):
-        if ratio > 1:
-            ratio = 1
-        elif ratio < 0:
-            ratio = 0
-        self.current_controls["contrast_ratio"] = ratio
-        status = True
-        err_str = ""
-        return status, err_str
-
-    def setThresholding(self, ratio):
-        if ratio > 1:
-            ratio = 1
-        elif ratio < 0:
-            ratio = 0
-        self.current_controls["threshold_ratio"] = ratio
-        status = True
-        err_str = ""
-        return status, err_str
-
-    def setResolutionMode(self, mode):
-        if (mode > self.idx_if.RESOLUTION_MODE_MAX):
-            return False, "Invalid mode value"
-        self.current_controls["resolution_mode"] = mode
-        status = True
-        err_str = ""
-        return status, err_str
-    
-    def setFramerateMode(self, mode):
-        if (mode > self.idx_if.FRAMERATE_MODE_MAX):
-            return False, "Invalid mode value"
-        self.current_controls["framerate_mode"] = mode
-        status = True
-        err_str = ""
-        return status, err_str
 
     def getFramerate(self):
-        fr_mode = self.current_controls.get("framerate_mode")
-        adj_fps =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        adj_fps =   nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
         return adj_fps
     
     def getColorImg(self):
         # Check for control framerate adjustment
         last_time = self.cl_img_last_time
         current_time = nepi_ros.ros_time_now()
-        controls_enabled = self.current_controls.get("controls_enable")
-        fr_mode = self.current_controls.get("framerate_mode")
+
         need_data = False
-        if fr_mode != 3 and last_time != None and self.idx_if is not None:
-          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        if last_time != None and self.idx_if is not None:
+          adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
           timer =(current_time.to_sec() - last_time.to_sec())
           if timer > fr_delay:
             need_data = True
         else:
           need_data = True
+
 
         # Get and Process Data if Needed
         if need_data == False:
@@ -552,10 +483,7 @@ class OnvifCamNode:
             if self.bw_image_acquisition_running:
                 self.cached_2d_color_frame = cv2_img
                 self.cached_2d_color_frame_timestamp = ros_timestamp
-            self.img_uri_lock.release()
-            # Apply controls
-            if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
-                cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)        
+            self.img_uri_lock.release()      
             return ret, msg, cv2_img, ros_timestamp, encoding
         
     def stopColorImg(self):
@@ -577,17 +505,17 @@ class OnvifCamNode:
         # Check for control framerate adjustment
         last_time = self.bw_img_last_time
         current_time = nepi_ros.ros_time_now()
-        controls_enabled = self.current_controls.get("controls_enable")
-        fr_mode = self.current_controls.get("framerate_mode")
+
         need_data = False
-        if fr_mode != 3 and last_time != None and self.idx_if is not None:
-          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        if last_time != None and self.idx_if is not None:
+          adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
           timer =(current_time.to_sec() - last_time.to_sec())
           if timer > fr_delay:
             need_data = True
         else:
           need_data = True
+
         # Get and Process Data if Needed
         if need_data == False:
           return False, "Waiting for Timer", None, None, None  # Return None data
@@ -625,9 +553,6 @@ class OnvifCamNode:
             # Fix the channel count if necessary
             if cv2_img.ndim == 3:
                 cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2GRAY)
-            # Apply controls
-            if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
-                cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
             return ret, msg, cv2_img, ros_timestamp, encoding
     
     def stopBWImg(self):

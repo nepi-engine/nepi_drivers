@@ -23,7 +23,8 @@ import math
 import threading
 import cv2
 
-from nepi_sdk.device_if_idx import ROSIDXSensorIF
+
+from nepi_api.device_if_idx import IDXDeviceIF
 
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_msg
@@ -56,20 +57,12 @@ class V4l2CamNode:
                                     
     DEFAULT_DEVICE_PATH = '/dev/video0'
 
+
     #Factory Control Values 
-    FACTORY_CONTROLS = dict( controls_enable = True,
-    auto_adjust = False,
-    brightness_ratio = 0.5,
-    contrast_ratio =  0.5,
-    threshold_ratio =  0.0,
-    resolution_mode = 1, # LOW, MED, HIGH, MAX
-    framerate_mode = 1, # LOW, MED, HIGH, MAX
-    start_range_ratio = None, 
-    stop_range_ratio = None,
-    min_range_m = None,
-    max_range_m = None,
-    frame_id = None
+    FACTORY_CONTROLS = dict( 
+    frame_id = 'sensor_frame' 
     )
+
  
     DEFAULT_CURRENT_FPS = 20 # Will be update later with actual
 
@@ -98,6 +91,8 @@ class V4l2CamNode:
     di_img_last_time = None
     pc_img_last_time = None
     pc_last_time = None
+
+    framerate_ratio = 1.0
 
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
@@ -143,16 +138,9 @@ class V4l2CamNode:
         idx_callback_names = {
             "Controls" : {
                 # IDX Standard
-                "Controls_Enable":  self.setControlsEnable,
-                "Auto_Adjust":  self.setAutoAdjust,
-                "Brightness": self.setBrightness,
-                "Contrast":  self.setContrast,
-                "Thresholding": self.setThresholding,
-                "Resolution": self.setResolutionMode,
-                "Framerate":  self.setFramerateMode,
-                "Range":  None
+                "Framerate":  self.setFramerateRatio
             },
-            
+    
 
             "Data" : {
                 # Data callbacks
@@ -185,7 +173,7 @@ class V4l2CamNode:
         self.factory_settings = self.getFactorySettings()
 
         # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-        nepi_msg.publishMsgInfo(self,"Launching NEPI IDX (ROS) interface...")
+        nepi_msg.publishMsgInfo(self,"Launching NEPI IDX () interface...")
         self.device_info_dict["node_name"] = self.node_name
         if self.node_name.find("_") != -1:
             split_name = self.node_name.rsplit('_', 1)
@@ -193,20 +181,13 @@ class V4l2CamNode:
             self.device_info_dict["identifier"] = split_name[1]
         else:
             self.device_info_dict["sensor_name"] = self.node_name
-        self.idx_if = ROSIDXSensorIF(device_info = self.device_info_dict,
+        self.idx_if = IDXDeviceIF(device_info = self.device_info_dict,
                                      capSettings = self.cap_settings,
                                      factorySettings = self.factory_settings,
                                      settingUpdateFunction=self.settingUpdateFunction,
                                      getSettingsFunction=self.getSettings,
-                                     factoryControls = self.FACTORY_CONTROLS,
-                                     setControlsEnable = idx_callback_names["Controls"]["Controls_Enable"],
-                                     setAutoAdjust= idx_callback_names["Controls"]["Auto_Adjust"],
-                                     setResolutionMode=idx_callback_names["Controls"]["Resolution"], 
-                                     setFramerateMode=idx_callback_names["Controls"]["Framerate"], 
-                                     setContrast=idx_callback_names["Controls"]["Contrast"], 
-                                     setBrightness=idx_callback_names["Controls"]["Brightness"], 
-                                     setThresholding=idx_callback_names["Controls"]["Thresholding"], 
-                                     setRange=idx_callback_names["Controls"]["Range"], 
+                                     factoryControls = self.factory_controls,
+                                     setFramerateRatio=idx_callback_names["Controls"]["Framerate"], 
                                      getFramerate = self.getFramerate,
                                      getColor2DImg=idx_callback_names["Data"]["Color2DImg"], 
                                      stopColor2DImgAcquisition=idx_callback_names["Data"]["StopColor2DImg"],
@@ -220,9 +201,7 @@ class V4l2CamNode:
                                      stopPointcloudAcquisition=idx_callback_names["Data"]["StopPointcloud"],
                                      getPointcloudImg=idx_callback_names["Data"]["PointcloudImg"], 
                                      stopPointcloudImgAcquisition=idx_callback_names["Data"]["StopPointcloudImg"],
-                                     getGPSMsg=idx_callback_names["Data"]["GPS"],
-                                     getOdomMsg=idx_callback_names["Data"]["Odom"],
-                                     getHeadingMsg=idx_callback_names["Data"]["Heading"])
+                                     getNavPoseDictFunction = None)
         nepi_msg.publishMsgInfo(self," " + " ... IDX interface running")
 
         # Update available IDX callbacks based on capabilities that the driver reports
@@ -231,7 +210,7 @@ class V4l2CamNode:
         self.getColorImg()
         # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
         time.sleep(1)
-        self.idx_if.updateFromParamServer()
+        self.idx_if.initConfig()
         self.idx_if.publishStatus()
 
         ## Initiation Complete
@@ -474,70 +453,19 @@ class V4l2CamNode:
         
         nepi_msg.publishMsgInfo(self,device_info_str)
 
-    
-    def setControlsEnable(self, enable):
-        self.current_controls["controls_enable"] = enable
-        status = True
-        err_str = ""
-        return status, err_str
         
-    def setAutoAdjust(self, enable):
-        ret = self.current_controls["auto_adjust"] = enable
-        status = True
-        err_str = ""
-        return status, err_str
-
-    def setBrightness(self, ratio):
-        if ratio > 1:
-            ratio = 1
-        elif ratio < 0:
-            ratio = 0
-        self.current_controls["brightness_ratio"] = ratio
-        status = True
-        err_str = ""
-        return status, err_str
-
-    def setContrast(self, ratio):
-        if ratio > 1:
-            ratio = 1
-        elif ratio < 0:
-            ratio = 0
-        self.current_controls["contrast_ratio"] = ratio
-        status = True
-        err_str = ""
-        return status, err_str
-
-    def setThresholding(self, ratio):
-        if ratio > 1:
-            ratio = 1
-        elif ratio < 0:
-            ratio = 0
-        self.current_controls["threshold_ratio"] = ratio
-        status = True
-        err_str = ""
-        return status, err_str
-
-    def setResolutionMode(self, mode):
-        if (mode > self.idx_if.RESOLUTION_MODE_MAX):
-            return False, "Invalid mode value"
-        self.current_controls["resolution_mode"] = mode
-        status = True
-        err_str = ""
-        return status, err_str
-    
-    def setFramerateMode(self, mode):
-        if (mode > self.idx_if.FRAMERATE_MODE_MAX):
-            return False, "Invalid mode value"
-        self.current_controls["framerate_mode"] = mode
-        #print('Set FR Mode: ' +  str(self.current_controls["framerate_mode"]))
+    def setFramerateRatio(self, ratio):
+        if ratio < 0.1:
+            ratio = 0.1
+        if ratio > .99:
+            ratio = 1.0
+        self.framerate_ratio = ratio
         status = True
         err_str = ""
         return status, err_str
 
     def getFramerate(self):
-        fr_mode = self.current_controls.get("framerate_mode")
-        #print('Got FR Mode: ' +  str(fr_mode))
-        adj_fps =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        adj_fps =   nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
         return adj_fps
 
     def setDriverCameraControl(self, control_name, value):
@@ -545,15 +473,13 @@ class V4l2CamNode:
     
     # Good base class candidate - Shared with ONVIF
     def getColorImg(self):
-
         # Check for control framerate adjustment
         last_time = self.cl_img_last_time
         current_time = nepi_ros.ros_time_now()
-        controls_enabled = self.current_controls.get("controls_enable")
-        fr_mode = self.current_controls.get("framerate_mode")
+        
         need_data = False
-        if fr_mode != 3 and last_time != None and self.idx_if is not None:
-          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        if last_time != None and self.idx_if is not None:
+          adj_fr =   nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
           timer =(current_time.to_sec() - last_time.to_sec())
           if timer > fr_delay:
@@ -592,9 +518,7 @@ class V4l2CamNode:
                 self.cached_2d_color_image = cv2_img
                 self.cached_2d_color_image_timestamp = ros_timestamp
             self.img_lock.release()
-            # Apply controls
-            if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
-                cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
+
             return ret, msg, cv2_img, ros_timestamp, encoding
     
     # Good base class candidate - Shared with ONVIF
@@ -614,15 +538,14 @@ class V4l2CamNode:
     
     # Good base class candidate - Shared with ONVIF
     def getBWImg(self):
-
         # Check for control framerate adjustment
         last_time = self.bw_img_last_time
         current_time = nepi_ros.ros_time_now()
-        controls_enabled = self.current_controls.get("controls_enable")
-        fr_mode = self.current_controls.get("framerate_mode")
+
+
         need_data = False
-        if fr_mode != 3 and last_time != None and self.idx_if is not None:
-          adj_fr = nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        if last_time != None and self.idx_if is not None:
+          adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
           timer =(current_time.to_sec() - last_time.to_sec())
           if timer > fr_delay:
@@ -669,8 +592,7 @@ class V4l2CamNode:
             if cv2_img.ndim == 3:
                 cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2GRAY)
                  # Apply controls
-            if self.current_controls.get("controls_enable") and cv2_img is not None and self.idx_if is not None:
-                cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)               
+            
             return ret, msg, cv2_img, ros_timestamp, encoding
         
     # Good base class candidate - Shared with ONVIF

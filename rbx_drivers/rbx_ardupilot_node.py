@@ -33,7 +33,7 @@ from nepi_sdk import nepi_nav
 from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_settings
 
-from nepi_sdk.device_if_rbx import ROSRBXRobotIF
+from nepi_api.device_if_rbx import RBXRobotIF
 
 from std_msgs.msg import Empty, Int8, UInt8, UInt32, Bool, String, Float32, Float64
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
@@ -272,7 +272,7 @@ class ArdupilotNode:
           
 
     # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-    nepi_msg.publishMsgInfo(self,"Launching NEPI IDX (ROS) interface...")
+    nepi_msg.publishMsgInfo(self,"Launching NEPI IDX () interface...")
     self.device_info_dict["node_name"] = self.node_name
     if self.node_name.find("_") != -1:
         split_name = self.node_name.rsplit('_', 1)
@@ -288,7 +288,7 @@ class ArdupilotNode:
     nepi_msg.publishMsgInfo(self,str(self.device_info_dict))
 
 
-    self.rbx_if = ROSRBXRobotIF(device_info = self.device_info_dict,
+    self.rbx_if = RBXRobotIF(device_info = self.device_info_dict,
                                   capSettings = self.cap_settings,
                                   factorySettings = self.factory_settings,
                                   settingUpdateFunction = self.settingUpdateFunction,
@@ -325,7 +325,7 @@ class ArdupilotNode:
 
     nepi_msg.publishMsgInfo(self,": ... IDX interface running")
     #updated the system config from the parameters that have been established
-    self.rbx_if.updateFromParamServer()
+    self.rbx_if.initConfig()
     time.sleep(1)
 
     ## Start goto setpoint check/send loop

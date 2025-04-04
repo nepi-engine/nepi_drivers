@@ -18,14 +18,13 @@
 
 ### Set the namespace before importing nepi_ros
 import os
-#os.environ["ROS_NAMESPACE"] = "/nepi/s2x"
 import serial
 import serial.tools.list_ports
 import time
 import re
 import sys
 
-from nepi_sdk.device_if_ptx import ROSPTXActuatorIF
+from nepi_api.device_if_ptx import PTXActuatorIF
 
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_msg
@@ -140,7 +139,7 @@ class KistKPT20Node:
             self.factory_settings = self.getFactorySettings()
 
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-            nepi_msg.publishMsgInfo(self,"Launching NEPI PTX (ROS) interface...")
+            nepi_msg.publishMsgInfo(self,"Launching NEPI PTX () interface...")
             self.device_info_dict["node_name"] = self.node_name
             if self.node_name.find("_") != -1:
                 split_name = self.node_name.rsplit('_', 1)
@@ -189,7 +188,7 @@ class KistKPT20Node:
 
             # Launch the PTX interface --  this takes care of initializing all the ptx settings from config. file, subscribing and advertising topics and services, etc.
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-            nepi_msg.publishMsgInfo(self,"Launching NEPI PTX (ROS) interface...")
+            nepi_msg.publishMsgInfo(self,"Launching NEPI PTX () interface...")
             self.device_info_dict["node_name"] = self.node_name
             if self.node_name.find("_") != -1:
                 split_name = self.node_name.rsplit('_', 1)
@@ -251,7 +250,7 @@ class KistKPT20Node:
             self.waypoints = {} # Dictionary of dictionaries with numerical key and {waypoint_pitch, waypoint_yaw} dict value
 
 
-            self.ptx_if = ROSPTXActuatorIF(device_info = self.device_info_dict, 
+            self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict, 
                                         capSettings = self.cap_settings,
                                         factorySettings = self.factory_settings,
                                         settingUpdateFunction=self.settingUpdateFunction,
@@ -449,11 +448,11 @@ class KistKPT20Node:
     def setCurrentSettingsAsDefault(self):
         # Don't need to worry about any of our params in this class, just child interfaces' params
         if self.ptx_if is not None:
-            self.ptx_if.setCurrentSettingsToParamServer()
+            self.ptx_if.initConfig()
 
-    def updateFromParamServer(self):
+    def resetCb(self):
         if self.ptx_if is not None:
-            self.ptx_if.updateFromParamServer()
+            self.ptx_if.resetCb()
 
 
     #######################

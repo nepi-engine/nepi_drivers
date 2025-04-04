@@ -25,6 +25,7 @@ import string
 import ipaddress
 
 from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_msg
 
@@ -144,7 +145,7 @@ class KistKPT20Discovery:
         except Exception as e:
             nepi_msg.publishMsgWarn(self, ":" + self.log_name + ": Not a valid IP port " + ip_port + " " + str(e))#
             return self.active_paths_list
-        success = nepi_ros.ping_ip(ip_addr)
+        success = nepi_utils.ping_ip(ip_addr)
         if success == True:
           self.path_list = [ip_addr + ':' + ip_port]
         else:
@@ -301,22 +302,5 @@ class KistKPT20Discovery:
         nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
     return success
 
-  def ping_ip(self,ip_address):
-      """
-      Pings an IP address and returns True if successful, False otherwise.
-      """
-      try:
-          # Use the ping command with a count of 1 to avoid continuous pings
-          process = subprocess.run(['ping', '-c', '1', ip_address], capture_output=True, text=True, timeout=5)
-
-          # Check the return code
-          if process.returncode == 0:
-              return True
-          else:
-              return False
-      except subprocess.TimeoutExpired:
-          return False
-      except Exception as e:
-          print(f"An error occurred: {e}")
-          return False
+  
 

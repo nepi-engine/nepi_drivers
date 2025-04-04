@@ -26,6 +26,7 @@ import time
 
 
 from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_save
@@ -223,8 +224,8 @@ class ZedCamDiscovery:
     launch_check = True
     if launch_id in self.launch_time_dict.keys():
       launch_time = self.launch_time_dict[launch_id]
-      cur_time = nepi_ros.get_time()
-      launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
+      cur_time = nepi_utils.get_time()
+      launch_check = (cur_time - launch_time) > self.NODE_LOAD_TIME_SEC
     if launch_check == False:
       return False  ###
 
@@ -270,16 +271,16 @@ class ZedCamDiscovery:
 
             file_name = self.drv_dict['NODE_DICT']['file_name']
             #Try and launch node
-            self.DEVICE_DICT[path] = {'device_class': root_name, 'device_path': path, 'device_type': dtype, 
+            self.DEVICE_DICT[path_str] = {'device_class': root_name, 'device_path': path_str, 'device_type': dtype, 
                                       'node_name': device_node_name, 'node_namespace': device_node_namespace}
             [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name)
             if success:
-              self.DEVICE_DICT[path]['node_subprocess'] = sub_process
-              self.DEVICE_DICT[path]['zed_type'] = root_name
+              self.DEVICE_DICT[path_str]['node_subprocess'] = sub_process
+              self.DEVICE_DICT[path_str]['zed_type'] = root_name
               nepi_msg.publishMsgInfo(self,msg)
 
             # Process luanch results
-            self.launch_time_dict[launch_id] = nepi_ros.get_time()
+            self.launch_time_dict[launch_id] = nepi_utils.get_time()
             if success:
               nepi_msg.publishMsgInfo(self," Launched node: " + device_node_name)
             else:
@@ -288,7 +289,7 @@ class ZedCamDiscovery:
                 nepi_msg.publishMsgInfo(self," Will not try relaunch for node: " + device_node_name)
                 self.dont_retry_list.append(launch_id)
               else:
-                nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+                nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
     return success
 
   def stopAndPurgeDeviceNode(self, node_namespace):

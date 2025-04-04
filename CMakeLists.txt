@@ -20,7 +20,7 @@ set(CMAKE_VERBOSE_MAKEFILE TRUE)
 set(OpenCV_DIR /usr/share/OpenCV)
 
 find_package(catkin REQUIRED
-    COMPONENTS std_msgs sensor_msgs nepi_sdk nepi_ros_interfaces cv_bridge OpenCV  serial pcl_ros pcl_conversions tf2_ros )
+    COMPONENTS std_msgs sensor_msgs nepi_sdk nepi_api nepi_ros_interfaces cv_bridge OpenCV  serial pcl_ros pcl_conversions tf2_ros )
 
 find_package(PkgConfig)
 

@@ -19,14 +19,13 @@
 
 ### Set the namespace before importing nepi_ros
 import os
-#os.environ["ROS_NAMESPACE"] = "/nepi/s2x"
 import serial
 import serial.tools.list_ports
 import time
 import re
 import sys
 
-from nepi_sdk.device_if_lsx import ROSLSXDeviceIF
+from nepi_api.device_if_lsx import LSXDeviceIF
 
 from nepi_ros_interfaces.msg import LSXStatus
 
@@ -149,14 +148,14 @@ class SealiteNode(object):
     ### Try and connect to device
     self.connected = self.connect() 
     if self.connected:
-      # Create LSX ROS node
+      # Create LSX  node
       nepi_msg.publishMsgInfo(self,'Connected')
       # Initialize settings
       self.cap_settings = self.getCapSettings()
       self.factory_settings = self.getFactorySettings()
 
       # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-      nepi_msg.publishMsgInfo(self,"Launching NEPI LSX (ROS) interface...")
+      nepi_msg.publishMsgInfo(self,"Launching NEPI LSX () interface...")
       self.device_info_dict["node_name"] = self.node_name
       if self.node_name.find("_") != -1:
           split_name = self.node_name.rsplit('_', 1)
@@ -169,7 +168,7 @@ class SealiteNode(object):
       self.device_info_dict["hw_version"] = self.hw_version
       self.device_info_dict["sw_version"] = self.sw_version
 
-      self.lsx_if = ROSLSXDeviceIF(
+      self.lsx_if = LSXDeviceIF(
                   device_info = self.device_info_dict, 
                   getStatusFunction = self.getStatus,
                   capSettings = self.cap_settings,

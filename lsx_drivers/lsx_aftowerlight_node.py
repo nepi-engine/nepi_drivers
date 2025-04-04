@@ -18,14 +18,13 @@
 
 
 import os
-#os.environ["ROS_NAMESPACE"] = "/nepi/s2x"
 import serial
 import serial.tools.list_ports
 import time
 import re
 import sys
 
-from nepi_sdk.device_if_lsx import ROSLSXDeviceIF
+from nepi_api.device_if_lsx import LSXDeviceIF
 
 from nepi_ros_interfaces.msg import LSXStatus
 
@@ -122,7 +121,7 @@ class AfTowerLightNode(object):
       ### Try and connect to device
       self.connected = self.connect()
       if self.connected:
-        # Create LSX ROS node
+        # Create LSX  node
         nepi_msg.publishMsgInfo(self,'Connected')
       else:
         nepi_msg.publishMsgInfo(self,"Shutting down node")
@@ -135,7 +134,7 @@ class AfTowerLightNode(object):
       self.factory_settings = self.getFactorySettings()
 
       # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
-      nepi_msg.publishMsgInfo(self,"Launching NEPI LSX (ROS) interface...")
+      nepi_msg.publishMsgInfo(self,"Launching NEPI LSX () interface...")
       self.device_info_dict["node_name"] = self.node_name
       if self.node_name.find("_") != -1:
           split_name = self.node_name.rsplit('_', 1)
@@ -150,7 +149,7 @@ class AfTowerLightNode(object):
 
 
 
-      self.lsx_if = ROSLSXDeviceIF(
+      self.lsx_if = LSXDeviceIF(
 
                   device_info = self.device_info_dict, 
                   getStatusFunction = self.getStatus,

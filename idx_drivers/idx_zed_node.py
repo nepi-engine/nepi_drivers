@@ -34,9 +34,10 @@ import dynamic_reconfigure.client
 import numpy as np
 import tf
 
-from nepi_sdk.device_if_idx import ROSIDXSensorIF
+from nepi_api.device_if_idx import IDXDeviceIF
 
 from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_nav
 from nepi_sdk import nepi_img
@@ -101,15 +102,8 @@ class ZedCamNode(object):
 
     FACTORY_SETTINGS_OVERRIDES = dict( )
     
-    
     #Factory Control Values 
-    FACTORY_CONTROLS = dict( controls_enable = True,
-    auto_adjust = False,
-    brightness_ratio = 0.5,
-    contrast_ratio =  0.5,
-    threshold_ratio =  0.0,
-    resolution_mode = 1, # LOW, MED, HIGH, MAX
-    framerate_mode = 1, # LOW, MED, HIGH, MAX
+    FACTORY_CONTROLS = dict( 
     start_range_ratio = 0.0, 
     stop_range_ratio = 1.0,
     min_range_m = 0.0,
@@ -117,6 +111,7 @@ class ZedCamNode(object):
     frame_id = 'sensor_frame' 
     )
 
+    
     ZED_MIN_RANGE_M_OVERRIDES = { 'zed': .2, 'zedm': .15, 'zed2': .2, 'zedx': .2} 
     ZED_MAX_RANGE_M_OVERRIDES = { 'zed':  15, 'zedm': 15, 'zed2': 20, 'zedx': 15} 
 
@@ -182,7 +177,7 @@ class ZedCamNode(object):
     pc_img_last_time = None
     pc_last_time = None
 
-
+    framerate_ratio = 1.0
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"         
     drv_dict = dict()                          
@@ -199,7 +194,7 @@ class ZedCamNode(object):
 
         ################################################
         # Try to restore camera calibration files from
-        [success,files_copied,files_not_copied] = nepi_ros.copy_files_from_folder(self.CAL_BACKUP_PATH,self.CAL_SRC_PATH)
+        [success,files_copied,files_not_copied] = nepi_utils.copy_files_from_folder(self.CAL_BACKUP_PATH,self.CAL_SRC_PATH)
         if success:
           if len(files_copied) > 0:
             strList = str(files_copied)
@@ -225,7 +220,7 @@ class ZedCamNode(object):
           pass #nepi_msg.publishMsgInfo(self,str(e))
 
         if zed_wrapper_not_running == False:
-          rospy.signal_shutdown("Zed ROS Wrapper still running, Shutting Down")
+          rospy.signal_shutdown("Zed  Wrapper still running, Shutting Down")
         else:
         '''
 
@@ -251,7 +246,7 @@ class ZedCamNode(object):
         # Run the correct zed_ros_wrapper launch file
         zed_launchfile = self.zed_type + '.launch'
         zed_ros_wrapper_run_cmd = ['roslaunch', 'zed_wrapper', zed_launchfile]
-        # TODO: Some process management for the Zed ROS wrapper
+        # TODO: Some process management for the Zed  wrapper
         self.zed_ros_wrapper_proc = subprocess.Popen(zed_ros_wrapper_run_cmd)
         # Now that Zed SDK is started, we can set up the reconfig client
         nepi_ros.sleep(5,10)
@@ -308,21 +303,16 @@ class ZedCamNode(object):
         self.pc_img_sub = None
         odom_sub = rospy.Subscriber(ZED_ODOM_TOPIC, Odometry, self.idx_odom_topic_callback)
 
-        # Launch the ROS node
+        # Launch the  node
         nepi_msg.publishMsgInfo(self,"... Connected!")
 
 
         idx_callback_names = {
             "Controls" : {
                 # IDX Standard
-                "Controls_Enable":  self.setControlsEnable,
-                "Auto_Adjust":  self.setAutoAdjust,
-                "Brightness": self.setBrightness,
-                "Contrast":  self.setContrast,
-                "Thresholding": self.setThresholding,
-                "Resolution": self.setResolutionMode,
-                "Framerate":  self.setFramerateMode,
+                "Framerate":  self.setFramerateRatio,
                 "Range": self.setRange
+                
             },
             
 
@@ -363,7 +353,7 @@ class ZedCamNode(object):
             
 
         # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-        nepi_msg.publishMsgInfo(self,"Launching NEPI IDX (ROS) interface...")
+        nepi_msg.publishMsgInfo(self,"Launching NEPI IDX () interface...")
         self.device_info_dict["node_name"] = self.node_name
         if self.node_name.find("_") != -1:
             split_name = self.node_name.rsplit('_', 1)
@@ -371,21 +361,15 @@ class ZedCamNode(object):
             self.device_info_dict["identifier"] = split_name[1]
         else:
             self.device_info_dict["sensor_name"] = self.node_name
-        self.idx_if = ROSIDXSensorIF(device_info = self.device_info_dict,
+        self.idx_if = IDXDeviceIF(device_info = self.device_info_dict,
                                     capSettings = self.cap_settings,
                                     factorySettings = self.factory_settings,
                                     settingUpdateFunction=self.settingUpdateFunction,
                                     getSettingsFunction=self.getSettings,
-                                    factoryControls = self.FACTORY_CONTROLS,
-                                    setControlsEnable = idx_callback_names["Controls"]["Controls_Enable"],
-                                    setAutoAdjust= idx_callback_names["Controls"]["Auto_Adjust"],
-                                    setResolutionMode=idx_callback_names["Controls"]["Resolution"], 
-                                    setFramerateMode=idx_callback_names["Controls"]["Framerate"], 
-                                    setContrast=idx_callback_names["Controls"]["Contrast"], 
-                                    setBrightness=idx_callback_names["Controls"]["Brightness"], 
-                                    setThresholding=idx_callback_names["Controls"]["Thresholding"], 
-                                    setRange=idx_callback_names["Controls"]["Range"], 
+                                    factoryControls = self.factory_controls,
+                                    setFramerateRatio=idx_callback_names["Controls"]["Framerate"], 
                                     getFramerate = self.getFramerate,
+                                    setRange=idx_callback_names["Controls"]["Range"],
                                     getColor2DImg=idx_callback_names["Data"]["Color2DImg"], 
                                     stopColor2DImgAcquisition=idx_callback_names["Data"]["StopColor2DImg"],
                                     getBW2DImg=idx_callback_names["Data"]["BW2DImg"], 
@@ -398,19 +382,17 @@ class ZedCamNode(object):
                                     stopPointcloudAcquisition=idx_callback_names["Data"]["StopPointcloud"],
                                     getPointcloudImg=idx_callback_names["Data"]["PointcloudImg"], 
                                     stopPointcloudImgAcquisition=idx_callback_names["Data"]["StopPointcloudImg"],
-                                    getGPSMsg=idx_callback_names["Data"]["GPS"],
-                                    getOdomMsg=idx_callback_names["Data"]["Odom"],
-                                    getHeadingMsg=idx_callback_names["Data"]["Heading"])
+                                    getNavPoseDictFunction = None)
         nepi_msg.publishMsgInfo(self,"... IDX interface running")
 
         # Update available IDX callbacks based on capabilities that the driver reports
         self.logDeviceInfo()
 
         # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
-        self.idx_if.updateFromParamServer()
+        self.idx_if.initConfig()
 
         # Try to backup camera calibration files
-        [success,files_copied,files_not_copied] = nepi_ros.copy_files_from_folder(self.CAL_SRC_PATH,self.CAL_BACKUP_PATH)
+        [success,files_copied,files_not_copied] = nepi_utils.copy_files_from_folder(self.CAL_SRC_PATH,self.CAL_BACKUP_PATH)
         if success:
           if len(files_copied) > 0:
             strList = str(files_copied)
@@ -497,11 +479,10 @@ class ZedCamNode(object):
         # Check for control framerate adjustment
         last_time = self.cl_img_last_time
         current_time = nepi_ros.ros_time_now()
-        controls_enabled = self.current_controls.get("controls_enable")
-        fr_mode = self.current_controls.get("framerate_mode")
+
         need_data = False
-        if fr_mode != 3 and last_time != None and self.idx_if is not None:
-          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        if last_time != None and self.idx_if is not None:
+          adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
           timer =(current_time.to_sec() - last_time.to_sec())
           if timer > fr_delay:
@@ -522,17 +503,17 @@ class ZedCamNode(object):
         # Check for control framerate adjustment
         last_time = self.bw_img_last_time
         current_time = nepi_ros.ros_time_now()
-        controls_enabled = self.current_controls.get("controls_enable")
-        fr_mode = self.current_controls.get("framerate_mode")
+ 
         need_data = False
-        if fr_mode != 3 and last_time != None and self.idx_if is not None:
-          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        if last_time != None and self.idx_if is not None:
+          adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
           timer =(current_time.to_sec() - last_time.to_sec())
           if timer > fr_delay:
             need_data = True
         else:
           need_data = True
+
 
         # Get and Process Data if Needed
         if need_data == True:
@@ -548,17 +529,18 @@ class ZedCamNode(object):
         # Check for control framerate adjustment
         last_time = self.dm_img_last_time
         current_time = nepi_ros.ros_time_now()
-        controls_enabled = self.current_controls.get("controls_enable")
-        fr_mode = self.current_controls.get("framerate_mode")
+
         need_data = False
-        if fr_mode != 3 and last_time != None and self.idx_if is not None:
-          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        if last_time != None and self.idx_if is not None:
+          adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
           timer =(current_time.to_sec() - last_time.to_sec())
           if timer > fr_delay:
             need_data = True
         else:
           need_data = True
+
+
         # Get and Process Data if Needed
         if need_data == True:
           self.dm_img_last_time = current_time
@@ -573,17 +555,19 @@ class ZedCamNode(object):
         # Check for control framerate adjustment
         last_time = self.di_img_last_time
         current_time = nepi_ros.ros_time_now()
-        controls_enabled = self.current_controls.get("controls_enable")
-        fr_mode = self.current_controls.get("framerate_mode")
+
+        
         need_data = False
-        if fr_mode != 3 and last_time != None and self.idx_if is not None:
-          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        if last_time != None and self.idx_if is not None:
+          adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
           timer =(current_time.to_sec() - last_time.to_sec())
           if timer > fr_delay:
             need_data = True
         else:
           need_data = True
+
+
         # Get and Process Data if Needed
         if need_data == True:
           self.di_img_last_time = current_time
@@ -598,17 +582,19 @@ class ZedCamNode(object):
         # Check for control framerate adjustment
         last_time = self.pc_last_time
         current_time = nepi_ros.ros_time_now()
-        controls_enabled = self.current_controls.get("controls_enable")
-        fr_mode = self.current_controls.get("framerate_mode")
+
+
         need_data = False
-        if fr_mode != 3 and last_time != None and self.idx_if is not None:
-          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        if last_time != None and self.idx_if is not None:
+          adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
           timer =(current_time.to_sec() - last_time.to_sec())
           if timer > fr_delay:
             need_data = True
         else:
           need_data = True
+
+
         # Get and Process Data if Needed
         if need_data == True:
           self.pc_last_time = current_time
@@ -622,17 +608,18 @@ class ZedCamNode(object):
         # Check for control framerate adjustment
         last_time = self.pc_img_last_time
         current_time = nepi_ros.ros_time_now()
-        controls_enabled = self.current_controls.get("controls_enable")
-        fr_mode = self.current_controls.get("framerate_mode")
+
+
         need_data = False
-        if fr_mode != 3 and last_time != None and self.idx_if is not None:
-          adj_fr =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        if last_time != None and self.idx_if is not None:
+          adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
           timer =(current_time.to_sec() - last_time.to_sec())
           if timer > fr_delay:
             need_data = True
         else:
           need_data = True
+
         # Get and Process Data if Needed
         if need_data == True:
           self.pc_img_last_time = current_time
@@ -656,67 +643,19 @@ class ZedCamNode(object):
         nepi_msg.publishMsgInfo(self,device_info_str)
         nepi_msg.publishMsgInfo(self,str(self.device_info_dict))
 
-    def setControlsEnable(self, enable):
-        self.current_controls["controls_enable"] = enable
-        status = True
-        err_str = ""
-        return status, err_str
-        
-    def setAutoAdjust(self, enable):
-        self.current_controls["auto_adjust"] = enable
-        status = True
-        err_str = ""
-        return status, err_str
-
-    def setBrightness(self, ratio):
-        if ratio > 1:
-            ratio = 1
-        elif ratio < 0:
-            ratio = 0
-        self.current_controls["brightness_ratio"] = ratio
-        status = True
-        err_str = ""
-        return status, err_str
-
-    def setContrast(self, ratio):
-        if ratio > 1:
-            ratio = 1
-        elif ratio < 0:
-            ratio = 0
-        self.current_controls["contrast_ratio"] = ratio
-        status = True
-        err_str = ""
-        return status, err_str
-
-    def setThresholding(self, ratio):
-        if ratio > 1:
-            ratio = 1
-        elif ratio < 0:
-            ratio = 0
-        self.current_controls["threshold_ratio"] = ratio
-        status = True
-        err_str = ""
-        return status, err_str
-
-    def setResolutionMode(self, mode):
-        if (mode > self.idx_if.RESOLUTION_MODE_MAX):
-            return False, "Invalid mode value"
-        self.current_controls["resolution_mode"] = mode
-        status = True
-        err_str = ""
-        return status, err_str
-    
-    def setFramerateMode(self, mode):
-        if (mode > self.idx_if.FRAMERATE_MODE_MAX):
-            return False, "Invalid mode value"
-        self.current_controls["framerate_mode"] = mode
+     
+    def setFramerateRatio(self, ratio):
+        if ratio < 0.1:
+            ratio = 0.1
+        if ratio > .99:
+            ratio = 1.0
+        self.framerate_ratio = ratio
         status = True
         err_str = ""
         return status, err_str
 
     def getFramerate(self):
-        fr_mode = self.current_controls.get("framerate_mode")
-        adj_fps =   nepi_img.adjust_framerate(self.current_fps,fr_mode)
+        adj_fps =   nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
         return adj_fps
 
     def setRange(self, min_ratio, max_ratio):
@@ -747,7 +686,7 @@ class ZedCamNode(object):
           self.color_img_sub = rospy.Subscriber(self.color_img_topic, Image, self.color_2d_image_callback, queue_size = 1)
           time.sleep(0.1)
 
-
+        
 
         # Set process input variables
         data_product = "color_2d_image"
@@ -771,19 +710,14 @@ class ZedCamNode(object):
             status = True
             msg = ""
             ros_timestamp = img_msg.header.stamp
-            if self.current_controls.get("controls_enable") and self.idx_if is not None:
-              cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
-              cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls,self.current_fps)
-              #img_msg = nepi_img.cv2img_to_rosimg(cv2_img, encoding = encoding)
+            cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
             self.color_img_last_stamp = ros_timestamp
           else:
             msg = "No new data for " + data_product + " available"
         else:
           msg = "Received None type data for " + data_product + " process"
-        if cv2_img is not None:
-          return status, msg, cv2_img, ros_timestamp, encoding
-        else: 
-          return status, msg, img_msg, ros_timestamp, encoding
+        return status, msg, cv2_img, ros_timestamp, encoding
+
     
     # Good base class candidate - Shared with ONVIF
     def stopColorImg(self):
@@ -825,19 +759,13 @@ class ZedCamNode(object):
             status = True
             msg = ""
             ros_timestamp = img_msg.header.stamp
-            if self.current_controls.get("controls_enable") and self.idx_if is not None:
-              cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
-              cv2_img = self.idx_if.applyIDXControls2Image(cv2_img,self.current_controls)
-              #img_msg = nepi_img.cv2img_to_rosimg(cv2_img, encoding = encoding)
+            cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
             self.bw_img_last_stamp = ros_timestamp
           else:
             msg = "No new data for " + data_product + " available"
         else:
           msg = "Received None type data for " + data_product + " process"
-        if cv2_img is not None:
-          return status, msg, cv2_img, ros_timestamp, encoding
-        else: 
-          return status, msg, img_msg, ros_timestamp, encoding
+        return status, msg, cv2_img, ros_timestamp, encoding
     
     # Good base class candidate - Shared with ONVIF
     def stopBWImg(self):
@@ -881,24 +809,23 @@ class ZedCamNode(object):
             # Adjust range Limits if IDX Controls enabled and range ratios are not min/max
             start_range_ratio = self.current_controls.get("start_range_ratio")
             stop_range_ratio = self.current_controls.get("stop_range_ratio")
-            if self.current_controls.get("controls_enable") and (start_range_ratio > 0 or stop_range_ratio < 1):
-              # Convert ros depth_map to cv2_img and numpy depth data
-              cv2_depth_map = nepi_img.rosimg_to_cv2img(img_msg, encoding="passthrough")
-              depth_data = (np.array(cv2_depth_map, dtype=np.float32)) # replace nan values
-              # Get range data
-              min_range_m = self.current_controls.get("min_range_m")
-              max_range_m = self.current_controls.get("max_range_m")
-              #Update range limits and crop depth map
-              delta_range_m = max_range_m - min_range_m
-              max_range_m = min_range_m + stop_range_ratio * delta_range_m
-              min_range_m = min_range_m + start_range_ratio * delta_range_m
-              delta_range_m = max_range_m - min_range_m
-              # Filter depth_data in range
-              depth_data[np.isnan(depth_data)] = float('nan')  # set to NaN
-              depth_data[depth_data <= min_range_m] = float('nan')  # set to NaN
-              depth_data[depth_data >= max_range_m] = float('nan')  # set to NaN
-              cv2_img = depth_data
-              #img_msg = nepi_img.cv2img_to_rosimg(cv2_depth_image,encoding)
+            # Convert ros depth_map to cv2_img and numpy depth data
+            cv2_depth_map = nepi_img.rosimg_to_cv2img(img_msg, encoding="passthrough")
+            depth_data = (np.array(cv2_depth_map, dtype=np.float32)) # replace nan values
+            # Get range data
+            min_range_m = self.current_controls.get("min_range_m")
+            max_range_m = self.current_controls.get("max_range_m")
+            #Update range limits and crop depth map
+            delta_range_m = max_range_m - min_range_m
+            max_range_m = min_range_m + stop_range_ratio * delta_range_m
+            min_range_m = min_range_m + start_range_ratio * delta_range_m
+            delta_range_m = max_range_m - min_range_m
+            # Filter depth_data in range
+            depth_data[np.isnan(depth_data)] = float('nan')  # set to NaN
+            depth_data[depth_data <= min_range_m] = float('nan')  # set to NaN
+            depth_data[depth_data >= max_range_m] = float('nan')  # set to NaN
+            cv2_img = depth_data
+            #img_msg = nepi_img.cv2img_to_rosimg(cv2_depth_image,encoding)
           
           else:
             msg = "No new data for " + data_product + " available"
@@ -958,7 +885,7 @@ class ZedCamNode(object):
             max_range_m = self.current_controls.get("max_range_m")
             delta_range_m = max_range_m - min_range_m
             # Adjust range Limits if IDX Controls enabled and range ratios are not min/max
-            if self.current_controls.get("controls_enable") and (start_range_ratio > 0 or stop_range_ratio < 1):
+            if (start_range_ratio > 0 or stop_range_ratio < 1):
               max_range_m = min_range_m + stop_range_ratio * delta_range_m
               min_range_m = min_range_m + start_range_ratio * delta_range_m
               delta_range_m = max_range_m - min_range_m
@@ -1020,17 +947,16 @@ class ZedCamNode(object):
             status = True
             msg = ""
             self.pc_last_stamp = ros_timestamp
-            if self.current_controls.get("controls_enable"):
-              start_range_ratio = self.current_controls.get("start_range_ratio")
-              stop_range_ratio = self.current_controls.get("stop_range_ratio")
-              min_range_m = self.current_controls.get("min_range_m")
-              max_range_m = self.current_controls.get("max_range_m")
-              delta_range_m = max_range_m - min_range_m
-              range_clip_min_range_m = min_range_m + start_range_ratio  * delta_range_m
-              range_clip_max_range_m = min_range_m + stop_range_ratio  * delta_range_m
-              if start_range_ratio > 0 or stop_range_ratio < 1:
-                o3d_pc = nepi_pc.rospc_to_o3dpc(pc_msg, remove_nans=False)
-                o3d_pc = nepi_pc.range_clip_spherical( o3d_pc, range_clip_min_range_m, range_clip_max_range_m)
+            start_range_ratio = self.current_controls.get("start_range_ratio")
+            stop_range_ratio = self.current_controls.get("stop_range_ratio")
+            min_range_m = self.current_controls.get("min_range_m")
+            max_range_m = self.current_controls.get("max_range_m")
+            delta_range_m = max_range_m - min_range_m
+            range_clip_min_range_m = min_range_m + start_range_ratio  * delta_range_m
+            range_clip_max_range_m = min_range_m + stop_range_ratio  * delta_range_m
+            if start_range_ratio > 0 or stop_range_ratio < 1:
+              o3d_pc = nepi_pc.rospc_to_o3dpc(pc_msg, remove_nans=False)
+              o3d_pc = nepi_pc.range_clip_spherical( o3d_pc, range_clip_min_range_m, range_clip_max_range_m)
           else:
             msg = "No new data for " + data_product + " available"
         else:
@@ -1089,17 +1015,16 @@ class ZedCamNode(object):
             render_center = self.render_center
             render_up = self.render_up
 
-            if self.current_controls.get("controls_enable"):
-              start_range_ratio = self.current_controls.get("start_range_ratio")
-              stop_range_ratio = self.current_controls.get("stop_range_ratio")
-              min_range_m = self.current_controls.get("min_range_m")
-              max_range_m = self.current_controls.get("max_range_m")
-              delta_range_m = max_range_m - min_range_m
-              range_clip_min_range_m = min_range_m + start_range_ratio  * delta_range_m
-              range_clip_max_range_m = min_range_m + stop_range_ratio  * delta_range_m
-              if start_range_ratio > 0 or stop_range_ratio < 1:
-                o3d_pc = nepi_pc.rospc_to_o3dpc(pc_msg, remove_nans=False)
-                o3d_pc = nepi_pc.range_clip_spherical( o3d_pc, range_clip_min_range_m, range_clip_max_range_m)
+            start_range_ratio = self.current_controls.get("start_range_ratio")
+            stop_range_ratio = self.current_controls.get("stop_range_ratio")
+            min_range_m = self.current_controls.get("min_range_m")
+            max_range_m = self.current_controls.get("max_range_m")
+            delta_range_m = max_range_m - min_range_m
+            range_clip_min_range_m = min_range_m + start_range_ratio  * delta_range_m
+            range_clip_max_range_m = min_range_m + stop_range_ratio  * delta_range_m
+            if start_range_ratio > 0 or stop_range_ratio < 1:
+              o3d_pc = nepi_pc.rospc_to_o3dpc(pc_msg, remove_nans=False)
+              o3d_pc = nepi_pc.range_clip_spherical( o3d_pc, range_clip_min_range_m, range_clip_max_range_m)
         
               zoom_ratio = render_controls[0]
               zoom_scaler = 1 - zoom_ratio

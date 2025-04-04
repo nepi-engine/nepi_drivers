@@ -25,6 +25,7 @@ import subprocess
 import time
 
 from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_save
@@ -202,8 +203,8 @@ class V4L2CamDiscovery:
     launch_check = True
     if launch_id in self.launch_time_dict.keys():
       launch_time = self.launch_time_dict[launch_id]
-      cur_time = nepi_ros.get_time()
-      launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
+      cur_time = nepi_utils.get_time()
+      launch_check = (cur_time - launch_time) > self.NODE_LOAD_TIME_SEC
     if launch_check == False:
       return False  ###
 
@@ -255,7 +256,7 @@ class V4L2CamDiscovery:
                                       'node_subprocess': sub_process})
 
             # Process luanch results
-            self.launch_time_dict[launch_id] = nepi_ros.get_time()
+            self.launch_time_dict[launch_id] = nepi_utils.get_time()
             if success:
               nepi_msg.publishMsgInfo(self," Launched node: " + device_node_name)
             else:
@@ -264,7 +265,7 @@ class V4L2CamDiscovery:
                 nepi_msg.publishMsgInfo(self," Will not try relaunch for node: " + device_node_name)
                 self.dont_retry_list.append(launch_id)
               else:
-                nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+                nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
 
     return success
 

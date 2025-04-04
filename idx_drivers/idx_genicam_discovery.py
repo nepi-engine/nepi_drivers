@@ -162,7 +162,7 @@ class GenicamCamDiscovery:
         self.startDeviceNode(vendor=vendor, model=model, serial_number=sn)
 
         # Remove from dont_retry_list
-        launch_id = node_name
+        launch_id = node_namespace
         if launch_id in self.dont_retry_list:
           self.dont_retry_list.remove(launch_id) 
 
@@ -203,7 +203,7 @@ class GenicamCamDiscovery:
 
 
 
-    launch_id = node_namespace
+    launch_id = device_node_namespace
 
     # Check if should try to launch
     launch_check = True
