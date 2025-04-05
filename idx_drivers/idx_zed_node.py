@@ -898,7 +898,6 @@ class ZedCamNode(object):
             depth_data = np.abs(depth_data - max_range_m) # Reverse for colormap
             depth_data = np.array(255*depth_data/delta_range_m,np.uint8) # Scale for bgr colormap
             cv2_img = cv2.applyColorMap(depth_data, cv2.COLORMAP_JET)
-            #ros_img = nepi_img.cv2img_to_rosimg(cv2_depth_image,encoding)
           else:
             msg = "No new data for " + data_product + " available"
         else:
@@ -988,7 +987,7 @@ class ZedCamNode(object):
         data_product = "pointcloud_image"
         self.pc_img_lock.acquire()
         pc_msg = None
-        encoding = 'passthrough'
+        encoding = 'rgb8'
         if self.pc_img_msg != None:
           if self.pc_img_msg.header.stamp != self.pc_img_last_stamp:
             pc_msg = copy.deepcopy(self.pc_img_msg)
@@ -997,7 +996,7 @@ class ZedCamNode(object):
         # Initialize some process return variables
         status = False
         msg = ""
-        ros_img = None
+        cv2_img = None
         ros_timestamp = None
         ros_frame = None
         if pc_msg is not None:
@@ -1025,26 +1024,26 @@ class ZedCamNode(object):
             if start_range_ratio > 0 or stop_range_ratio < 1:
               o3d_pc = nepi_pc.rospc_to_o3dpc(pc_msg, remove_nans=False)
               o3d_pc = nepi_pc.range_clip_spherical( o3d_pc, range_clip_min_range_m, range_clip_max_range_m)
-        
-              zoom_ratio = render_controls[0]
-              zoom_scaler = 1 - zoom_ratio
-              render_eye = [number*zoom_scaler for number in self.render_eye] # Apply IDX zoom control
-              
-              rotate_ratio = render_controls[1]
-              rotate_angle = (0.5 - rotate_ratio) * 2 * 180
-              rotate_vector = [0, 0, rotate_angle]
-              o3d_pc = nepi_pc.rotate_pc(o3d_pc, rotate_vector)
-              
-              tilt_ratio = render_controls[2]
-              tilt_angle = (0.5 - tilt_ratio) * 2 * 180
-              tilt_vector = [0, tilt_angle, 0]
-              o3d_pc = nepi_pc.rotate_pc(o3d_pc, tilt_vector)
+
+            zoom_ratio = render_controls[0]
+            zoom_scaler = 1 - zoom_ratio
+            render_eye = [number*zoom_scaler for number in self.render_eye] # Apply IDX zoom control
+            
+            rotate_ratio = render_controls[1]
+            rotate_angle = (0.5 - rotate_ratio) * 2 * 180
+            rotate_vector = [0, 0, rotate_angle]
+            o3d_pc = nepi_pc.rotate_pc(o3d_pc, rotate_vector)
+            
+            tilt_ratio = render_controls[2]
+            tilt_angle = (0.5 - tilt_ratio) * 2 * 180
+            tilt_vector = [0, tilt_angle, 0]
+            o3d_pc = nepi_pc.rotate_pc(o3d_pc, tilt_vector)
             
             if self.img_renderer is not None and self.img_renderer_mtl is not None:
               self.img_renderer = nepi_pc.remove_img_renderer_geometry(self.img_renderer)
               self.img_renderer = nepi_pc.add_img_renderer_geometry(o3d_pc,self.img_renderer, self.img_renderer_mtl)
               o3d_img = nepi_pc.render_img(self.img_renderer,render_center,render_eye,render_up)
-              ros_img = nepi_pc.o3dimg_to_rosimg(o3d_img, stamp=ros_timestamp, frame_id=ros_frame)
+              cv2_img = nepi_pc.o3dimg_to_cv2img(o3d_img)
             else:
               # Create point cloud renderer
               self.img_renderer = nepi_pc.create_img_renderer(img_width=img_width,img_height=img_height, fov=self.render_fov, background = self.render_background)
@@ -1054,7 +1053,7 @@ class ZedCamNode(object):
             msg = "No new data for " + data_product + " available"
         else:
           msg = "Received None type data for " + data_product + " process"
-        return status, msg, ros_img, ros_timestamp,  encoding
+        return status, msg, cv2_img, ros_timestamp,  encoding
 
     
     def stopPointcloudImg(self):
