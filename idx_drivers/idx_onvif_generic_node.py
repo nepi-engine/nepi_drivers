@@ -134,13 +134,13 @@ class OnvifCamNode:
             self.logDeviceInfo()        
             # Configurable IDX parameter and data output remapping to support specific camera needs/capabilities
             # Don't edit this table directly -- do it through idx_remapping parameters
-        idx_callback_names = {
+            idx_callback_names = {
             "Controls" : {
                 # IDX Standard
                 "Framerate":  self.setFramerateRatio
-            },
+                },
 
-            "Data" : {
+                "Data" : {
                     # Data callbacks
                     "Color2DImg": self.getColorImg,
                     "StopColor2DImg": self.stopColorImg,

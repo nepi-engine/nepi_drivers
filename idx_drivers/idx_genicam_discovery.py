@@ -162,14 +162,14 @@ class GenicamCamDiscovery:
         self.startDeviceNode(vendor=vendor, model=model, serial_number=sn)
 
         # Remove from dont_retry_list
-        launch_id = node_namespace
-        if launch_id in self.dont_retry_list:
-          self.dont_retry_list.remove(launch_id) 
+        #launch_id = node_namespace
+        #if launch_id in self.dont_retry_list:
+          #self.dont_retry_list.remove(launch_id) 
 
     # Stop any nodes associated with devices that have disappeared.
     for node_namespace, running in active_devices.items():
       if not running:
-        nepi_msg.publishMsgInfo(self,"Device no longer present. Stopping node " + node_name)
+        nepi_msg.publishMsgInfo(self,"Device no longer present. Stopping node " + node_namespace)
         self.stopAndPurgeDeviceNode(node_namespace)
           
         # Remove from dont_retry_list
