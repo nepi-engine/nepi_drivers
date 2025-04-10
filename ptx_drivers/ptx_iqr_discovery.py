@@ -129,9 +129,10 @@ class IqrPanTiltDiscovery:
     success = False
     launch_id = path_str
 
-    file_name = self.drv_dict['NODE_DICT']['file_name']
+    file_name = 'iqr_ros_pan_tilt_node' # self.drv_dict['NODE_DICT']['file_name']
     device_node_name = 'iqr_pan_tilt_' + path_str.split("ttyACM")[1]
     nepi_msg.publishMsgWarn(self, "launching on node: " + device_node_name + " on path: " + path_str)
+    nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "***Launching node with file: " + file_name)
     nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "***Launching node with name: " + device_node_name)
     [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name, device_path = path_str)
 
