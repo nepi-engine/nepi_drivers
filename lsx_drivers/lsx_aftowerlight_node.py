@@ -24,13 +24,15 @@ import time
 import re
 import sys
 
-from nepi_api.device_if_lsx import LSXDeviceIF
-
 from nepi_ros_interfaces.msg import LSXStatus
 
 from nepi_sdk import nepi_ros
-from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
+
+from nepi_api.device_if_lsx import LSXDeviceIF
+from nepi_api.sys_if_msg import MsgIF
+
 
 
 PKG_NAME = 'LSX_AFTOWERLIGHT'
@@ -104,28 +106,36 @@ class AfTowerLightNode(object):
   drv_dict = dict()   
   ### LXS Driver NODE Initialization
   def __init__(self):
-      nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
-      self.node_name = nepi_ros.get_node_name()
+      ####  NODE Initialization ####
+      self.class_name = type(self).__name__
       self.base_namespace = nepi_ros.get_base_namespace()
-      nepi_msg.createMsgPublishers(self)
-      nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
-      ##############################
+      self.node_name = nepi_ros.get_node_name()
+      self.node_namespace = nepi_ros.get_node_namespace()
+
+      ##############################  
+      # Create Msg Class
+      self.msg_if = MsgIF(log_name = self.class_name)
+      self.msg_if.pub_info("Starting Node Initialization Processes")
+
+      ##############################  
+      # Initialize Class Variables
+
       # Get required drv driver dict info
       self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
-      #nepi_msg.publishMsgWarn(self,"AFTOWER_NODE: " + str(self.drv_dict))
+      #self.msg_if.pub_warn("AFTOWER_NODE: " + str(self.drv_dict))
       self.ser_port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
       ser_baud_str = self.drv_dict['DEVICE_DICT']['baud_rate_str'] 
       self.ser_baud_int = int(ser_baud_str)
-      nepi_msg.publishMsgInfo(self,"Connecting to Device on port " + self.ser_port_str + " with baud " + ser_baud_str)
+      self.msg_if.pub_info("Connecting to Device on port " + self.ser_port_str + " with baud " + ser_baud_str)
       ################################################
       ### Try and connect to device
       self.connected = self.connect()
       if self.connected:
         # Create LSX  node
-        nepi_msg.publishMsgInfo(self,'Connected')
+        self.msg_if.pub_info('Connected')
       else:
-        nepi_msg.publishMsgInfo(self,"Shutting down node")
-        nepi_msg.publishMsgInfo(self,"Specified serial port not available")
+        self.msg_if.pub_info("Shutting down node")
+        self.msg_if.pub_info("Specified serial port not available")
         nepi_ros.signal_shutdown("Serial port not available")  
 
 
@@ -134,7 +144,7 @@ class AfTowerLightNode(object):
       self.factory_settings = self.getFactorySettings()
 
       # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
-      nepi_msg.publishMsgInfo(self,"Launching NEPI LSX () interface...")
+      self.msg_if.pub_info("Launching NEPI LSX () interface...")
       self.device_info_dict["node_name"] = self.node_name
       if self.node_name.find("_") != -1:
           split_name = self.node_name.rsplit('_', 1)
@@ -172,7 +182,7 @@ class AfTowerLightNode(object):
                  )
     
       # Initialization Complete
-      nepi_msg.publishMsgInfo(self,"Initialization Complete")
+      self.msg_if.pub_info("Initialization Complete")
       #Set up node shutdown
       nepi_ros.on_shutdown(self.cleanup_actions)
       # Spin forever (until object is detected)
@@ -286,13 +296,13 @@ class AfTowerLightNode(object):
     if check_ser_port == True:
       try: 
         self.serial_port = serial.Serial(self.ser_port_str,self.ser_baud_int,timeout = 0.1)
-        #nepi_msg.publishMsgWarn(self,"Serial port open")
+        #self.msg_if.pub_warn("Serial port open")
         success = True
       except:
-        nepi_msg.publishMsgWarn(self,"Failed to open serial port")
+        self.msg_if.pub_warn("Failed to open serial port")
       self.serial_port
     else: 
-      nepi_msg.publishMsgWarn(self,"Failed to find serial port")
+      self.msg_if.pub_warn("Failed to find serial port")
     return success
 
 
@@ -310,9 +320,9 @@ class AfTowerLightNode(object):
         
         self.serial_port.write(bytes([ser_msg]))
       except Exception as e:
-        nepi_msg.publishMsgInfo(self,"Failed to send message")
+        self.msg_if.pub_info("Failed to send message")
     else:
-      nepi_msg.publishMsgInfo(self,"serial port not defined, returning empty string")
+      self.msg_if.pub_info("serial port not defined, returning empty string")
     self.serial_busy = False
     return response
 
@@ -321,8 +331,8 @@ class AfTowerLightNode(object):
     success = False
     ports = serial.tools.list_ports.comports()
     for loc, desc, hwid in sorted(ports):
-      nepi_msg.publishMsgInfo(self,"Checking port: " + loc)
-      nepi_msg.publishMsgInfo(self,"For port: " + port_str)
+      self.msg_if.pub_info("Checking port: " + loc)
+      self.msg_if.pub_info("For port: " + port_str)
       if loc == port_str:
         success = True
     return success
@@ -330,7 +340,7 @@ class AfTowerLightNode(object):
   #######################
   ### Cleanup processes on node shutdown
   def cleanup_actions(self):
-    nepi_msg.publishMsgInfo(self,"Shutting down: Executing script cleanup actions")
+    self.msg_if.pub_info("Shutting down: Executing script cleanup actions")
     if self.serial_port is not None:
       self.serial_port.close()
       

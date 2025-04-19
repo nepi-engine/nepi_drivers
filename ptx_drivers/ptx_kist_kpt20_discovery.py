@@ -27,7 +27,7 @@ import ipaddress
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
-from nepi_sdk import nepi_msg
+
 
 PKG_NAME = 'PTX_KIST_KTP20' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
@@ -65,12 +65,14 @@ class KistKPT20Discovery:
 
   ################################################          
   def __init__(self):
-    self.log_name = PKG_NAME.lower() + "_discovery" 
-    nepi_msg.createMsgPublishers(self)
+    ############
+    # Create Message Logger
+    self.log_name = PKG_NAME.lower() + "_discovery"
+    self.logger = nepi_ros.logger(log_name = self.log_name)
     time.sleep(1)
-    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Starting Initialization")
-    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Initialization Complete")
+    self.logger.log_msg_info("Starting Initialization")
     self.letters_list = list(string.ascii_uppercase)
+    self.logger.log_msg_info("Initialization Complete")
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
@@ -83,7 +85,7 @@ class KistKPT20Discovery:
     ########################
     # Get discovery options
     try:
-      #Snepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Starting discovery with drv_dict " + str(drv_dict))#
+      #Sself.logger.log_msg_warn("Starting discovery with drv_dict " + str(drv_dict))#
       baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
       baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
       baudrate_list = []
@@ -121,7 +123,7 @@ class KistKPT20Discovery:
       ip_port = drv_dict['DISCOVERY_DICT']['OPTIONS']['ip_port']['value']
 
     except Exception as e:
-      nepi_msg.publishMsgWarn(self, ":" + self.log_name + ": Failed to load options " + str(e))#
+      self.logger.log_msg_warn("Failed to load options " + str(e))#
       return None
 
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
@@ -138,12 +140,12 @@ class KistKPT20Discovery:
         try:
             test = ipaddress.ip_address(ip_addr)
         except Exception as e:
-            nepi_msg.publishMsgWarn(self, ":" + self.log_name + ": Not a valid IP address " + ip_addr + " " + str(e))#
+            self.logger.log_msg_warn("Not a valid IP address " + ip_addr + " " + str(e))#
             return self.active_paths_list
         try:
             test = int(ip_port)
         except Exception as e:
-            nepi_msg.publishMsgWarn(self, ":" + self.log_name + ": Not a valid IP port " + ip_port + " " + str(e))#
+            self.logger.log_msg_warn("Not a valid IP port " + ip_port + " " + str(e))#
             return self.active_paths_list
         success = nepi_utils.ping_ip(ip_addr)
         if success == True:
@@ -171,8 +173,8 @@ class KistKPT20Discovery:
         if path_str.find(id) != -1 or path_str in self.active_paths_list:
           valid_path = False
       if valid_path:
-        #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Looking for path: " + path_str)
-        #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": In path_list: " + str(self.active_paths_list))
+        #self.logger.log_msg_info("Looking for path: " + path_str)
+        #self.logger.log_msg_info("In path_list: " + str(self.active_paths_list))
         found = self.checkForDevice(path_str)
         if found:
           success = self.launchDeviceNode(path_str)
@@ -183,9 +185,9 @@ class KistKPT20Discovery:
 
   ##########  Device specific calls
   def checkForDevice(self,path_str):
-    #nepi_msg.publishMsgWarn(self, "Sealight checkForDevice start")###
+    #self.logger.log_msg_warn("Sealight checkForDevice start")###
     found_device = False
-    #nepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Running device search with path: " + path_str + " and buadlist " + str(self.baudrate_list))
+    #self.logger.log_msg_warn("Running device search with path: " + path_str + " and buadlist " + str(self.baudrate_list))
     if path_str not in self.active_paths_list:
       for baud_str in self.baudrate_list:
         self.baud_str = baud_str
@@ -198,7 +200,7 @@ class KistKPT20Discovery:
           elif self.connection == 'TCP-Server':
             serial_port = serial.serial_for_url('socket://' + path_str, timeout=1)
         except Exception as e:
-          nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
+          self.logger.log_msg_info("Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
           continue
         #################################################
         for addr_str in self.addr_search_list:
@@ -221,14 +223,14 @@ class KistKPT20Discovery:
             bs = serial_port.readline()
             response = bs.decode()
           except Exception as e:
-            #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Got a serial read/write error: " + str(e))
+            #self.logger.log_msg_info("Got a serial read/write error: " + str(e))
             continue
           #############################################
           if len(response) > 5:
             if response[0:5] == ser_msg[0:5]:
-              nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at path: " + path_str)
-              nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at baudrate: " + baud_str)
-              nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at address: " + self.addr_str)
+              self.logger.log_msg_info("Found device at path: " + path_str)
+              self.logger.log_msg_info("Found device at baudrate: " + baud_str)
+              self.logger.log_msg_info("Found device at address: " + self.addr_str)
               found_device = True
               return found_device
           ##############################################
@@ -242,7 +244,7 @@ class KistKPT20Discovery:
     if path_str not in self.available_paths_list:
       active = False
     if active == False:
-      nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "No longer detecting device on : " + path_str)
+      self.logger.log_msg_info("No longer detecting device on : " + path_str)
       if path_str in self.active_devices_dict.keys():
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
@@ -272,7 +274,7 @@ class KistKPT20Discovery:
 
     ### Start Node Luanch Process
     device_node_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
-    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + device_node_name)
+    self.logger.log_msg_info(" launching node: " + device_node_name)
     #Setup required param server drv_dict for discovery node
     dict_param_name = self.base_namespace + device_node_name + "/drv_dict"
     # Try to load node saved device config
@@ -282,8 +284,8 @@ class KistKPT20Discovery:
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
     self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str
     self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
-    #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + str(self.drv_dict))
-    nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Launching node  with path: " + path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str)
+    #self.logger.log_msg_info(" launching node: " + str(self.drv_dict))
+    self.logger.log_msg_info("Launching node  with path: " + path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str)
     nepi_ros.set_param(self,dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name, device_path = path_str)
     if success == True:
@@ -292,14 +294,14 @@ class KistKPT20Discovery:
     # Process luanch results
     self.launch_time_dict[launch_id] = nepi_ros.get_time()
     if success:
-      nepi_msg.publishMsgInfo(self," Launched node: " + device_node_name)
+      self.logger.log_msg_info("Launched node: " + device_node_name)
     else:
-      nepi_msg.publishMsgInfo(self," Failed to lauch node: " + device_node_name + " with msg: " + msg)
+      self.logger.log_msg_info("Failed to lauch node: " + device_node_name + " with msg: " + msg)
       if self.retry == False:
-        nepi_msg.publishMsgInfo(self," Will not try relaunch for node: " + device_node_name)
+        self.logger.log_msg_info("Will not try relaunch for node: " + device_node_name)
         self.dont_retry_list.append(launch_id)
       else:
-        nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+        self.logger.log_msg_info("Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
     return success
 
   

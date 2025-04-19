@@ -26,9 +26,10 @@ import time
 
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_utils
-from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_save
+
+from nepi_api.sys_if_msg import MsgIF
 
 PKG_NAME = 'IDX_V4L2' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
@@ -55,21 +56,24 @@ class V4L2CamDiscovery:
   deviceList = []         
   
   def __init__(self):
-    #### NODE INIT SETUP ####
-    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
-    self.node_name = nepi_ros.get_node_name()
+    ####  NODE Initialization ####
+    self.class_name = type(self).__name__
     self.base_namespace = nepi_ros.get_base_namespace()
-    nepi_msg.createMsgPublishers(self)
-    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
-    ##############################
+    self.node_name = nepi_ros.get_node_name()
+    self.node_namespace = nepi_ros.get_node_namespace()
+
+    ##############################  
+    # Create Msg Class
+    self.msg_if = MsgIF(log_name = self.class_name)
+    self.msg_if.pub_info("Starting Node Initialization Processes")
 
     ########################
     # Get discovery options
     try:
       self.drv_dict = nepi_ros.get_param(self,'~drv_dict',dict())
-      nepi_msg.publishMsgWarn(self,"Initial Driver Dict: " + str(self.drv_dict))
+      self.logger.log_msg_warn("Initial Driver Dict: " + str(self.drv_dict))
     except Exception as e:
-      nepi_msg.publishMsgWarn(self, "Failed to load options " + str(e))#
+      self.logger.log_msg_warn("Failed to load options " + str(e))#
       nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
       return
 
@@ -81,7 +85,7 @@ class V4L2CamDiscovery:
 
     nepi_ros.start_timer_process(nepi_ros.ros_duration(1), self.detectAndManageDevices, oneshot = True)
     # Now start the node
-    nepi_msg.publishMsgInfo(self,"Initialization Complete")
+    self.logger.log_msg_info("Initialization Complete")
     nepi_ros.spin()
 
   #**********************
@@ -112,7 +116,7 @@ class V4L2CamDiscovery:
         path_str = line
         # Check if this device is already known and launched  
         if device_type not in self.excludedDevices:  
-          # nepi_msg.publishMsgWarn(self,"Found device type: " + device_type + " on path " + path_str) 
+          # self.logger.log_msg_warn("Found device type: " + device_type + " on path " + path_str) 
           # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
           is_video_cap_device = False
           sub_process = subprocess.Popen(['v4l2-ctl', '-d', path_str, '--all'],
@@ -141,7 +145,7 @@ class V4L2CamDiscovery:
                 if device['device_type'] != device_type:
                   # Uh oh -- device has switched on us!
                   # Kill previous and start new?
-                  nepi_msg.publishMsgWarn(self,"detected V4L2 device type change (" + device['device_type'] + "-->" + 
+                  self.logger.log_msg_warn("detected V4L2 device type change (" + device['device_type'] + "-->" + 
                                 device_type + ") for device at " + path_str)
                   self.stopAndPurgeDeviceNode(device['node_namespace'])
 
@@ -158,9 +162,9 @@ class V4L2CamDiscovery:
                   ### DON'T REMOVE FROM dont_retry_list ###
                   launch_id = path_str
                   if launch_id in self.dont_retry_list:
-                    nepi_msg.publishMsgWarn(self,"node " + device['node_name'] + " is not running. WILL NOT RESTART")
+                    self.logger.log_msg_warn("node " + device['node_name'] + " is not running. WILL NOT RESTART")
                   else:
-                    nepi_msg.publishMsgWarn(self,"node " + device['node_name'] + " is not running. RESTARTING")
+                    self.logger.log_msg_warn("node " + device['node_name'] + " is not running. RESTARTING")
 
                   time.sleep(1)
 
@@ -168,23 +172,23 @@ class V4L2CamDiscovery:
               break
         
             if known_device == False:
-              #nepi_msg.publishMsgInfo(self,"Found new V4L2 device on path: " + path_str)
+              #self.logger.log_msg_info("Found new V4L2 device on path: " + path_str)
               success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
               if success:
-                nepi_msg.publishMsgInfo(self,"Started new node for path: " + path_str)
+                self.logger.log_msg_info("Started new node for path: " + path_str)
               else:
                 pass
-                #nepi_msg.publishMsgInfo(self,"Failed to start new node for path: " + path_str)
+                #self.logger.log_msg_info("Failed to start new node for path: " + path_str)
 
     # Check that device path still active
-    #nepi_msg.publishMsgWarn(self,"Active paths " + str(active_paths))
+    #self.logger.log_msg_warn("Active paths " + str(active_paths))
     purge_list = []
     for device in self.deviceList:
       path_str = device['device_path']
       if path_str not in active_paths:
         purge_list.append(device['node_namespace'])
     for node_name in purge_list:
-        nepi_msg.publishMsgInfo(self,"Device path: " + path_str + " no longer present. Stopping node " + device['node_name'])
+        self.logger.log_msg_info("Device path: " + path_str + " no longer present. Stopping node " + device['node_name'])
         self.stopAndPurgeDeviceNode(node_name)  
 
         # Remove from dont_retry_list
@@ -234,10 +238,10 @@ class V4L2CamDiscovery:
             device_exists = True
 
         if device_exists is False:
-          nepi_msg.publishMsgInfo(self,"Initiating new V4L2 node " + device_node_namespace)
+          self.logger.log_msg_info("Initiating new V4L2 node " + device_node_namespace)
           # Now start the node via rosrun
           # rosrun nepi_drivers_idx v4l2_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
-          nepi_msg.publishMsgInfo(self,"" + "Launching node " + device_node_name)
+          self.logger.log_msg_info("" + "Launching node " + device_node_name)
           if dtype not in self.excludedDevices:
             #Setup required param server drv_dict for discovery node
             self.drv_dict['DEVICE_DICT'] = {'device_path': path_str}
@@ -247,7 +251,7 @@ class V4L2CamDiscovery:
             nepi_drvs.checkLoadConfigFile(device_node_name)
             
             file_name = self.drv_dict['NODE_DICT']['file_name']
-            nepi_msg.publishMsgInfo(self,"Starting new V4L2 node with drv_dict " +str(self.drv_dict))
+            self.logger.log_msg_info("Starting new V4L2 node with drv_dict " +str(self.drv_dict))
             #Try and launch node
             [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name)
             if success:
@@ -258,19 +262,19 @@ class V4L2CamDiscovery:
             # Process luanch results
             self.launch_time_dict[launch_id] = nepi_utils.get_time()
             if success:
-              nepi_msg.publishMsgInfo(self," Launched node: " + device_node_name)
+              self.logger.log_msg_info(" Launched node: " + device_node_name)
             else:
-              nepi_msg.publishMsgInfo(self," Failed to lauch node: " + device_node_name + " with msg: " + msg)
+              self.logger.log_msg_info(" Failed to lauch node: " + device_node_name + " with msg: " + msg)
               if self.retry == False:
-                nepi_msg.publishMsgInfo(self," Will not try relaunch for node: " + device_node_name)
+                self.logger.log_msg_info(" Will not try relaunch for node: " + device_node_name)
                 self.dont_retry_list.append(launch_id)
               else:
-                nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
+                self.logger.log_msg_info(" Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
 
     return success
 
   def stopAndPurgeDeviceNode(self, node_namespace):
-    nepi_msg.publishMsgInfo(self,"stopping " + node_namespace)
+    self.logger.log_msg_info("stopping " + node_namespace)
     for i, device in enumerate(self.deviceList):
       if device['node_namespace'] == node_namespace:
         node_name = device['node_namespace'].split("/")[-1]
@@ -279,7 +283,7 @@ class V4L2CamDiscovery:
         # And remove it from the list
         self.deviceList.pop(i)  
     if success == False:
-      nepi_msg.publishMsgWarn(self,"Unable to stop unknown node " + node_namespace)
+      self.logger.log_msg_warn("Unable to stop unknown node " + node_namespace)
 
   def deviceNodeIsRunning(self, node_namespace):
     for device in self.deviceList:
@@ -289,7 +293,7 @@ class V4L2CamDiscovery:
         else:
           return True
     # If we get here, didn't find the node in our list    
-    nepi_msg.publishMsgWarn(self,"cannot check run status of unknown node " + node_namespace)
+    self.logger.log_msg_warn("cannot check run status of unknown node " + node_namespace)
     return False
   
 

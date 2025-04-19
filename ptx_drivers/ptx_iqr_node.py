@@ -16,6 +16,20 @@
 # - mailto:nepi@numurus.com
 #
 
+import os
+import serial
+import serial.tools.list_ports
+import time
+import re
+import sys
+
+from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_utils
+from nepi_sdk import nepi_settings
+
+from nepi_api.device_if_ptx import PTXActuatorIF
+from nepi_api.sys_if_msg import MsgIF
+
 PKG_NAME = 'PTX_IQR' 
 FILE_TYPE = 'NODE'
 
@@ -40,10 +54,25 @@ TEST_DRV_DICT = {
 
 
 
+
+####  Currently written in C++, need to convert to python node
+
 class IqrPanTiltNode:
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"
   def __init__(self):
-    pass
+    ####  NODE Initialization ####
+    self.class_name = type(self).__name__
+    self.base_namespace = nepi_ros.get_base_namespace()
+    self.node_name = nepi_ros.get_node_name()
+    self.node_namespace = nepi_ros.get_node_namespace()
+
+    ##############################  
+    # Create Msg Class
+    self.msg_if = MsgIF(log_name = self.class_name)
+    self.msg_if.pub_info("Starting Node Initialization Processes")
+
+    ##############################  
+    # Initialize Class Variables
 
 if __name__ == '__main__':
 	node = IqrPanTiltNode()

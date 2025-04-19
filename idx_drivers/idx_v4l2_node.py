@@ -23,14 +23,14 @@ import math
 import threading
 import cv2
 
-
-from nepi_api.device_if_idx import IDXDeviceIF
-
 from nepi_sdk import nepi_ros
-from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_img
 from nepi_sdk import nepi_settings
+
+from nepi_api.device_if_idx import IDXDeviceIF
+from nepi_api.sys_if_msg import MsgIF
 
 PKG_NAME = 'IDX_V4L2' # Use in display menus
 FILE_TYPE = 'NODE'
@@ -98,16 +98,23 @@ class V4l2CamNode:
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                             
     def __init__(self):
-        #### APP NODE INIT SETUP ####
-        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
-        self.node_name = nepi_ros.get_node_name()
+        ####  NODE Initialization ####
+        self.class_name = type(self).__name__
         self.base_namespace = nepi_ros.get_base_namespace()
-        nepi_msg.createMsgPublishers(self)
-        nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
-        ##############################
+        self.node_name = nepi_ros.get_node_name()
+        self.node_namespace = nepi_ros.get_node_namespace()
+
+        ##############################  
+        # Create Msg Class
+        self.msg_if = MsgIF(log_name = self.class_name)
+        self.msg_if.pub_info("Starting Node Initialization Processes")
+
+        ##############################  
+        # Initialize Class Variables
+               
         # Get required drv driver dict info
         self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_DRV_DICT) 
-        #nepi_msg.publishMsgWarn(self,"Drv_Dict: " + str(self.drv_dict))
+        #self.msg_if.pub_warn("Drv_Dict: " + str(self.drv_dict))
         self.driver_path = self.drv_dict['path']
         self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
         self.driver_module = self.driver_file.split('.')[0]
@@ -117,23 +124,23 @@ class V4l2CamNode:
         if self.device_path == "":
             self.device_path = self.DEFAULT_DEVICE_PATH
         # import driver class fromn driver module
-        nepi_msg.publishMsgInfo(self,"Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
+        self.msg_if.pub_info("Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
         [success, msg, self.driver_class] = nepi_drvs.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
         if success:
             try:
                 self.driver = self.driver_class(self.device_path)
             except Exception as e:
                 # Only log the error every 30 seconds -- don't want to fill up log in the case that the camera simply isn't attached.
-                nepi_msg.publishMsgWarn(self,"Failed to instantiate driver " + str(e) )
+                self.msg_if.pub_warn("Failed to instantiate driver " + str(e) )
                 sys.exit(-1)
         ################################################
         # Start node initialization
         
 
         if not self.driver.isConnected():
-           nepi_msg.publishMsgWarn(self,"Failed to connect to camera device")
+           self.msg_if.pub_warn("Failed to connect to camera device")
             
-        nepi_msg.publishMsgInfo(self,"... Connected!")
+        self.msg_if.pub_info("... Connected!")
 
         idx_callback_names = {
             "Controls" : {
@@ -173,7 +180,7 @@ class V4l2CamNode:
         self.factory_settings = self.getFactorySettings()
 
         # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-        nepi_msg.publishMsgInfo(self,"Launching NEPI IDX () interface...")
+        self.msg_if.pub_info("Launching NEPI IDX () interface...")
         self.device_info_dict["node_name"] = self.node_name
         if self.node_name.find("_") != -1:
             split_name = self.node_name.rsplit('_', 1)
@@ -202,7 +209,7 @@ class V4l2CamNode:
                                      getPointcloudImg=idx_callback_names["Data"]["PointcloudImg"], 
                                      stopPointcloudImgAcquisition=idx_callback_names["Data"]["StopPointcloudImg"],
                                      getNavPoseDictFunction = None)
-        nepi_msg.publishMsgInfo(self," " + " ... IDX interface running")
+        self.msg_if.pub_info(" " + " ... IDX interface running")
 
         # Update available IDX callbacks based on capabilities that the driver reports
         self.logDeviceInfo()
@@ -214,7 +221,7 @@ class V4l2CamNode:
         self.idx_if.publishStatus()
 
         ## Initiation Complete
-        nepi_msg.publishMsgInfo(self,"Initialization Complete")
+        self.msg_if.pub_info("Initialization Complete")
         # Now start the node
         nepi_ros.spin()
 
@@ -265,11 +272,11 @@ class V4l2CamNode:
             cap_setting['name'] = 'resolution'
             cap_settings['resolution'] = cap_setting
         except Exception as e:
-            nepi_msg.publishMsgInfo(self," " + "Driver returned invalid resolution options: " + str(available_resolutions))
+            self.msg_if.pub_info(" " + "Driver returned invalid resolution options: " + str(available_resolutions))
         # Add Framerate Cap cap_setting
         try:
             [success,framerates] = self.driver.getCurrentResolutionAvailableFramerates()
-            nepi_msg.publishMsgInfo(self," " + "Driver returned framerate options: " + str(framerates))
+            self.msg_if.pub_info(" " + "Driver returned framerate options: " + str(framerates))
             cap_setting = dict()
             cap_setting['type'] = 'Descrete'
             options = []
@@ -281,7 +288,7 @@ class V4l2CamNode:
                 cap_setting['name'] = 'framerate'
                 cap_settings['framerate'] = cap_setting
         except Exception as e:
-            nepi_msg.publishMsgInfo(self," " + "Driver returned invalid framerate options: " + str(framerates))
+            self.msg_if.pub_info(" " + "Driver returned invalid framerate options: " + str(framerates))
         return cap_settings
 
 
@@ -332,7 +339,7 @@ class V4l2CamNode:
         controls_dict = self.driver.getCameraControls()
         #for key in controls_dict.keys():
         #string = str(controls_dict[key])
-        #nepi_msg.publishMsgInfo(self,key + " " + string)
+        #self.msg_if.pub_info(key + " " + string)
         for setting_name in controls_dict.keys():
             info = controls_dict[setting_name]
             setting_type = info['type']
@@ -404,14 +411,14 @@ class V4l2CamNode:
                             res_dict = {'width': width, 'height': height}
                             success, msg = self.driver.setResolution(res_dict)
                         except Exception as e:
-                            nepi_msg.publishMsgInfo(self,"Resoluton setting: " + data + " could not be parsed to float " + str(e))                            
+                            self.msg_if.pub_info("Resoluton setting: " + data + " could not be parsed to float " + str(e))                            
                         break     
                     elif setting_name == "framerate":
                         try:
                             framerate = float(data)
                             success, msg = self.driver.setFramerate(framerate)
                         except Exception as e:
-                            nepi_msg.publishMsgInfo(self,"Framerate setting: " + data + " could not be parsed to float " + str(e))
+                            self.msg_if.pub_info("Framerate setting: " + data + " could not be parsed to float " + str(e))
                         break    
             if found_setting is False:
                 msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                   
@@ -430,7 +437,7 @@ class V4l2CamNode:
         controls_dict = self.driver.getCameraControls()
         for key in controls_dict.keys():
             string = str(controls_dict[key])
-            nepi_msg.publishMsgInfo(self,key + " " + string)
+            self.msg_if.pub_info(key + " " + string)
         
 
 
@@ -451,7 +458,7 @@ class V4l2CamNode:
             _, available_framerates = self.driver.getCurrentResolutionAvailableFramerates()
             device_info_str += "\tAvailable Framerates (current resolution): " + str(available_framerates) + "\n"
         
-        nepi_msg.publishMsgInfo(self,device_info_str)
+        self.msg_if.pub_info(device_info_str)
 
         
     def setFramerateRatio(self, ratio):

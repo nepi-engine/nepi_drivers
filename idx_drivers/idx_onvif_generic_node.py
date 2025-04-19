@@ -24,13 +24,15 @@ import math
 import threading
 import cv2
 
-from nepi_api.device_if_idx import IDXDeviceIF
-
 from nepi_sdk import nepi_ros
-from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_img
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_settings
+
+from nepi_api.device_if_idx import IDXDeviceIF
+from nepi_api.sys_if_msg import MsgIF
+
 
 PKG_NAME = 'IDX_ONVIF_GENERIC' # Use in display menus
 FILE_TYPE = 'NODE'
@@ -73,13 +75,20 @@ class OnvifCamNode:
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                                                    
     def __init__(self):
-        #### APP NODE INIT SETUP ####
-        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
-        self.node_name = nepi_ros.get_node_name()
+        ####  NODE Initialization ####
+        self.class_name = type(self).__name__
         self.base_namespace = nepi_ros.get_base_namespace()
-        nepi_msg.createMsgPublishers(self)
-        nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
-        ##############################
+        self.node_name = nepi_ros.get_node_name()
+        self.node_namespace = nepi_ros.get_node_namespace()
+
+        ##############################  
+        # Create Msg Class
+        self.msg_if = MsgIF(log_name = self.class_name)
+        self.msg_if.pub_info("Starting Node Initialization Processes")
+
+        ##############################  
+        # Initialize Class Variables
+        
         # Get required drv driver dict info
         try:
             self.drv_dict = nepi_ros.get_param(self,'~drv_dict') # Crash if not provide
@@ -93,13 +102,13 @@ class OnvifCamNode:
 
         # Require the camera connection parameters to have been set
         if not nepi_ros.has_param(self,'~credentials/username'):
-            nepi_msg.publishMsgErr(self,"Missing credentials/username parameter... cannot start")
+            self.msg_if.pub_warn("Missing credentials/username parameter... cannot start")
             return
         if not nepi_ros.has_param(self,'~credentials/password'):
-            nepi_msg.publishMsgErr(self,"Missing credentials/password parameter... cannot start")
+            self.msg_if.pub_warn("Missing credentials/password parameter... cannot start")
             return
         if not nepi_ros.has_param(self,'~network/host'):
-            nepi_msg.publishMsgErr(self,"Missing network/host parameter... cannot start")
+            self.msg_if.pub_warn("Missing network/host parameter... cannot start")
             return
                 
         username = str(nepi_ros.get_param(self,'~credentials/username'))
@@ -111,7 +120,7 @@ class OnvifCamNode:
         nepi_ros.set_param(self,'~/network/port', onvif_port)
 
 
-        nepi_msg.publishMsgInfo(self,"Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
+        self.msg_if.pub_info("Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
         [success, msg, self.driver_class] = nepi_drvs.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
         driver_constructed = False
         if success:
@@ -120,16 +129,16 @@ class OnvifCamNode:
                 try:
                     self.driver = self.driver_class(username, password, host, onvif_port)
                     driver_constructed = True
-                    nepi_msg.publishMsgInfo(self,"ONVIF_NODE: Driver constructed")
+                    self.msg_if.pub_info("ONVIF_NODE: Driver constructed")
                 except Exception as e:
-                    nepi_msg.publishMsgInfo(self,"ONVIF_NODE: Failed to construct driver " + self.driver_module + " with exception: " + str(e))
+                    self.msg_if.pub_info("ONVIF_NODE: Failed to construct driver " + self.driver_module + " with exception: " + str(e))
                     time.sleep(1)
                 attempts += 1 
         if driver_constructed == False:
             nepi_ros.signal_shutdown("Shutting down Onvif node " + self.node_name + ", unable to connect to driver")
         else:
             ################################################
-            nepi_msg.publishMsgInfo(self,"... Connected!")
+            self.msg_if.pub_info("... Connected!")
             self.dev_info = self.driver.getDeviceInfo()
             self.logDeviceInfo()        
             # Configurable IDX parameter and data output remapping to support specific camera needs/capabilities
@@ -188,7 +197,7 @@ class OnvifCamNode:
             self.factory_settings = self.getFactorySettings()
 
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-            nepi_msg.publishMsgInfo(self,"Launching NEPI IDX () interface...")
+            self.msg_if.pub_info("Launching NEPI IDX () interface...")
             self.device_info_dict["node_name"] = self.node_name
             if self.node_name.find("_") != -1:
                 split_name = self.node_name.rsplit('_', 1)
@@ -218,7 +227,7 @@ class OnvifCamNode:
                                         getPointcloudImg=idx_callback_names["Data"]["PointcloudImg"], 
                                         stopPointcloudImgAcquisition=idx_callback_names["Data"]["StopPointcloudImg"],
                                         getNavPoseDictFunction = None)
-            nepi_msg.publishMsgInfo(self," ... IDX interface running")
+            self.msg_if.pub_info(" ... IDX interface running")
             # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
             self.idx_if.initConfig()
 
@@ -266,7 +275,7 @@ class OnvifCamNode:
         # Add Resolution Cap Settting
         try:
             [success,resolutions,encoder_cfg] = self.driver.getAvailableResolutions()
-            nepi_msg.publishMsgInfo(self," " + "Driver returned resolution options: " + str(resolutions))
+            self.msg_if.pub_info(" " + "Driver returned resolution options: " + str(resolutions))
             if success:
                 cap_setting = dict()
                 cap_setting['name'] = 'Resolution'
@@ -280,11 +289,11 @@ class OnvifCamNode:
                 cap_setting['options'] = options
                 cap_settings['Resolution'] = cap_setting
         except Exception as e:
-            nepi_msg.publishMsgWarn(self," " + "Driver returned invalid resolution options: " + str(e))
+            self.msg_if.pub_warn(" " + "Driver returned invalid resolution options: " + str(e))
         # Add Framerate Cap cap_setting
         try:
             [success,framerates,encoder_cfg] = self.driver.getFramerateRange()
-            nepi_msg.publishMsgInfo(self," " + "Driver returned framerate options: " + str(framerates))
+            self.msg_if.pub_info(" " + "Driver returned framerate options: " + str(framerates))
             if success:
                 cap_setting = dict()
                 cap_setting['name'] = 'Framerate'
@@ -293,7 +302,7 @@ class OnvifCamNode:
                 cap_setting['options'] = options
                 cap_settings['Framerate'] = cap_setting
         except Exception as e:
-            nepi_msg.publishMsgWarn(self," " + "Driver returned invalid framerate options: " + str(e))
+            self.msg_if.pub_warn(" " + "Driver returned invalid framerate options: " + str(e))
         return cap_settings
 
 
@@ -341,7 +350,7 @@ class OnvifCamNode:
                     settings[setting_name] = setting
         # Add Resolution Cap Settting
         [success,res_dict] = self.driver.getResolution()
-        #nepi_msg.publishMsgInfo(self,str(res_dict))
+        #self.msg_if.pub_info(str(res_dict))
         setting = dict()
         setting['name'] = 'Resolution'
         setting['type'] = 'Discrete'
@@ -384,19 +393,19 @@ class OnvifCamNode:
                             width = int(data_split[0])
                             height = int(data_split[1])
                         except Exception as e:
-                            nepi_msg.publishMsgInfo(self,"Resoluton setting: " + data + " could not be parsed to int " + str(e)) 
+                            self.msg_if.pub_info("Resoluton setting: " + data + " could not be parsed to int " + str(e)) 
                         try:
                             res_dict = {'Width': width, 'Height': height}
                             success, msg = self.driver.setResolution(res_dict)
                         except Exception as e:
-                            nepi_msg.publishMsgInfo(self,"setResolution function failed " + str(e))                            
+                            self.msg_if.pub_info("setResolution function failed " + str(e))                            
                         break     
                     elif setting_name == "Framerate":
                         try:
                             framerate = int(data)
                             success, msg = self.driver.setFramerate(framerate)
                         except Exception as e:
-                            nepi_msg.publishMsgInfo(self,"Framerate setting: " + data + " could not be parsed to float " + str(e))
+                            self.msg_if.pub_info("Framerate setting: " + data + " could not be parsed to float " + str(e))
                         break    
             if found_setting is False:
                 msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                   
@@ -413,12 +422,12 @@ class OnvifCamNode:
         dev_info_string += "Model: " + self.dev_info["Model"] + "\n"
         dev_info_string += "Firmware Version: " + self.dev_info["FirmwareVersion"] + "\n"
         dev_info_string += "Serial Number: " + self.dev_info["HardwareId"] + "\n"
-        nepi_msg.publishMsgInfo(self,dev_info_string)
+        self.msg_if.pub_info(dev_info_string)
     
         controls_dict = self.driver.getCameraControls()
         for key in controls_dict.keys():
             string = str(controls_dict[key])
-            nepi_msg.publishMsgInfo(self,key + " " + string)
+            self.msg_if.pub_info(key + " " + string)
                 
         
     def setFramerateRatio(self, ratio):

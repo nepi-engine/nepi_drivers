@@ -34,11 +34,8 @@ import dynamic_reconfigure.client
 import numpy as np
 import tf
 
-from nepi_api.device_if_idx import IDXDeviceIF
-
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_utils
-from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_nav
 from nepi_sdk import nepi_img
 from nepi_sdk import nepi_pc
@@ -54,6 +51,10 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import NavSatFix
 from dynamic_reconfigure.msg import Config
 from rospy.numpy_msg import numpy_msg
+
+from nepi_api.device_if_idx import IDXDeviceIF
+from nepi_api.sys_if_msg import MsgIF
+
 
 PKG_NAME = 'IDX_ZED' # Use in display menus
 FILE_TYPE = 'NODE'
@@ -182,13 +183,20 @@ class ZedCamNode(object):
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"         
     drv_dict = dict()                          
     def __init__(self):
-        #### APP NODE INIT SETUP ####
-        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
-        self.node_name = nepi_ros.get_node_name()
+        ####  NODE Initialization ####
+        self.class_name = type(self).__name__
         self.base_namespace = nepi_ros.get_base_namespace()
-        nepi_msg.createMsgPublishers(self)
-        nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
-        ##############################
+        self.node_name = nepi_ros.get_node_name()
+        self.node_namespace = nepi_ros.get_node_namespace()
+
+        ##############################  
+        # Create Msg Class
+        self.msg_if = MsgIF(log_name = self.class_name)
+        self.msg_if.pub_info("Starting Node Initialization Processes")
+
+        ##############################  
+        # Initialize Class Variables
+
         # Get required drv driver dict info
         self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_DRV_DICT) 
 
@@ -198,9 +206,9 @@ class ZedCamNode(object):
         if success:
           if len(files_copied) > 0:
             strList = str(files_copied)
-            nepi_msg.publishMsgInfo(self,"Restored zed cal files: " + strList)
+            self.msg_if.pub_info("Restored zed cal files: " + strList)
         else:
-          nepi_msg.publishMsgInfo(self,"Failed to restore zed cal files")
+          self.msg_if.pub_info("Failed to restore zed cal files")
 
         # Connect to Zed node
         self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
@@ -217,7 +225,7 @@ class ZedCamNode(object):
           zed_wrapper_not_running = nepi_drvs.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
           nepi_ros.sleep(2,20)
         except Exception as e:
-          pass #nepi_msg.publishMsgInfo(self,str(e))
+          pass #self.msg_if.pub_info(str(e))
 
         if zed_wrapper_not_running == False:
           rospy.signal_shutdown("Zed  Wrapper still running, Shutting Down")
@@ -230,18 +238,18 @@ class ZedCamNode(object):
           try:
             with open(zed_params_path) as f:
               cfg = yaml.load(f, Loader=yaml.FullLoader)
-            #nepi_msg.publishMsgWarn(self,"Updating zed param config with resolution " + str(self.res_val))
+            #self.msg_if.pub_warn("Updating zed param config with resolution " + str(self.res_val))
             cfg['general']['resolution'] = self.res_val
             cfg['general']['grab_frame_rate'] = self.framerate
-            nepi_msg.publishMsgWarn(self,"Updating zed param file: " + zed_params_path + " with cfg " + str(cfg))
+            self.msg_if.pub_warn("Updating zed param file: " + zed_params_path + " with cfg " + str(cfg))
             with open(zed_params_path, "w") as f:
                 cfg = yaml.dump(
                     cfg, stream=f, default_flow_style=False, sort_keys=False
                 )
           except:
-            nepi_msg.publishMsgWarn(self,"Failed to update zed param file: " + zed_params_path + " " + str(e))
+            self.msg_if.pub_warn("Failed to update zed param file: " + zed_params_path + " " + str(e))
         else:
-          nepi_msg.publishMsgWarn(self,"Failed to find zed param file: " + zed_params_path)
+          self.msg_if.pub_warn("Failed to find zed param file: " + zed_params_path)
 
         # Run the correct zed_ros_wrapper launch file
         zed_launchfile = self.zed_type + '.launch'
@@ -260,18 +268,18 @@ class ZedCamNode(object):
             self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=3)
             success = True
           except Exception as e:
-            nepi_msg.publishMsgInfo(self,str(e))
+            self.msg_if.pub_info(str(e))
             nepi_ros.sleep(waittime,10)
             timer += waittime
         if timer >= timeout or self.zed_dynamic_reconfig_client is None:
-          nepi_msg.publishMsgWarn(self,"Failed to connect to zed_node using launch process" + str(zed_ros_wrapper_run_cmd))
-          nepi_msg.publishMsgWarn(self,"Killing node named: " + ZED_BASE_NAMESPACE)
+          self.msg_if.pub_warn("Failed to connect to zed_node using launch process" + str(zed_ros_wrapper_run_cmd))
+          self.msg_if.pub_warn("Killing node named: " + ZED_BASE_NAMESPACE)
           success = nepi_drvs.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
           if success:
             time.sleep(2)
           nepi_ros.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
           return
-        nepi_msg.publishMsgWarn(self,"Zed DRC: " + str(self.zed_dynamic_reconfig_client))
+        self.msg_if.pub_warn("Zed DRC: " + str(self.zed_dynamic_reconfig_client))
         time.sleep(2)
 
 
@@ -291,20 +299,22 @@ class ZedCamNode(object):
 
 
         # Wait for zed camera topic to publish, then subscribeCAPS SETTINGS
-        nepi_msg.publishMsgInfo(self,"Waiting for topic: " + self.color_img_topic)
+        self.msg_if.pub_info("Waiting for topic: " + self.color_img_topic)
         nepi_ros.wait_for_topic(self.color_img_topic)
 
-        nepi_msg.publishMsgInfo(self,"Starting Zed IDX subscribers and publishers")
+        self.msg_if.pub_info("Starting Zed IDX subscribers and publishers")
         self.color_img_sub = None
         self.bw_img_sub = None
         self.depth_map_sub = None
         self.depth_img_sub = None
         self.pc_sub = None
         self.pc_img_sub = None
+
+        
         odom_sub = rospy.Subscriber(ZED_ODOM_TOPIC, Odometry, self.idx_odom_topic_callback)
 
         # Launch the  node
-        nepi_msg.publishMsgInfo(self,"... Connected!")
+        self.msg_if.pub_info("... Connected!")
 
 
         idx_callback_names = {
@@ -353,7 +363,7 @@ class ZedCamNode(object):
             
 
         # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-        nepi_msg.publishMsgInfo(self,"Launching NEPI IDX () interface...")
+        self.msg_if.pub_info("Launching NEPI IDX () interface...")
         self.device_info_dict["node_name"] = self.node_name
         if self.node_name.find("_") != -1:
             split_name = self.node_name.rsplit('_', 1)
@@ -383,7 +393,7 @@ class ZedCamNode(object):
                                     getPointcloudImg=idx_callback_names["Data"]["PointcloudImg"], 
                                     stopPointcloudImgAcquisition=idx_callback_names["Data"]["StopPointcloudImg"],
                                     getNavPoseDictFunction = None)
-        nepi_msg.publishMsgInfo(self,"... IDX interface running")
+        self.msg_if.pub_info("... IDX interface running")
 
         # Update available IDX callbacks based on capabilities that the driver reports
         self.logDeviceInfo()
@@ -396,12 +406,14 @@ class ZedCamNode(object):
         if success:
           if len(files_copied) > 0:
             strList = str(files_copied)
-            nepi_msg.publishMsgInfo(self,"Backed up zed cal files: " + strList)
+            self.msg_if.pub_info("Backed up zed cal files: " + strList)
         else:
-          nepi_msg.publishMsgInfo(self,"Failed to back up up zed cal files")
+          self.msg_if.pub_info("Failed to back up up zed cal files")
 
+
+        ##########################################
         ## Initiation Complete
-        nepi_msg.publishMsgInfo(self,"Initialization Complete")
+        self.msg_if.pub_info("Initialization Complete")
         # Now start zed node check process
         self.attempts = 0
         nepi_ros.start_timer_process(nepi_ros.ros_duration(1), self.checkZedNodeCb)
@@ -640,8 +652,8 @@ class ZedCamNode(object):
 
     def logDeviceInfo(self):
         device_info_str = self.node_name + " info:\n"
-        nepi_msg.publishMsgInfo(self,device_info_str)
-        nepi_msg.publishMsgInfo(self,str(self.device_info_dict))
+        self.msg_if.pub_info(device_info_str)
+        self.msg_if.pub_info(str(self.device_info_dict))
 
      
     def setFramerateRatio(self, ratio):
@@ -1073,19 +1085,19 @@ class ZedCamNode(object):
 
 
     def cleanup_actions(self):
-      nepi_msg.publishMsgInfo(self,"Shutting down: Executing script cleanup actions")
+      self.msg_if.pub_info("Shutting down: Executing script cleanup actions")
       try:
         zed_type = self.zed_type
         zed_node_namespace = os.path.join(self.base_namespace,zed_type,'zed_node')
         nepi_ros.kill_node_namespace(zed_node_namespace)
       except Exception as e:
-        nepi_msg.publishMsgWarn(self,"Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
+        self.msg_if.pub_warn("Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
       try:
         zed_type = self.zed_type
         zed_node_namespace = os.path.join(self.base_namespace,zed_type,zed_type + '_state_publisher')
         nepi_ros.kill_node_namespace(zed_node_namespace)
       except Exception as e:
-        nepi_msg.publishMsgWarn(self,"Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
+        self.msg_if.pub_warn("Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
         
 if __name__ == '__main__':
     node = ZedCamNode()

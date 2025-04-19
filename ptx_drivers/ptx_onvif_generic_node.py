@@ -16,12 +16,13 @@
 # - mailto:nepi@numurus.com
 #
 
-from nepi_sdk import nepi_ros
-from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_drvs
+from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
 
-from nepi_api.device_if_ptx import PTXActuatorIF
+from nepi_api.device_if_lsx import LSXDeviceIF
+from nepi_api.sys_if_msg import MsgIF
 
 PKG_NAME = 'PTX_ONVIF_GENERIC' # Use in display menus
 FILE_TYPE = 'NODE'
@@ -54,13 +55,20 @@ class OnvifPanTiltNode:
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                                                    
     def __init__(self):
-        #### APP NODE INIT SETUP ####
-        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
-        self.node_name = nepi_ros.get_node_name()
+        ####  NODE Initialization ####
+        self.class_name = type(self).__name__
         self.base_namespace = nepi_ros.get_base_namespace()
-        nepi_msg.createMsgPublishers(self)
-        nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
-        ##############################
+        self.node_name = nepi_ros.get_node_name()
+        self.node_namespace = nepi_ros.get_node_namespace()
+
+        ##############################  
+        # Create Msg Class
+        self.msg_if = MsgIF(log_name = self.class_name)
+        self.msg_if.pub_info("Starting Node Initialization Processes")
+
+        ##############################  
+        # Initialize Class Variables
+        
         # Get required drv driver dict info
         try:
             self.drv_dict = nepi_ros.get_param(self,'~drv_dict') # Crash if not provide
@@ -74,13 +82,13 @@ class OnvifPanTiltNode:
 
         # Require the camera connection parameters to have been set
         if not nepi_ros.has_param(self,'~credentials/username'):
-            nepi_msg.publishMsgErr(self,"Missing credentials/username parameter... cannot start")
+            self.msg_if.pub_warn("Missing credentials/username parameter... cannot start")
             return
         if not nepi_ros.has_param(self,'~credentials/password'):
-            nepi_msg.publishMsgErr(self,"Missing credentials/password parameter... cannot start")
+            self.msg_if.pub_warn("Missing credentials/password parameter... cannot start")
             return
         if not nepi_ros.has_param(self,'~network/host'):
-            nepi_msg.publishMsgErr(self,"Missing network/host parameter... cannot start")
+            self.msg_if.pub_warn("Missing network/host parameter... cannot start")
             return
                 
         username = str(nepi_ros.get_param(self,'~credentials/username'))
@@ -92,7 +100,7 @@ class OnvifPanTiltNode:
         nepi_ros.set_param(self,'~/network/port', onvif_port)
 
 
-        nepi_msg.publishMsgInfo(self,"Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
+        self.msg_if.pub_info("Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
         [success, msg, self.driver_class] = nepi_drvs.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
         
         driver_constructed = False
@@ -102,16 +110,16 @@ class OnvifPanTiltNode:
                 try:
                     self.driver = self.driver_class(username, password, host, onvif_port)
                     driver_constructed = True
-                    nepi_msg.publishMsgInfo(self,"Driver constructed")
+                    self.msg_if.pub_info("Driver constructed")
                 except Exception as e:
-                    nepi_msg.publishMsgInfo(self,"Failed to construct driver: " + self.driver_module + "with exception: " + str(e))
+                    self.msg_if.pub_info("Failed to construct driver: " + self.driver_module + "with exception: " + str(e))
                     nepi_ros.sleep(1)
                 attempts += 1 
         if driver_constructed == False:
             nepi_ros.signal_shutdown("Shutting down Onvif node " + self.node_name + ", unable to connect to driver")
         else:
             ################################################
-            nepi_msg.publishMsgInfo(self,"... Connected!")
+            self.msg_if.pub_info("... Connected!")
             self.dev_info = self.driver.getDeviceInfo()
             self.logDeviceInfo()
 
@@ -152,8 +160,8 @@ class OnvifPanTiltNode:
             
             self.has_absolute_positioning_and_feedback = self.driver.hasAbsolutePositioning() and self.driver.reportsPosition()
             ptx_capabilities_dict['has_absolute_positioning'] = self.has_absolute_positioning_and_feedback
-            nepi_msg.publishMsgWarn(self,"hasAbsolutePositioning gnode check" + str(self.driver.hasAbsolutePositioning()))
-            nepi_msg.publishMsgWarn(self,"reportsPosition gnode check" + str(self.driver.reportsPosition()))
+            self.msg_if.pub_warn("hasAbsolutePositioning gnode check" + str(self.driver.hasAbsolutePositioning()))
+            self.msg_if.pub_warn("reportsPosition gnode check" + str(self.driver.reportsPosition()))
                     
             if not self.driver.canHome() and not self.has_absolute_positioning_and_feedback:
                 ptx_callback_names["GoHome"] = None
@@ -182,7 +190,7 @@ class OnvifPanTiltNode:
             # that case, assign these to null in the config file
             # TODO: Not sure we actually need remappings for PTX: Makes sense for IDX because there are lots of controllable params.
             ptx_remappings = nepi_ros.get_param(self,'~ptx_remappings', {})
-            nepi_msg.publishMsgInfo(self,'Establishing PTX remappings')
+            self.msg_if.pub_info('Establishing PTX remappings')
             for from_name in ptx_remappings:
                 to_name = ptx_remappings[from_name]
                 if from_name not in ptx_callback_names or (to_name not in ptx_callback_names and to_name != None and to_name != 'None'):
@@ -196,7 +204,7 @@ class OnvifPanTiltNode:
 
             # Launch the PTX interface --  this takes care of initializing all the ptx settings from config. file, subscribing and advertising topics and services, etc.
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-            nepi_msg.publishMsgInfo(self,"Launching NEPI PTX () interface...")
+            self.msg_if.pub_info("Launching NEPI PTX () interface...")
             self.device_info_dict["node_name"] = self.node_name
             if self.node_name.find("_") != -1:
                 split_name = self.node_name.rsplit('_', 1)
@@ -245,13 +253,13 @@ class OnvifPanTiltNode:
 
             # Initialize settings
             self.cap_settings = self.getCapSettings()
-            nepi_msg.publishMsgInfo(self,"" +"CAPS SETTINGS")
+            self.msg_if.pub_info("" +"CAPS SETTINGS")
             #for setting in self.cap_settings:
-                #nepi_msg.publishMsgInfo(self,"" +setting)
+                #self.msg_if.pub_info("" +setting)
             self.factory_settings = self.getFactorySettings()
-            nepi_msg.publishMsgInfo(self,"" +"FACTORY SETTINGS")
+            self.msg_if.pub_info("" +"FACTORY SETTINGS")
             #for setting in self.factory_settings:
-                #nepi_msg.publishMsgInfo(self,"" +setting)
+                #self.msg_if.pub_info("" +setting)
 
             self.speed_ratio = 0.5
             self.home_yaw_deg = 0.0
@@ -279,7 +287,7 @@ class OnvifPanTiltNode:
                                         gotoWaypointCb = ptx_callback_names["GotoWaypoint"],
                                         setWaypointCb = ptx_callback_names["SetWaypoint"],
                                         setWaypointHereCb = ptx_callback_names["SetWaypointHere"])
-            nepi_msg.publishMsgInfo(self," ... PTX interface running")
+            self.msg_if.pub_info(" ... PTX interface running")
 
 
             nepi_ros.spin()
@@ -292,7 +300,7 @@ class OnvifPanTiltNode:
         dev_info_string += "Model: " + self.dev_info["Model"] + "\n"
         dev_info_string += "Firmware Version: " + self.dev_info["FirmwareVersion"] + "\n"
         dev_info_string += "Serial Number: " + self.dev_info["HardwareId"] + "\n"
-        nepi_msg.publishMsgInfo(self,dev_info_string)
+        self.msg_if.pub_info(dev_info_string)
 
 
     #**********************
@@ -490,7 +498,7 @@ class OnvifPanTiltNode:
         if self.driver.hasWaypoints():
             self.driver.setPresetHere(waypoint_index)
 
-        nepi_msg.publishMsgInfo(self,"Waypoint set to current position")
+        self.msg_if.pub_info("Waypoint set to current position")
 
     def setCurrentSettingsAsDefault(self):
         # Don't need to worry about any of our params in this class, just child interfaces' params

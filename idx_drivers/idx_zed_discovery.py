@@ -27,9 +27,10 @@ import time
 
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_utils
-from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_save
+
+from nepi_api.sys_if_msg import MsgIF
 
 PKG_NAME = 'IDX_ZED' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
@@ -69,26 +70,29 @@ class ZedCamDiscovery:
   failed_node_list = []
 
   def __init__(self):
-    #### APP NODE INIT SETUP ####
-    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
-    self.node_name = nepi_ros.get_node_name()
+    ####  NODE Initialization ####
+    self.class_name = type(self).__name__
     self.base_namespace = nepi_ros.get_base_namespace()
-    nepi_msg.createMsgPublishers(self)
-    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
-    ##############################
+    self.node_name = nepi_ros.get_node_name()
+    self.node_namespace = nepi_ros.get_node_namespace()
+
+    ##############################  
+    # Create Msg Class
+    self.msg_if = MsgIF(log_name = self.class_name)
+    self.msg_if.pub_info("Starting Node Initialization Processes")
 
     ########################
     # Get discovery options
     try:
       self.drv_dict = nepi_ros.get_param(self,'~drv_dict',dict())
-      nepi_msg.publishMsgWarn(self,"Initial Driver Dict: " + str(self.drv_dict))
+      self.logger.log_msg_warn("Initial Driver Dict: " + str(self.drv_dict))
       res_val = 3
       if 'resolution' in self.drv_dict['DISCOVERY_DICT']['OPTIONS']:
         res_str = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['resolution']['value']
         if res_str in self.RES_DICT.keys():
           self.res_val = self.RES_DICT[res_str]
     except Exception as e:
-      nepi_msg.publishMsgWarn(self, "Failed to load options " + str(e))#
+      self.logger.log_msg_warn("Failed to load options " + str(e))#
       nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
       return None
 
@@ -100,7 +104,7 @@ class ZedCamDiscovery:
 
     nepi_ros.start_timer_process(nepi_ros.ros_duration(1), self.detectAndManageDevices, oneshot = True)
 
-    nepi_msg.publishMsgInfo(self,"Initialization Complete")
+    self.logger.log_msg_info("Initialization Complete")
     nepi_ros.spin()
 
   #**********************
@@ -161,7 +165,7 @@ class ZedCamDiscovery:
                 if device['device_type'] != device_type:
                   # Uh oh -- device has switched on us!
                   # Kill previous and start new?
-                  nepi_msg.publishMsgWarn(self,"detected Zed device type change (" + device['device_type'] + "-->" + 
+                  self.logger.log_msg_warn("detected Zed device type change (" + device['device_type'] + "-->" + 
                                 device_type + ") for device at " + path_str)
                   self.stopAndPurgeDeviceNode(device['node_namespace'])
 
@@ -178,9 +182,9 @@ class ZedCamDiscovery:
                   ### DON'T REMOVE FROM dont_retry_list ###
                   launch_id = path_str
                   if launch_id in self.dont_retry_list:
-                    nepi_msg.publishMsgWarn(self,"node " + device['node_name'] + " is not running. WILL NOT RESTART")
+                    self.logger.log_msg_warn("node " + device['node_name'] + " is not running. WILL NOT RESTART")
                   else:
-                    nepi_msg.publishMsgWarn(self,"node " + device['node_name'] + " is not running. RESTARTING")
+                    self.logger.log_msg_warn("node " + device['node_name'] + " is not running. RESTARTING")
                     
                   time.sleep(1)
 
@@ -189,15 +193,15 @@ class ZedCamDiscovery:
               
 
             if known_device == False:
-              nepi_msg.publishMsgWarn(self,"Starting zed on path" + path_str)
+              self.logger.log_msg_warn("Starting zed on path" + path_str)
               success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
               if success:
-                nepi_msg.publishMsgInfo(self,"Started new node for path: " + path_str)
+                self.logger.log_msg_info("Started new node for path: " + path_str)
               else:
-                nepi_msg.publishMsgInfo(self,"Failed to start new node for path: " + path_str)
+                self.logger.log_msg_info("Failed to start new node for path: " + path_str)
 
     # Check that device path still active
-    #nepi_msg.publishMsgWarn(self,"Active paths " + str(active_paths))
+    #self.logger.log_msg_warn("Active paths " + str(active_paths))
     purge_list = []
     for path_str in self.DEVICE_DICT.keys():
       if path_str not in active_paths:
@@ -205,7 +209,7 @@ class ZedCamDiscovery:
     for path_str in purge_list:
         device_dict = self.DEVICE_DICT[path_str]
         node_name = device_dict['node_namespace']
-        nepi_msg.publishMsgInfo(self,"Device path: " + path_str + " no longer present. Stopping node " + node_name)
+        self.logger.log_msg_info("Device path: " + path_str + " no longer present. Stopping node " + node_name)
         self.stopAndPurgeDeviceNode(node_name)  
 
         # Remove from dont_retry_list
@@ -256,11 +260,11 @@ class ZedCamDiscovery:
 
         if device_exists is False:
           device_node_namespace = nepi_ros.get_base_namespace() + device_node_name
-          nepi_msg.publishMsgInfo(self,"Initiating new Zed node " + device_node_namespace)
+          self.logger.log_msg_info("Initiating new Zed node " + device_node_namespace)
 
           # Now start the node via rosrun
           # rosrun nepi_drivers_idx zed_camera_node.py __name:=usb_cam_1 _path_str:=/dev/video0
-          nepi_msg.publishMsgInfo(self,"Launching node " + device_node_name)
+          self.logger.log_msg_info("Launching node " + device_node_name)
           if dtype in self.includeDevices:
             #Setup required param server drv_dict for discovery node
             self.drv_dict['DEVICE_DICT']={'zed_type': root_name, 'res_val': self.res_val, 'framerate': self.FRAMERATE}
@@ -277,23 +281,23 @@ class ZedCamDiscovery:
             if success:
               self.DEVICE_DICT[path_str]['node_subprocess'] = sub_process
               self.DEVICE_DICT[path_str]['zed_type'] = root_name
-              nepi_msg.publishMsgInfo(self,msg)
+              self.logger.log_msg_info("msg)
 
             # Process luanch results
             self.launch_time_dict[launch_id] = nepi_utils.get_time()
             if success:
-              nepi_msg.publishMsgInfo(self," Launched node: " + device_node_name)
+              self.logger.log_msg_info(" Launched node: " + device_node_name)
             else:
-              nepi_msg.publishMsgInfo(self," Failed to lauch node: " + device_node_name + " with msg: " + msg)
+              self.logger.log_msg_info(" Failed to lauch node: " + device_node_name + " with msg: " + msg)
               if self.retry == False:
-                nepi_msg.publishMsgInfo(self," Will not try relaunch for node: " + device_node_name)
+                self.logger.log_msg_info(" Will not try relaunch for node: " + device_node_name)
                 self.dont_retry_list.append(launch_id)
               else:
-                nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
+                self.logger.log_msg_info(" Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
     return success
 
   def stopAndPurgeDeviceNode(self, node_namespace):
-    nepi_msg.publishMsgWarn(self,"stopping " + node_namespace)
+    self.logger.log_msg_warn("stopping " + node_namespace)
     purge_path = None
     for path in self.DEVICE_DICT.keys():
       device = self.DEVICE_DICT[path]
@@ -304,7 +308,7 @@ class ZedCamDiscovery:
         if success:
           purge_path = path
         else:
-          nepi_msg.publishMsgWarn(self,"Unable to stop unknown node " + node_namespace)
+          self.logger.log_msg_warn("Unable to stop unknown node " + node_namespace)
 
     if purge_path is not None:
       # Try and kill the zed_node
@@ -313,13 +317,13 @@ class ZedCamDiscovery:
         zed_node_namespace = os.path.join(self.base_namespace,zed_type,'zed_node')
         nepi_ros.kill_node_namespace(zed_node_namespace)
       except Exception as e:
-        nepi_msg.publishMsgWarn(self,"Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
+        self.logger.log_msg_warn("Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
       try:
         zed_type = self.DEVICE_DICT[purge_path]['zed_type']
         zed_node_namespace = os.path.join(self.base_namespace,zed_type,zed_type + '_state_publisher')
         nepi_ros.kill_node_namespace(zed_node_namespace)
       except Exception as e:
-        nepi_msg.publishMsgWarn(self,"Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
+        self.logger.log_msg_warn("Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
       # delete device dict entry
       del self.DEVICE_DICT[purge_path]
 
@@ -334,7 +338,7 @@ class ZedCamDiscovery:
         else:
           return True
     # If we get here, didn't find the node in our list    
-    nepi_msg.publishMsgWarn(self,"cannot check run status of unknown node " + node_namespace)
+    self.logger.log_msg_warn("cannot check run status of unknown node " + node_namespace)
     return False
   
   def short_name(self,name):

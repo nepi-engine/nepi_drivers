@@ -30,10 +30,8 @@ import copy
 
 from nepi_sdk import nepi_ros 
 from nepi_sdk import nepi_nav
-from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
-
-from nepi_api.device_if_rbx import RBXRobotIF
 
 from std_msgs.msg import Empty, Int8, UInt8, UInt32, Bool, String, Float32, Float64
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
@@ -45,6 +43,9 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Image, NavSatFix, BatteryState
 
 from nepi_ros_interfaces.msg import AxisControls
+
+from nepi_api.device_if_rbx import RBXRobotIF
+from nepi_api.sys_if_msg import MsgIF
 
 PKG_NAME = 'RBX_ARDUPILOT' # Use in display menus
 FILE_TYPE = 'NODE'
@@ -153,12 +154,20 @@ class ArdupilotNode:
   drv_dict = dict()   
   ### LXS Driver NODE Initialization
   def __init__(self):
-    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
-    self.node_name = nepi_ros.get_node_name()
+    ####  NODE Initialization ####
+    self.class_name = type(self).__name__
     self.base_namespace = nepi_ros.get_base_namespace()
-    nepi_msg.createMsgPublishers(self)
-    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
-    ##############################
+    self.node_name = nepi_ros.get_node_name()
+    self.node_namespace = nepi_ros.get_node_namespace()
+
+    ##############################  
+    # Create Msg Class
+    self.msg_if = MsgIF(log_name = self.class_name)
+    self.msg_if.pub_info("Starting Node Initialization Processes")
+
+    ##############################  
+    # Initialize Class Variables
+
     self.status_msg_pub = rospy.Publisher("~status_msg", String, queue_size=1)
 
     ## Define RBX NavPose Publishers
@@ -176,28 +185,28 @@ class ArdupilotNode:
 
     # Get Mavlink NameSpace
     mav_node_name = self.node_name.replace("ardupilot","mavlink")
-    nepi_msg.publishMsgInfo(self,"Waiting for mavlink node that includes: " + mav_node_name)
+    self.msg_if.pub_info("Waiting for mavlink node that includes: " + mav_node_name)
     mav_node_name = nepi_ros.wait_for_node(mav_node_name)
     MAVLINK_NAMESPACE = (mav_node_name + '/')
-    nepi_msg.publishMsgInfo(self,"Using mavlink namespace: " + MAVLINK_NAMESPACE)
+    self.msg_if.pub_info("Using mavlink namespace: " + MAVLINK_NAMESPACE)
     # Start Mavlink State Subscriber
     MAVLINK_STATE_TOPIC = MAVLINK_NAMESPACE + "state"
     # Wait for MAVLink State topic to publish then subscribe
-    nepi_msg.publishMsgInfo(self,"Waiting for topic: " + MAVLINK_STATE_TOPIC)
+    self.msg_if.pub_info("Waiting for topic: " + MAVLINK_STATE_TOPIC)
     nepi_ros.wait_for_topic(MAVLINK_STATE_TOPIC)
-    nepi_msg.publishMsgInfo(self,"Starting state scubscriber callback")
+    self.msg_if.pub_info("Starting state scubscriber callback")
     rospy.Subscriber(MAVLINK_STATE_TOPIC, State, self.get_state_callback)
     while self.state_current == "None" and not rospy.is_shutdown():
-      nepi_msg.publishMsgInfo(self,"Waiting for mavlink state status to set")
+      self.msg_if.pub_info("Waiting for mavlink state status to set")
       time.sleep(0.1)
     while self.mode_current == "None" and not rospy.is_shutdown():
-      nepi_msg.publishMsgInfo(self,"Waiting for mavlink mode status to set")
+      self.msg_if.pub_info("Waiting for mavlink mode status to set")
       time.sleep(0.1)
-    nepi_msg.publishMsgInfo(self,"Starting State: " + self.state_current)
-    nepi_msg.publishMsgInfo(self,"Starting Mode: " + self.mode_current)
+    self.msg_if.pub_info("Starting State: " + self.state_current)
+    self.msg_if.pub_info("Starting Mode: " + self.mode_current)
 
     # MAVLINK Required Services
-    nepi_msg.publishMsgInfo(self,"Configuring interfaces for mavlink namespace: " + MAVLINK_NAMESPACE)
+    self.msg_if.pub_info("Configuring interfaces for mavlink namespace: " + MAVLINK_NAMESPACE)
     ## Define Mavlink Services Calls
     MAVLINK_SET_HOME_SERVICE = MAVLINK_NAMESPACE + "cmd/set_home"
     MAVLINK_SET_MODE_SERVICE = MAVLINK_NAMESPACE + "set_mode"
@@ -232,24 +241,24 @@ class ArdupilotNode:
     self.setpoint_attitude_pub = rospy.Publisher(MAVLINK_SETPOINT_ATTITUDE_TOPIC, AttitudeTarget, queue_size=1)
     self.setpoint_position_local_pub = rospy.Publisher(MAVLINK_SETPOINT_POSITION_LOCAL_TOPIC, PoseStamped, queue_size=1)
 
-    nepi_msg.publishMsgInfo(self,"... Connected to Mavlink!")
+    self.msg_if.pub_info("... Connected to Mavlink!")
 
 
 
     # Initialize RBX Settings
     self.cap_settings = self.getCapSettings()
     '''
-    nepi_msg.publishMsgWarn(self,"CAPS SETTINGS")
+    self.msg_if.pub_warn("CAPS SETTINGS")
     for setting_name in self.cap_settings.keys():
         setting = self.cap_settings[setting_name]
-        nepi_msg.publishMsgWarn(self,str(setting))
+        self.msg_if.pub_warn(str(setting))
     '''
     self.factory_settings = self.getFactorySettings()
     '''
-    nepi_msg.publishMsgWarn(self,"FACTORY SETTINGS")
+    self.msg_if.pub_warn("FACTORY SETTINGS")
     for setting_name in self.factory_settings.keys():
         setting = self.factory_settings[setting_name]
-        nepi_msg.publishMsgWarn(self,str(setting))
+        self.msg_if.pub_warn(str(setting))
     '''
 
 
@@ -261,7 +270,7 @@ class ArdupilotNode:
       # Define fake gps namespace
       fake_gps_node = self.node_name.replace("ardupilot","fake_gps")
       FAKE_GPS_NAMESPACE = nepi_ros.get_base_namespace() + fake_gps_node + "/"
-      nepi_msg.publishMsgInfo(self,"Setting up fake_gps pubs at namespace: " + FAKE_GPS_NAMESPACE)
+      self.msg_if.pub_info("Setting up fake_gps pubs at namespace: " + FAKE_GPS_NAMESPACE)
       # Start fake gps local publishers
       self.fake_gps_enable_pub = rospy.Publisher(FAKE_GPS_NAMESPACE + "enable", Bool, queue_size=1)
       self.fake_gps_reset_pub = rospy.Publisher(FAKE_GPS_NAMESPACE + "reset", GeoPoint, queue_size=1)
@@ -272,7 +281,7 @@ class ArdupilotNode:
           
 
     # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-    nepi_msg.publishMsgInfo(self,"Launching NEPI IDX () interface...")
+    self.msg_if.pub_info("Launching NEPI IDX () interface...")
     self.device_info_dict["node_name"] = self.node_name
     if self.node_name.find("_") != -1:
         split_name = self.node_name.rsplit('_', 1)
@@ -285,7 +294,7 @@ class ArdupilotNode:
     self.device_info_dict["serial_number"] = ""
     self.device_info_dict["hw_version"] = ""
     self.device_info_dict["sw_version"] = ""
-    nepi_msg.publishMsgInfo(self,str(self.device_info_dict))
+    self.msg_if.pub_info(str(self.device_info_dict))
 
 
     self.rbx_if = RBXRobotIF(device_info = self.device_info_dict,
@@ -323,7 +332,7 @@ class ArdupilotNode:
                                 )
 
 
-    nepi_msg.publishMsgInfo(self,": ... IDX interface running")
+    self.msg_if.pub_info(": ... IDX interface running")
     #updated the system config from the parameters that have been established
     self.rbx_if.initConfig()
     time.sleep(1)
@@ -332,7 +341,7 @@ class ArdupilotNode:
     setpoint_pub_interval = float(1) / self.SETPOINT_PUBLISH_RATE_HZ
     rospy.Timer(rospy.Duration(setpoint_pub_interval), self.sendGotoCommandLoop)
     ## Initiation Complete
-    nepi_msg.publishMsgInfo(self,"Initialization Complete")
+    self.msg_if.pub_info("Initialization Complete")
     # Spin forever (until object is detected)
     rospy.spin()
 
@@ -469,7 +478,7 @@ class ArdupilotNode:
         self.attitude_target.header.seq = self.att_sp_seq
         self.setpoint_attitude_pub.publish(self.attitude_target) # Publish Setpoint
       elif self.position_target != None:
-        nepi_msg.publishMsgInfo(self,"got position target valid")
+        self.msg_if.pub_info("got position target valid")
         self.pos_sp_seq += self.pos_sp_seq
         self.position_target.header.stamp = rospy.Time.now()
         self.position_target.header.seq = self.pos_sp_seq
@@ -487,7 +496,7 @@ class ArdupilotNode:
 
   def gotoPose(self,attitude_enu_degs):
     att_str = str(attitude_enu_degs)
-    nepi_msg.publishMsgInfo(self,"Recieved Pose setpoint command: " + att_str)
+    self.msg_if.pub_info("Recieved Pose setpoint command: " + att_str)
     # Create Setpoint Attitude Message
     attitude_enu_quat = nepi_nav.convert_rpy2quat(attitude_enu_degs)
     orientation_enu_quat = Quaternion()
@@ -513,7 +522,7 @@ class ArdupilotNode:
 
   def gotoPosition(self,point_enu_m,orientation_enu_deg):
     pos_str = str(point_enu_m)
-    nepi_msg.publishMsgInfo(self,"Recieved Position setpoint command: " + pos_str)
+    self.msg_if.pub_info("Recieved Position setpoint command: " + pos_str)
     # Create PoseStamped Setpoint Local ENU Message
     orientation_enu_q = nepi_nav.convert_rpy2quat(orientation_enu_deg)
     orientation_enu_quat = Quaternion()
@@ -532,7 +541,7 @@ class ArdupilotNode:
 
   def gotoLocation(self,geopoint_amsl,orientation_ned_deg):
     loc_str = str(geopoint_amsl)
-    nepi_msg.publishMsgInfo(self,"Recieved Location setpoint command: " + loc_str)
+    self.msg_if.pub_info("Recieved Location setpoint command: " + loc_str)
     # Create GeoPose Setpoint Global AMSL and Yaw NED Message
     orientation_ned_q = nepi_nav.convert_rpy2quat(orientation_ned_deg)
     orientation_ned_quat = Quaternion()
@@ -583,7 +592,7 @@ class ArdupilotNode:
       altitude_wgs84 = navsatfix_msg.altitude - geoid_height_m
       navsatfix_msg.altitude = altitude_wgs84 
       #navfixStr=str(navsatfix_msg)
-      #nepi_msg.publishMsgInfo(self,"ARDU_RBX: " + navfixStr)
+      #self.msg_if.pub_info("ARDU_RBX: " + navfixStr)
       if not rospy.is_shutdown():
         self.rbx_navpose_gps_pub.publish(navsatfix_msg)
       
@@ -630,11 +639,11 @@ class ArdupilotNode:
     arm_cmd = CommandBoolRequest()
     arm_cmd.value = arm_value
     if arm_value == True and self.gps_connected == False:
-      nepi_msg.publishMsgInfo(self,"Ignoring Arm command as no GPS is connected")
+      self.msg_if.pub_info("Ignoring Arm command as no GPS is connected")
     else:
-      nepi_msg.publishMsgInfo(self,"Updating State to: " + str(arm_value))
+      self.msg_if.pub_info("Updating State to: " + str(arm_value))
       time.sleep(1) # Give time for other process to see busy
-      nepi_msg.publishMsgInfo(self,"Waiting for armed value to set to " + str(arm_value))
+      self.msg_if.pub_info("Waiting for armed value to set to " + str(arm_value))
       timeout_sec = self.rbx_if.rbx_info.cmd_timeout
       check_interval_s = 0.25
       check_timer = 0
@@ -642,9 +651,9 @@ class ArdupilotNode:
         self.arming_client.call(arm_cmd)
         time.sleep(check_interval_s)
         check_timer += check_interval_s
-        #nepi_msg.publishMsgInfo(self,"Waiting for armed value to set")
-        #nepi_msg.publishMsgInfo(self,"Set Value: " + str(arm_value))
-        #nepi_msg.publishMsgInfo(self,"Cur Value: " + str(self.mavlink_state.armed))
+        #self.msg_if.pub_info("Waiting for armed value to set")
+        #self.msg_if.pub_info("Set Value: " + str(arm_value))
+        #self.msg_if.pub_info("Cur Value: " + str(self.mavlink_state.armed))
       if self.mavlink_state.armed == arm_value:
         # Reset Home Location on Arming
         if arm_value == True and arm_value != last_arm_value:
@@ -654,18 +663,18 @@ class ArdupilotNode:
           home_loc.altitude = self.rbx_if.current_location_wgs84_geo[2]
           self.home_location = home_loc
       else:
-        nepi_msg.publishMsgInfo(self,"Setting Armed value timed-out")
-      nepi_msg.publishMsgInfo(self,"Armed value set to " + str(arm_value))
+        self.msg_if.pub_info("Setting Armed value timed-out")
+      self.msg_if.pub_info("Armed value set to " + str(arm_value))
   
 
   ### Function to set mavlink mode
   def set_mavlink_mode(self,mode_new):
     new_mode = SetModeRequest()
     new_mode.custom_mode = mode_new
-    nepi_msg.publishMsgInfo(self,"Updating mode")
-    nepi_msg.publishMsgInfo(self,mode_new)
+    self.msg_if.pub_info("Updating mode")
+    self.msg_if.pub_info(mode_new)
     time.sleep(1) # Give time for other process to see busy
-    nepi_msg.publishMsgInfo(self,"Waiting for mode to set to " + mode_new)
+    self.msg_if.pub_info("Waiting for mode to set to " + mode_new)
     timeout_sec = self.rbx_if.rbx_info.cmd_timeout
     check_interval_s = 0.25
     check_timer = 0
@@ -673,13 +682,13 @@ class ArdupilotNode:
       self.mode_client.call(new_mode)
       time.sleep(check_interval_s)
       check_timer += check_interval_s
-      #nepi_msg.publishMsgInfo(self,"Waiting for mode to set")
-      #nepi_msg.publishMsgInfo(self,"Set Value: " + mode_new)
-      #nepi_msg.publishMsgInfo(self,"Cur Value: " + str(self.mavlink_state.mode))
+      #self.msg_if.pub_info("Waiting for mode to set")
+      #self.msg_if.pub_info("Set Value: " + mode_new)
+      #self.msg_if.pub_info("Cur Value: " + str(self.mavlink_state.mode))
     if self.mavlink_state.mode == mode_new:
-      nepi_msg.publishMsgInfo(self,"Mode set to " + mode_new)
+      self.msg_if.pub_info("Mode set to " + mode_new)
     else:
-      nepi_msg.publishMsgInfo(self,"Setting mode value timed-out")
+      self.msg_if.pub_info("Setting mode value timed-out")
 
 
 
@@ -708,7 +717,7 @@ class ArdupilotNode:
   ## Action Function for setting arm state and sending takeoff command
   global launch
   def launch(self):
-    nepi_msg.publishMsgInfo(self,"Recieved Launch cmd")
+    self.msg_if.pub_info("Recieved Launch cmd")
     cmd_success = False
     if "guided" in self.RBX_MODE_FUNCTIONS:
       cmd_success = self.setModeInd(self.RBX_MODE_FUNCTIONS.index("guided"))
@@ -732,7 +741,7 @@ class ArdupilotNode:
     if self.state_current == "ARM":
       takeoff_height_m = float(self.settings_dict['takeoff_height_m']['value'])
       takeoff_min_pitch_deg = float(self.settings_dict['takeoff_min_pitch_deg']['value'])
-      nepi_msg.publishMsgInfo(self,"Sending Takeoff Command to altitude to " + str(takeoff_height_m) + " meters")
+      self.msg_if.pub_info("Sending Takeoff Command to altitude to " + str(takeoff_height_m) + " meters")
       self.takeoff_client(min_pitch=takeoff_min_pitch_deg,altitude=takeoff_height_m)
       geo_point = GeoPoint()
       geo_point.latitude = self.rbx_if.current_location_wgs84_geo[0]
@@ -754,12 +763,12 @@ class ArdupilotNode:
       if (check_timer < timeout_sec):
         cmd_success = True
         self.takeoff_complete = True
-        nepi_msg.publishMsgInfo(self,"Takeoff action completed with error: " + str(alt_error) + " meters")
+        self.msg_if.pub_info("Takeoff action completed with error: " + str(alt_error) + " meters")
       else:
         self.takeoff_complete = False
-        nepi_msg.publishMsgInfo(self,"Takeoff action timed-out with error: " + str(alt_error) + " meters")
+        self.msg_if.pub_info("Takeoff action timed-out with error: " + str(alt_error) + " meters")
     else:
-      nepi_msg.publishMsgInfo(self,"Ignoring Takeoff command as system is not Armed")
+      self.msg_if.pub_info("Ignoring Takeoff command as system is not Armed")
     return cmd_success
 
   ### Function for switching to STABILIZE mode
@@ -783,7 +792,7 @@ class ArdupilotNode:
     goal_alt = 0
     geo_point.altitude = goal_alt
     self.fake_gps_goto_location_pub.publish(geo_point)
-    nepi_msg.publishMsgInfo(self,"Waiting for land process to complete and disarm")
+    self.msg_if.pub_info("Waiting for land process to complete and disarm")
     timeout_sec = self.rbx_if.rbx_info.cmd_timeout
     check_interval_s = float(timeout_sec) / 100
     check_timer = 0
@@ -791,10 +800,10 @@ class ArdupilotNode:
       time.sleep(check_interval_s)
       check_timer += check_interval_s
     if self.state_current == "ARM":
-      nepi_msg.publishMsgInfo(self,"Land process complete")
+      self.msg_if.pub_info("Land process complete")
       cmd_success = True
     else:
-      nepi_msg.publishMsgInfo(self,"Land process timed-out")
+      self.msg_if.pub_info("Land process timed-out")
     return cmd_success
 
 
@@ -818,10 +827,10 @@ class ArdupilotNode:
       stabilized_check = max_distance_error_m < error_goal_m
       last_loc = cur_loc
     if stabilized_check:
-      nepi_msg.publishMsgInfo(self,"RTL process complete")
+      self.msg_if.pub_info("RTL process complete")
       cmd_success = True
     else:
-      nepi_msg.publishMsgInfo(self,"RTL process timed-out")
+      self.msg_if.pub_info("RTL process timed-out")
     return cmd_success
 
 
@@ -849,7 +858,7 @@ class ArdupilotNode:
   def resume(self):
     cmd_success = False
     # Reset mode to last
-    nepi_msg.publishMsgInfo(self,"Switching mavlink mode from " + self.RBX_MODES[self.mode_current] + " back to " + self.RBX_MODES[self.mode_last])
+    self.msg_if.pub_info("Switching mavlink mode from " + self.RBX_MODES[self.mode_current] + " back to " + self.RBX_MODES[self.mode_last])
     self.set_mavlink_mode(self.RBX_MODES[self.mode_last])
     cmd_success = True
     return cmd_success
@@ -857,7 +866,7 @@ class ArdupilotNode:
 
   ### Function for setting home location
   def set_home_location(self,geo_point):
-    nepi_msg.publishMsgInfo(self,'Sending mavlink set home command')
+    self.msg_if.pub_info("Sending mavlink set home command")
     cmd_home = CommandHomeRequest()
     cmd_home.current_gps = False
     cmd_home.latitude = geo_point.latitude
@@ -880,7 +889,7 @@ class ArdupilotNode:
   # Node Cleanup Function
   
   def cleanup_actions(self):
-    nepi_msg.publishMsgInfo(self,"Shutting down: Executing script cleanup actions")
+    self.msg_if.pub_info("Shutting down: Executing script cleanup actions")
 
 
 #########################################

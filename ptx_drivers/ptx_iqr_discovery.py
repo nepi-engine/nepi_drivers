@@ -21,10 +21,9 @@ import os
 import subprocess
 import time
 
-from nepi_sdk import nepi_drvs
-from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_ros
-
+from nepi_sdk import nepi_utils
+from nepi_sdk import nepi_drvs
 
 PKG_NAME = 'PTX_IQR' 
 FILE_TYPE = 'DISCOVERY'
@@ -45,18 +44,22 @@ class IqrPanTiltDiscovery:
 
   ################################################          
   def __init__(self):
-    self.log_name = PKG_NAME.lower() + "_discovery" 
-    nepi_msg.createMsgPublishers(self)
+    ############
+    # Create Message Logger
+    self.log_name = PKG_NAME.lower() + "_discovery"
+    self.logger = nepi_ros.logger(log_name = self.log_name)
     time.sleep(1)
-    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Starting Initialization")
-    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Initialization Complete")
+    self.logger.log_msg_info("Starting Initialization")
+    self.logger.log_msg_info("Initialization Complete")
+
+
 
  
   ##########  DRV Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
   def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict):
     self.drv_dict = drv_dict
-    #nepi_msg.printMsg(self.log_name + "Got drv_dict : " + str(self.drv_dict))
+    #self.logger.log_msg_warn("Got drv_dict : " + str(self.drv_dict))
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
@@ -86,7 +89,7 @@ class IqrPanTiltDiscovery:
       if path_str not in self.active_paths_list:
         found_device = self.checkForDevice(path_str)
         if found_device == True:
-          nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "Found device on path: " + path_str)
+          self.logger.log_msg_info("Found device on path: " + path_str)
           success = self.launchDeviceNode(path_str)
           if success == True:
             self.active_paths_list.append(path_str)
@@ -110,7 +113,7 @@ class IqrPanTiltDiscovery:
     elif self.checkForDevice(path_str) == False:
       active = False
     if active == False:
-      nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "No longer detecting device on : " + path_str)
+      self.logger.log_msg_info("No longer detecting device on : " + path_str)
       if path_str in self.active_devices_dict.keys():
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
@@ -131,23 +134,23 @@ class IqrPanTiltDiscovery:
 
     file_name = 'iqr_ros_pan_tilt_node' # self.drv_dict['NODE_DICT']['file_name']
     device_node_name = 'iqr_pan_tilt_' + path_str.split("ttyACM")[1]
-    nepi_msg.publishMsgWarn(self, "launching on node: " + device_node_name + " on path: " + path_str)
-    nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "***Launching node with file: " + file_name)
-    nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "***Launching node with name: " + device_node_name)
+    self.logger.log_msg_warn("launching on node: " + device_node_name + " on path: " + path_str)
+    self.logger.log_msg_info("***Launching node with file: " + file_name)
+    self.logger.log_msg_info("***Launching node with name: " + device_node_name)
     [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name, device_path = path_str)
 
     # Process luanch results
     self.launch_time_dict[launch_id] = nepi_ros.get_time()
     if success:
-      nepi_msg.publishMsgInfo(self," Launched node: " + device_node_name)
+      self.logger.log_msg_info("Launched node: " + device_node_name)
       self.active_devices_dict[path_str] = {'node_name': device_node_name, 'sub_process': sub_process}
     else:
-      nepi_msg.publishMsgInfo(self," Failed to lauch node: " + device_node_name + " with msg: " + msg)
+      self.logger.log_msg_info("Failed to lauch node: " + device_node_name + " with msg: " + msg)
       if self.retry == False:
-        nepi_msg.publishMsgInfo(self," Will not try relaunch for node: " + device_node_name)
+        self.logger.log_msg_info("Will not try relaunch for node: " + device_node_name)
         self.dont_retry_list.append(launch_id)
       else:
-        nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+        self.logger.log_msg_info("Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
     return success
 
     
