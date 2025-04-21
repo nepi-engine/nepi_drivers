@@ -30,7 +30,7 @@ from nepi_sdk import nepi_settings
 from nepi_sdk import nepi_drvs
 
 from nepi_api.device_if_idx import IDXDeviceIF
-from nepi_api.sys_if_msg import MsgIF
+from nepi_api.messages_if import MsgIF
 
 PKG_NAME = 'IDX_GENICAM' # Use in display menus
 FILE_TYPE = 'NODE'

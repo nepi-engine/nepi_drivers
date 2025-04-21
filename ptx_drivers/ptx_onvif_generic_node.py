@@ -21,8 +21,8 @@ from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
 
-from nepi_api.device_if_lsx import LSXDeviceIF
-from nepi_api.sys_if_msg import MsgIF
+from nepi_api.device_if_ptx import PTXActuatorIF
+from nepi_api.messages_if import MsgIF
 
 PKG_NAME = 'PTX_ONVIF_GENERIC' # Use in display menus
 FILE_TYPE = 'NODE'

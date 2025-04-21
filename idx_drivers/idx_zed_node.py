@@ -53,7 +53,7 @@ from dynamic_reconfigure.msg import Config
 from rospy.numpy_msg import numpy_msg
 
 from nepi_api.device_if_idx import IDXDeviceIF
-from nepi_api.sys_if_msg import MsgIF
+from nepi_api.messages_if import MsgIF
 
 
 PKG_NAME = 'IDX_ZED' # Use in display menus

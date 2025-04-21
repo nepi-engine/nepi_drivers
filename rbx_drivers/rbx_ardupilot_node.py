@@ -45,7 +45,7 @@ from sensor_msgs.msg import Image, NavSatFix, BatteryState
 from nepi_ros_interfaces.msg import AxisControls
 
 from nepi_api.device_if_rbx import RBXRobotIF
-from nepi_api.sys_if_msg import MsgIF
+from nepi_api.messages_if import MsgIF
 
 PKG_NAME = 'RBX_ARDUPILOT' # Use in display menus
 FILE_TYPE = 'NODE'

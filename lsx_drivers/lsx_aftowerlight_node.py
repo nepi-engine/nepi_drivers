@@ -31,7 +31,7 @@ from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
 
 from nepi_api.device_if_lsx import LSXDeviceIF
-from nepi_api.sys_if_msg import MsgIF
+from nepi_api.messages_if import MsgIF
 
 
 

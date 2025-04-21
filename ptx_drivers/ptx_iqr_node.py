@@ -28,7 +28,7 @@ from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
 
 from nepi_api.device_if_ptx import PTXActuatorIF
-from nepi_api.sys_if_msg import MsgIF
+from nepi_api.messages_if import MsgIF
 
 PKG_NAME = 'PTX_IQR' 
 FILE_TYPE = 'NODE'
