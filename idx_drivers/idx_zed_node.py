@@ -48,7 +48,7 @@ from sensor_msgs.msg import Image, PointCloud2
 from nepi_ros_interfaces.msg import IDXStatus, RangeWindow, SaveDataStatus, SaveData, SaveDataRate
 from nepi_ros_interfaces.srv import IDXCapabilitiesQuery, IDXCapabilitiesQueryResponse
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import NavSatFix
+
 from dynamic_reconfigure.msg import Config
 from rospy.numpy_msg import numpy_msg
 
@@ -112,9 +112,48 @@ class ZedCamNode(object):
     frame_id = 'sensor_frame' 
     )
 
-    
     ZED_MIN_RANGE_M_OVERRIDES = { 'zed': .2, 'zedm': .15, 'zed2': .2, 'zedx': .2} 
     ZED_MAX_RANGE_M_OVERRIDES = { 'zed':  15, 'zedm': 15, 'zed2': 20, 'zedx': 15} 
+
+    navpose_dict = {
+                          'frame_3d': 'ENU',
+                          'frame_alt': 'WGS84',
+
+                          'geoid_height_meters': 0,
+
+                          'has_heading': False,
+                          'time_heading': 0,
+                          'heading_deg': 0,
+
+                          'has_oreientation': True,
+                          'time_oreientation': nepi_utils.get_time(),
+                          # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
+                          'roll_deg': 0,
+                          'pitch_deg': 0,
+                          'yaw_deg': 0,
+
+                          'has_position': True,
+                          'time_position': nepi_utils.get_time(),
+                          # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
+                          'x_m': 0,
+                          'y_m': 0,
+                          'z_m': 0,
+
+                          'has_location': False,
+                          'time_location': 0,
+                          # Global Location in set altitude frame (lat,long,alt) with alt in meters
+                          'lat': 0,
+                          'long': 0,
+
+                          'has_altitude': False,
+                          'time_altitude': 0,
+                          'alt_m': 0,
+    
+                          'has_depth': False,
+                          'time_depth': 0,
+                          'alt_m': 0
+    }
+
 
     zed_type = 'zed'
 
@@ -311,7 +350,7 @@ class ZedCamNode(object):
         self.pc_img_sub = None
 
         
-        odom_sub = rospy.Subscriber(ZED_ODOM_TOPIC, Odometry, self.idx_odom_topic_callback)
+        odom_sub = rospy.Subscriber(ZED_ODOM_TOPIC, Odometry, self.odom_topic_callback)
 
         # Launch the  node
         self.msg_if.pub_info("... Connected!")
@@ -339,10 +378,7 @@ class ZedCamNode(object):
                 "Pointcloud":  self.getPointcloud, 
                 "StopPointcloud":  self.stopPointcloud,
                 "PointcloudImg":  self.getPointcloudImg, 
-                "StopPointcloudImg":  self.stopPointcloudImg,
-                "GPS": None,
-                "Odom": self.getOdom,
-                "Heading": None
+                "StopPointcloudImg":  self.stopPointcloudImg
             }
         }
 
@@ -392,7 +428,9 @@ class ZedCamNode(object):
                                     stopPointcloudAcquisition=idx_callback_names["Data"]["StopPointcloud"],
                                     getPointcloudImg=idx_callback_names["Data"]["PointcloudImg"], 
                                     stopPointcloudImgAcquisition=idx_callback_names["Data"]["StopPointcloudImg"],
-                                    getNavPoseDictFunction = None)
+                                    getNavPoseDictFunction=self.getNavPoseDictFunction, 
+                                    has_heading = False, has_position = True, has_orientation = True, 
+                                    has_location = False, has_altitude = False, has_depth = False,)
         self.msg_if.pub_info("... IDX interface running")
 
         # Update available IDX callbacks based on capabilities that the driver reports
@@ -641,10 +679,27 @@ class ZedCamNode(object):
           self.pc_img_lock.release()
 
 
+  def getNavPoseDictFunction():
+    return self.navpose_dict
 
-    # Callback to get odom data
-    def idx_odom_topic_callback(self, odom_msg):
-      self.odom_msg = odom_msg
+      
+  ### Callback to publish RBX odom topic
+  def odom_topic_callback(self,odom_msg):
+      rpy = nepi_nav.convert_quat2rpy(msg.pose.pose.orientation)
+      xyz = nepi_nav.convert_point_body2enu(msg.pose.pose.position,rpy[2])
+      time_ns = nepi_ros.sec_from_ros_stamp(odom_msg.header.stamp)
+
+      self.navpose_dict['time_oreantation'] = time_ns
+      # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
+      self.navpose_dict['roll_deg'] = rpy[0]
+      self.navpose_dict['pitch_deg'] = rpy[1]
+      self.navpose_dict['yaw_deg'] = rpy[2]
+
+      self.navpose_dict['time_position'] = time_ns
+      # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
+      self.navpose_dict['x_m'] = xyz[0]
+      self.navpose_dict['y_m'] = xyz[1]
+      self.navpose_dict['z_m'] = xyz[2]
 
 
     #**********************
@@ -1080,8 +1135,6 @@ class ZedCamNode(object):
         msg = "Success"
         return ret,msg
 
-    def getOdom(self):
-        return self.odom_msg
 
 
     def cleanup_actions(self):

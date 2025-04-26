@@ -51,6 +51,7 @@ PKG_NAME = 'RBX_ARDUPILOT' # Use in display menus
 FILE_TYPE = 'NODE'
 
 
+
 #########################################
 # Node Class
 #########################################
@@ -97,6 +98,47 @@ class ArdupilotNode:
                           serial_number = "",
                           hw_version = "",
                           sw_version = "")
+
+
+  navpose_dict = {
+                        'frame_3d': 'ENU',
+                        'frame_alt': 'WGS84',
+
+                        'geoid_height_meters': 0,
+
+                        'has_heading': True,
+                        'time_heading': nepi_utils.get_time(),
+                        'heading_deg': 0,
+
+                        'has_oreientation': True,
+                        'time_oreientation': nepi_utils.get_time(),
+                        # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
+                        'roll_deg': 0,
+                        'pitch_deg': 0,
+                        'yaw_deg': 0,
+
+                        'has_position': True,
+                        'time_position': nepi_utils.get_time(),
+                        # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
+                        'x_m': 0,
+                        'y_m': 0,
+                        'z_m': 0,
+
+                        'has_location': True,
+                        'time_location': nepi_utils.get_time(),
+                        # Global Location in set altitude frame (lat,long,alt) with alt in meters
+                        'lat': 0,
+                        'long': 0,
+
+                        'has_altitude': True,
+                        'time_altitude': nepi_utils.get_time(),
+                        'alt_m': 0,
+  
+                        'has_depth': False,
+                        'time_depth': 0,
+                        'alt_m': 0
+  }
+
                         
   settings_dict = FACTORY_SETTINGS
 
@@ -325,9 +367,9 @@ class ArdupilotNode:
                                   gotoPoseFunction = self.gotoPose,
                                   gotoPositionFunction = self.gotoPosition, 
                                   gotoLocationFunction = self.gotoLocation,
-                                  gpsTopic = NEPI_RBX_NAVPOSE_GPS_TOPIC,
-                                  odomTopic = NEPI_RBX_NAVPOSE_ODOM_TOPIC,
-                                  headingTopic = NEPI_RBX_NAVPOSE_HEADING_TOPIC,
+                                  getNavPoseDictFunction= self.getNavPoseDictFunction, 
+                                  has_heading = True, has_position = True, has_orientation = True, 
+                                  has_location = True, has_altitude = True, has_depth = False,
                                   setFakeGPSFunction = setFakeGPSFunction
                                 )
 
@@ -581,6 +623,9 @@ class ArdupilotNode:
   # RBX NavPose Topic Publishers
   ### Callback to publish RBX navpose data
   
+  def getNavPoseDictFunction():
+    return self.navpose_dict
+
   def gps_topic_callback(self,navsatfix_msg):
       if navsatfix_msg.latitude != 0:
         self.gps_connected = True
@@ -590,22 +635,41 @@ class ArdupilotNode:
       else:
         geoid_height_m = self.rbx_if.current_geoid_height_m
       altitude_wgs84 = navsatfix_msg.altitude - geoid_height_m
-      navsatfix_msg.altitude = altitude_wgs84 
-      #navfixStr=str(navsatfix_msg)
-      #self.msg_if.pub_info("ARDU_RBX: " + navfixStr)
-      if not rospy.is_shutdown():
-        self.rbx_navpose_gps_pub.publish(navsatfix_msg)
+      time_ns = nepi_ros.sec_from_ros_stamp(navsatfix_msg.header.stamp)
+      self.navpose_dict['time_location'] = time_ns
+      self.navpose_dict['lat'] = navsatfix_msg.latitude
+      self.navpose_dict['long'] = navsatfix_msg.longitude
+      self.navpose_dict['time_altitude'] = time_ns
+      self.navpose_dict['alt_m'] = altitude_wgs84
+
+      self.navpose_dict['geoid_height_meters'] = geoid_height_m
+
       
   ### Callback to publish RBX odom topic
   def odom_topic_callback(self,odom_msg):
-      if not rospy.is_shutdown():
-        self.rbx_navpose_odom_pub.publish(odom_msg)
+      rpy = nepi_nav.convert_quat2rpy(msg.pose.pose.orientation)
+      xyz = nepi_nav.convert_point_body2enu(msg.pose.pose.position,rpy[2])
+      time_ns = nepi_ros.sec_from_ros_stamp(odom_msg.header.stamp)
+
+      self.navpose_dict['time_oreantation'] = time_ns
+      # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
+      self.navpose_dict['roll_deg'] = rpy[0]
+      self.navpose_dict['pitch_deg'] = rpy[1]
+      self.navpose_dict['yaw_deg'] = rpy[2]
+
+      self.navpose_dict['time_position'] = time_ns
+      # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
+      self.navpose_dict['x_m'] = xyz[0]
+      self.navpose_dict['y_m'] = xyz[1]
+      self.navpose_dict['z_m'] = xyz[2]
+
+
 
   ### Callback to publish RBX heading topic
   def heading_topic_callback(self,heading_msg):
-      if not rospy.is_shutdown():
-        self.rbx_navpose_heading_pub.publish(heading_msg)
-
+      time_ns = nepi_ros.sec_from_ros_stamp(heading.header.stamp)
+      self.navpose_dict['time_heading'] = time_ns
+      self.navpose_dict['heading_deg'] = heading_msg.data
 
   #######################
   # Mavlink Interface Methods
