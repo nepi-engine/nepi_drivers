@@ -18,3 +18,56 @@ driver:
       auto_restart:
         type: Bool
         default: 'True'
+      
+      baud_rate:
+        type: Discrete
+        options:
+          - All
+          - '9600'
+          - '19200'
+          - '38400'
+          - '57600'
+          - '115200'         
+        default: All
+        value: All
+
+      start_addr:
+        type: 'Int'
+        options:
+          - 'A'
+          - 'Z'
+        default: 'A'
+        value: 'A'
+
+      stop_addr:
+        type: 'Int'
+        options:
+          - 'A'
+          - 'Z'
+        default: 'A'
+        value: 'A'        
+
+      connection:
+        type: Discrete
+        options:
+          - Serial
+          - TCP-Server         
+        default: TCP-Server
+        value: TCP-Server
+
+      ip_address:
+        type: String
+        options:
+        - ""       
+        default: '192.168.0.5'
+        value: '192.168.0.5'      
+        
+      ip_port:
+        type: String
+        options:
+        - ""       
+        default: '10001'
+        value: '10001'
+      auto_restart:
+        type: Bool
+        default: 'True'
