@@ -137,76 +137,76 @@ class SealiteNode(object):
       ##############################  
       # Initialize Class Variables
 
-    # Get required drv driver dict info
-    self.drv_dict = nepi_ros.get_param('~drv_dict',dict()) 
-    #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
-    try:
-      self.port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
-      self.baud_str = self.drv_dict['DEVICE_DICT']['baud_str'] 
-      self.baud_int = int(self.baud_str)
-      self.addr_str = self.drv_dict['DEVICE_DICT']['addr_str'] 
-    except Exception as e:
-      self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
-      nepi_ros.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
-      return
-    # Address string must be three char long
-    zero_prefix_len = 3-len(self.addr_str)
-    for z in range(zero_prefix_len):
-      self.addr_str = ('0' + self.addr_str)  
-    ################################################  
-    self.msg_if.pub_info("Connecting to Device on port " + self.port_str + " with baud " + self.baud_str)
-    ### Try and connect to device
-    self.connected = self.connect() 
-    if self.connected:
-      # Create LSX  node
-      self.msg_if.pub_info("Connected")
-      # Initialize settings
-      self.cap_settings = self.getCapSettings()
-      self.factory_settings = self.getFactorySettings()
+  # Get required drv driver dict info
+  self.drv_dict = nepi_ros.get_param('~drv_dict',dict()) 
+  #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
+  try:
+    self.port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
+    self.baud_str = self.drv_dict['DEVICE_DICT']['baud_str'] 
+    self.baud_int = int(self.baud_str)
+    self.addr_str = self.drv_dict['DEVICE_DICT']['addr_str'] 
+  except Exception as e:
+    self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
+    nepi_ros.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
+    return
+  # Address string must be three char long
+  zero_prefix_len = 3-len(self.addr_str)
+  for z in range(zero_prefix_len):
+    self.addr_str = ('0' + self.addr_str)  
+  ################################################  
+  self.msg_if.pub_info("Connecting to Device on port " + self.port_str + " with baud " + self.baud_str)
+  ### Try and connect to device
+  self.connected = self.connect() 
+  if self.connected:
+    # Create LSX  node
+    self.msg_if.pub_info("Connected")
+    # Initialize settings
+    self.cap_settings = self.getCapSettings()
+    self.factory_settings = self.getFactorySettings()
 
-      # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-      self.msg_if.pub_info("Launching NEPI LSX () interface...")
-      self.device_info_dict["node_name"] = self.node_name
-      if self.node_name.find("_") != -1:
-          split_name = self.node_name.rsplit('_', 1)
-          self.device_info_dict["device_name"] = split_name[0]
-          self.device_info_dict["identifier"] = split_name[1]
-      else:
-          self.device_info_dict["device_name"] = self.node_name
-          self.device_info_dict["identifier"] = ""
-      self.device_info_dict["serial_number"] = self.serial_num
-      self.device_info_dict["hw_version"] = self.hw_version
-      self.device_info_dict["sw_version"] = self.sw_version
-
-      self.lsx_if = LSXDeviceIF(
-                  device_info = self.device_info_dict, 
-                  getStatusFunction = self.getStatus,
-                  capSettings = self.cap_settings,
-                  factorySettings = self.factory_settings,
-                  settingUpdateFunction=self.settingUpdateFunction,
-                  getSettingsFunction=self.getSettings,
-                  factoryControls = self.FACTORY_CONTROLS,
-                  standbyEnableFunction = None,
-                  turnOnOffFunction = self.turnOnOff,
-                  setIntensityRatioFunction = self.setIntensityRatio, 
-                  blinkOnOffFunction = None,
-                  reports_temp = True, 
-                  reports_power = False
-                 )
-    
-      # Start an sealite activity check process that kills node after some number of failed comms attempts
-      self.msg_if.pub_info("Starting an activity check process")
-      nepi_ros.start_timer_process(nepi_ros.ros_duration(0.2), self.check_timer_callback)
-      # Initialization Complete
-      self.msg_if.pub_info("Initialization Complete")
-      #Set up node shutdown
-      nepi_ros.on_shutdown(self.cleanup_actions)
-      # Spin forever (until object is detected)
-      nepi_ros.spin()
+    # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
+    self.msg_if.pub_info("Launching NEPI LSX () interface...")
+    self.device_info_dict["node_name"] = self.node_name
+    if self.node_name.find("_") != -1:
+        split_name = self.node_name.rsplit('_', 1)
+        self.device_info_dict["device_name"] = split_name[0]
+        self.device_info_dict["identifier"] = split_name[1]
     else:
-      self.msg_if.pub_info("Shutting down node")
-      self.msg_if.pub_info("Specified serial port not available")
-      nepi_ros.signal_shutdown("Serial port not available")   
+        self.device_info_dict["device_name"] = self.node_name
+        self.device_info_dict["identifier"] = ""
+    self.device_info_dict["serial_number"] = self.serial_num
+    self.device_info_dict["hw_version"] = self.hw_version
+    self.device_info_dict["sw_version"] = self.sw_version
+
+    self.lsx_if = LSXDeviceIF(
+                device_info = self.device_info_dict, 
+                getStatusFunction = self.getStatus,
+                capSettings = self.cap_settings,
+                factorySettings = self.factory_settings,
+                settingUpdateFunction=self.settingUpdateFunction,
+                getSettingsFunction=self.getSettings,
+                factoryControls = self.FACTORY_CONTROLS,
+                standbyEnableFunction = None,
+                turnOnOffFunction = self.turnOnOff,
+                setIntensityRatioFunction = self.setIntensityRatio, 
+                blinkOnOffFunction = None,
+                reports_temp = True, 
+                reports_power = False
+                )
+  
+    # Start an sealite activity check process that kills node after some number of failed comms attempts
+    self.msg_if.pub_info("Starting an activity check process")
+    nepi_ros.start_timer_process(nepi_ros.ros_duration(0.2), self.check_timer_callback)
+    # Initialization Complete
+    self.msg_if.pub_info("Initialization Complete")
+    #Set up node shutdown
+    nepi_ros.on_shutdown(self.cleanup_actions)
+    # Spin forever (until object is detected)
+    nepi_ros.spin()
+  else:
+    self.msg_if.pub_info("Shutting down node")
+    self.msg_if.pub_info("Specified serial port not available")
+    nepi_ros.signal_shutdown("Serial port not available")   
 
 
 

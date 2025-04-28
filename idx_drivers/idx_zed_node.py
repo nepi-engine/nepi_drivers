@@ -45,7 +45,7 @@ from nepi_sdk import nepi_settings
 from datetime import datetime
 from std_msgs.msg import UInt8, Empty, String, Bool, Float32
 from sensor_msgs.msg import Image, PointCloud2
-from nepi_ros_interfaces.msg import IDXStatus, RangeWindow, SaveDataStatus, SaveData, SaveDataRate
+from nepi_ros_interfaces.msg import IDXStatus, RangeWindow, SaveDataStatus, SaveDataRate
 from nepi_ros_interfaces.srv import IDXCapabilitiesQuery, IDXCapabilitiesQueryResponse
 from nav_msgs.msg import Odometry
 
@@ -680,27 +680,27 @@ class ZedCamNode(object):
           self.pc_img_lock.release()
 
 
-  def getNavPoseDictFunction():
-    return self.navpose_dict
+    def getNavPoseDictFunction():
+      return self.navpose_dict
 
-      
-  ### Callback to publish RBX odom topic
-  def odom_topic_callback(self,odom_msg):
-      rpy = nepi_nav.convert_quat2rpy(msg.pose.pose.orientation)
-      xyz = nepi_nav.convert_point_body2enu(msg.pose.pose.position,rpy[2])
-      time_ns = nepi_ros.sec_from_ros_stamp(odom_msg.header.stamp)
+        
+    ### Callback to publish RBX odom topic
+    def odom_topic_callback(self,odom_msg):
+        rpy = nepi_nav.convert_quat2rpy(msg.pose.pose.orientation)
+        xyz = nepi_nav.convert_point_body2enu(msg.pose.pose.position,rpy[2])
+        time_ns = nepi_ros.sec_from_ros_stamp(odom_msg.header.stamp)
 
-      self.navpose_dict['time_oreantation'] = time_ns
-      # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
-      self.navpose_dict['roll_deg'] = rpy[0]
-      self.navpose_dict['pitch_deg'] = rpy[1]
-      self.navpose_dict['yaw_deg'] = rpy[2]
+        self.navpose_dict['time_oreantation'] = time_ns
+        # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
+        self.navpose_dict['roll_deg'] = rpy[0]
+        self.navpose_dict['pitch_deg'] = rpy[1]
+        self.navpose_dict['yaw_deg'] = rpy[2]
 
-      self.navpose_dict['time_position'] = time_ns
-      # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
-      self.navpose_dict['x_m'] = xyz[0]
-      self.navpose_dict['y_m'] = xyz[1]
-      self.navpose_dict['z_m'] = xyz[2]
+        self.navpose_dict['time_position'] = time_ns
+        # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
+        self.navpose_dict['x_m'] = xyz[0]
+        self.navpose_dict['y_m'] = xyz[1]
+        self.navpose_dict['z_m'] = xyz[2]
 
 
     #**********************
