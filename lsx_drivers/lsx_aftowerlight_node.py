@@ -107,6 +107,7 @@ class AfTowerLightNode(object):
   ### LXS Driver NODE Initialization
   def __init__(self):
       ####  NODE Initialization ####
+      nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
       self.class_name = type(self).__name__
       self.base_namespace = nepi_ros.get_base_namespace()
       self.node_name = nepi_ros.get_node_name()
@@ -121,7 +122,7 @@ class AfTowerLightNode(object):
       # Initialize Class Variables
 
       # Get required drv driver dict info
-      self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_NEX_DICT) 
+      self.drv_dict = nepi_ros.get_param('~drv_dict',TEST_NEX_DICT) 
       #self.msg_if.pub_warn("AFTOWER_NODE: " + str(self.drv_dict))
       self.ser_port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
       ser_baud_str = self.drv_dict['DEVICE_DICT']['baud_rate_str'] 

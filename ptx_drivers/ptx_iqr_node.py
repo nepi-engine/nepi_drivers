@@ -61,6 +61,7 @@ class IqrPanTiltNode:
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"
   def __init__(self):
     ####  NODE Initialization ####
+    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
     self.class_name = type(self).__name__
     self.base_namespace = nepi_ros.get_base_namespace()
     self.node_name = nepi_ros.get_node_name()

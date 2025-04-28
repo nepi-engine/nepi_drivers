@@ -21,7 +21,7 @@ from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
 
 from nepi_api.device_if_ptx import PTXActuatorIF
-from nepi_api.sys_if_msg import MsgIF
+from nepi_api.messages_if import MsgIF
 
 PKG_NAME = 'PTX_ONVIF_GENERIC' # Use in display menus
 FILE_TYPE = 'NODE'
@@ -54,6 +54,7 @@ class OnvifPanTiltNode:
     drv_dict = dict()                                                    
     def __init__(self):
         ####  NODE Initialization ####
+        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
         self.class_name = type(self).__name__
         self.base_namespace = nepi_ros.get_base_namespace()
         self.node_name = nepi_ros.get_node_name()
@@ -69,7 +70,7 @@ class OnvifPanTiltNode:
 
         # Get required drv driver dict info
         try:
-            self.drv_dict = nepi_ros.get_param(self,'~drv_dict') # Crash if not provide
+            self.drv_dict = nepi_ros.get_param('~drv_dict') # Crash if not provide
         except Exception as e:
             nepi_ros.signal_shutdown("Failed to read drv_dict from param server for node " + self.node_name + " with exception: " + str(e))
         self.driver_path = self.drv_dict['path']
@@ -79,23 +80,23 @@ class OnvifPanTiltNode:
 
 
         # Require the camera connection parameters to have been set
-        if not nepi_ros.has_param(self,'~credentials/username'):
+        if not nepi_ros.has_param('~credentials/username'):
             self.msg_if.pub_warn("Missing credentials/username parameter... cannot start")
             return
-        if not nepi_ros.has_param(self,'~credentials/password'):
+        if not nepi_ros.has_param('~credentials/password'):
             self.msg_if.pub_warn("Missing credentials/password parameter... cannot start")
             return
-        if not nepi_ros.has_param(self,'~network/host'):
+        if not nepi_ros.has_param('~network/host'):
             self.msg_if.pub_warn("Missing network/host parameter... cannot start")
             return
                 
-        username = str(nepi_ros.get_param(self,'~credentials/username'))
-        password = str(nepi_ros.get_param(self,'~credentials/password'))
-        host = str(nepi_ros.get_param(self,'~network/host'))
+        username = str(nepi_ros.get_param('~credentials/username'))
+        password = str(nepi_ros.get_param('~credentials/password'))
+        host = str(nepi_ros.get_param('~network/host'))
         
         # Allow a default for the port, since it is part of onvif spec.
-        onvif_port = nepi_ros.get_param(self,'~network/port', 80)
-        nepi_ros.set_param(self,'~/network/port', onvif_port)
+        onvif_port = nepi_ros.get_param('~network/port', 80)
+        nepi_ros.set_param('~/network/port', onvif_port)
 
 
         self.msg_if.pub_info("Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
@@ -185,7 +186,7 @@ class OnvifPanTiltNode:
             # many ONVIF devices report capabilities that they don't actually have, so need a user-override mechanism. In
             # that case, assign these to null in the config file
             # TODO: Not sure we actually need remappings for PTX: Makes sense for IDX because there are lots of controllable params.
-            ptx_remappings = nepi_ros.get_param(self,'~ptx_remappings', {})
+            ptx_remappings = nepi_ros.get_param('~ptx_remappings', {})
             self.msg_if.pub_info("Establishing PTX remappings")
             for from_name in ptx_remappings:
                 to_name = ptx_remappings[from_name]
@@ -364,8 +365,8 @@ class OnvifPanTiltNode:
      
     def pitchDegToOvRatio(self, deg):
         ratio = 0.5
-        max_ph = nepi_ros.get_param(self,'~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
-        min_ph = nepi_ros.get_param(self,'~ptx/limits/min_pitch_hardstop_deg', self.default_settings['min_pitch_hardstop_deg'])
+        max_ph = nepi_ros.get_param('~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
+        min_ph = nepi_ros.get_param('~ptx/limits/min_pitch_hardstop_deg', self.default_settings['min_pitch_hardstop_deg'])
         reverse_pitch = False
         if self.ptx_if is not None:
             reverse_pitch = self.ptx_if.reverse_pitch_control
@@ -378,8 +379,8 @@ class OnvifPanTiltNode:
 
     def yawDegToOvRatio(self, deg):
         ratio = 0.5
-        max_yh = nepi_ros.get_param(self,'~ptx/limits/max_yaw_hardstop_deg', self.default_settings['max_yaw_hardstop_deg'])
-        min_yh = nepi_ros.get_param(self,'~ptx/limits/min_yaw_hardstop_deg', self.default_settings['min_yaw_hardstop_deg'])
+        max_yh = nepi_ros.get_param('~ptx/limits/max_yaw_hardstop_deg', self.default_settings['max_yaw_hardstop_deg'])
+        min_yh = nepi_ros.get_param('~ptx/limits/min_yaw_hardstop_deg', self.default_settings['min_yaw_hardstop_deg'])
         reverse_yaw = False
         if self.ptx_if is not None:
             reverse_yaw = self.ptx_if.reverse_yaw_control 
@@ -392,8 +393,8 @@ class OnvifPanTiltNode:
 
     def yawOvRatioToDeg(self, ovRatio):
         yaw_deg = 0
-        max_yh = nepi_ros.get_param(self,'~ptx/limits/max_yaw_hardstop_deg', self.default_settings['max_yaw_hardstop_deg'])
-        min_yh = nepi_ros.get_param(self,'~ptx/limits/min_yaw_hardstop_deg', self.default_settings['min_yaw_hardstop_deg'])
+        max_yh = nepi_ros.get_param('~ptx/limits/max_yaw_hardstop_deg', self.default_settings['max_yaw_hardstop_deg'])
+        min_yh = nepi_ros.get_param('~ptx/limits/min_yaw_hardstop_deg', self.default_settings['min_yaw_hardstop_deg'])
         reverse_yaw = False
         if self.ptx_if is not None:
             reverse_yaw = self.ptx_if.reverse_yaw_control 
@@ -405,8 +406,8 @@ class OnvifPanTiltNode:
     
     def pitchOvRatioToDeg(self, ovRatio):
         pitch_deg = 0
-        max_ph = nepi_ros.get_param(self,'~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
-        min_ph = nepi_ros.get_param(self,'~ptx/limits/min_pitch_hardstop_deg', self.default_settings['min_pitch_hardstop_deg'])
+        max_ph = nepi_ros.get_param('~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
+        min_ph = nepi_ros.get_param('~ptx/limits/min_pitch_hardstop_deg', self.default_settings['min_pitch_hardstop_deg'])
         reverse_pitch = False
         if self.ptx_if is not None:
             reverse_pitch = self.ptx_if.reverse_pitch_control

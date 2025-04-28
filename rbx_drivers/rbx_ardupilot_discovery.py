@@ -314,12 +314,12 @@ class ArdupilotDiscovery:
     rosparam_load_cmd = ['rosparam', 'load', '/opt/nepi/ros/share/mavros/launch/apm_config.yaml', mav_node_namespace]
     subprocess.run(rosparam_load_cmd)
     # Adjust the timesync_rate to cut down on log noise
-    nepi_ros.set_param(self,mav_node_namespace + '/conn/timesync_rate', 1.0)
+    nepi_ros.set_param(mav_node_namespace + '/conn/timesync_rate', 1.0)
     # Allow the HIL plugin. Disabled in apm configs for some reason
-    plugin_blacklist = nepi_ros.get_param(self,mav_node_namespace + '/plugin_blacklist')
+    plugin_blacklist = nepi_ros.get_param(mav_node_namespace + '/plugin_blacklist')
     if 'hil' in plugin_blacklist:
       plugin_blacklist.remove('hil')
-      nepi_ros.set_param(self,mav_node_namespace + '/plugin_blacklist', plugin_blacklist)
+      nepi_ros.set_param(mav_node_namespace + '/plugin_blacklist', plugin_blacklist)
     
     # Launch Mavlink Node
     self.logger.log_msg_info("Launching mavlink node: " + mav_node_name)
@@ -333,7 +333,7 @@ class ArdupilotDiscovery:
 
     ardu_node_name = "ardupilot_" + device_id_str
     has_fake_gps_param_namespace = self.base_namespace + ardu_node_name + "/has_fake_gps"
-    nepi_ros.set_param(self,has_fake_gps_param_namespace,self.enable_fake_gps)
+    nepi_ros.set_param(has_fake_gps_param_namespace,self.enable_fake_gps)
     self.logger.log_msg_info("" + "Starting ardupilot rbx node: " + ardu_node_name)
     processor_run_cmd = ["rosrun", "nepi_drivers", "rbx_ardupilot_node.py",
                           "__name:=" + ardu_node_name, f"__ns:={self.base_namespace}"]

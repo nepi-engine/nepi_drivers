@@ -91,6 +91,7 @@ class KistKPT20Node:
     drv_dict = dict()                                                    
     def __init__(self):
         ####  NODE Initialization ####
+        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
         self.class_name = type(self).__name__
         self.base_namespace = nepi_ros.get_base_namespace()
         self.node_name = nepi_ros.get_node_name()
@@ -105,7 +106,7 @@ class KistKPT20Node:
         # Initialize Class Variables
 
         # Get required drv driver dict info
-        self.drv_dict = nepi_ros.get_param(self,'~drv_dict',dict()) 
+        self.drv_dict = nepi_ros.get_param('~drv_dict',dict()) 
         #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
         try:
             self.port_str = self.drv_dict['DEVICE_DICT']['device_path'] 

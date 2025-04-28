@@ -223,6 +223,7 @@ class ZedCamNode(object):
     drv_dict = dict()                          
     def __init__(self):
         ####  NODE Initialization ####
+        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
         self.class_name = type(self).__name__
         self.base_namespace = nepi_ros.get_base_namespace()
         self.node_name = nepi_ros.get_node_name()
@@ -237,7 +238,7 @@ class ZedCamNode(object):
         # Initialize Class Variables
 
         # Get required drv driver dict info
-        self.drv_dict = nepi_ros.get_param(self,'~drv_dict',TEST_DRV_DICT) 
+        self.drv_dict = nepi_ros.get_param('~drv_dict',TEST_DRV_DICT) 
 
         ################################################
         # Try to restore camera calibration files from

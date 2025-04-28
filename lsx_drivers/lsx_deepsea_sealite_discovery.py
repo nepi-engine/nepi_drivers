@@ -247,7 +247,7 @@ class SealiteDiscovery:
     self.logger.log_msg_warn("Launching node  with path: " + path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str)
     #self.logger.log_msg_warn(" launching node: " + str(self.drv_dict))
     self.launch_time_dict[path_str] = nepi_ros.get_time()
-    nepi_ros.set_param(self,dict_param_name,self.drv_dict)
+    nepi_ros.set_param(dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, node_name, device_path = path_str)
     if success == True:
       self.active_devices_dict[path_str] = {'node_name': device_node_name, 'sub_process': sub_process}

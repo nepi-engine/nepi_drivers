@@ -76,6 +76,7 @@ class OnvifCamNode:
     drv_dict = dict()                                                    
     def __init__(self):
         ####  NODE Initialization ####
+        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
         self.class_name = type(self).__name__
         self.base_namespace = nepi_ros.get_base_namespace()
         self.node_name = nepi_ros.get_node_name()
@@ -91,7 +92,7 @@ class OnvifCamNode:
         
         # Get required drv driver dict info
         try:
-            self.drv_dict = nepi_ros.get_param(self,'~drv_dict') # Crash if not provide
+            self.drv_dict = nepi_ros.get_param('~drv_dict') # Crash if not provide
         except Exception as e:
             nepi_ros.signal_shutdown("Failed to read drv_dict from param server for node " + self.node_name + " with exception: " + str(e))
         self.driver_path = self.drv_dict['path']
@@ -101,23 +102,23 @@ class OnvifCamNode:
 
 
         # Require the camera connection parameters to have been set
-        if not nepi_ros.has_param(self,'~credentials/username'):
+        if not nepi_ros.has_param('~credentials/username'):
             self.msg_if.pub_warn("Missing credentials/username parameter... cannot start")
             return
-        if not nepi_ros.has_param(self,'~credentials/password'):
+        if not nepi_ros.has_param('~credentials/password'):
             self.msg_if.pub_warn("Missing credentials/password parameter... cannot start")
             return
-        if not nepi_ros.has_param(self,'~network/host'):
+        if not nepi_ros.has_param('~network/host'):
             self.msg_if.pub_warn("Missing network/host parameter... cannot start")
             return
                 
-        username = str(nepi_ros.get_param(self,'~credentials/username'))
-        password = str(nepi_ros.get_param(self,'~credentials/password'))
-        host = str(nepi_ros.get_param(self,'~network/host'))
+        username = str(nepi_ros.get_param('~credentials/username'))
+        password = str(nepi_ros.get_param('~credentials/password'))
+        host = str(nepi_ros.get_param('~network/host'))
         
         # Allow a default for the port, since it is part of onvif spec.
-        onvif_port = nepi_ros.get_param(self,'~network/port', 80)
-        nepi_ros.set_param(self,'~/network/port', onvif_port)
+        onvif_port = nepi_ros.get_param('~network/port', 80)
+        nepi_ros.set_param('~/network/port', onvif_port)
 
 
         self.msg_if.pub_info("Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
@@ -174,10 +175,10 @@ class OnvifCamNode:
             # will only affect the first one.... so
             # TODO: Consider a scheme for adjusting parameters for separate streams independently
             # or in lock-step. Not sure if the uri_index and encoder_index have the same meaning
-            self.img_uri_index = nepi_ros.get_param(self,'~/img_uri_index', 0)
-            nepi_ros.set_param(self,'~/img_uri_index', self.img_uri_index)
-            #self.bw_2d_img_uri_index = nepi_ros.get_param(self,'~/image_uris/bw_2d_img_uri_index', 0)
-            #nepi_ros.set_param(self,'~/image_uris/bw_2d_img_uri_index', self.bw_2d_img_uri_index)
+            self.img_uri_index = nepi_ros.get_param('~/img_uri_index', 0)
+            nepi_ros.set_param('~/img_uri_index', self.img_uri_index)
+            #self.bw_2d_img_uri_index = nepi_ros.get_param('~/image_uris/bw_2d_img_uri_index', 0)
+            #nepi_ros.set_param('~/image_uris/bw_2d_img_uri_index', self.bw_2d_img_uri_index)
 
             # Create threading locks for each URI index (currently just 1) to provide threadsafety
             self.img_uri_lock = threading.Lock()
@@ -239,11 +240,11 @@ class OnvifCamNode:
     # Sensor setting functions
 
     def getRtspUrl(self):
-        onvif_port = str(nepi_ros.get_param(self,'~network/port', 80))
-        onvif_address = str(nepi_ros.get_param(self,'~network/host',""))
+        onvif_port = str(nepi_ros.get_param('~network/port', 80))
+        onvif_address = str(nepi_ros.get_param('~network/host',""))
         url = "http://" + onvif_address #+ ":" + onvif_port
-        username = str(nepi_ros.get_param(self,'~credentials/username'))
-        password = str(nepi_ros.get_param(self,'~credentials/password'))
+        username = str(nepi_ros.get_param('~credentials/username'))
+        password = str(nepi_ros.get_param('~credentials/password'))
         return url, username, password
 
 

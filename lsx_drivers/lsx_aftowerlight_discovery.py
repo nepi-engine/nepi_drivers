@@ -173,7 +173,7 @@ class AfTowerLightDiscovery:
     self.drv_dict['DEVICE_DICT'] = dict()
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
     self.drv_dict['DEVICE_DICT']['baud_rate_str'] = self.baud_rate
-    nepi_ros.set_param(self,dict_param_name,self.drv_dict)
+    nepi_ros.set_param(dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, node_name, device_path = path_str)
     if success == True:
       self.active_devices_dict[path_str] = {'node_name': device_node_name, 'sub_process': sub_process}

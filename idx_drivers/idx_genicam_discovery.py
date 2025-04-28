@@ -27,12 +27,12 @@ import time
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
-from nepi_sdk import nepi_save
+
 
 # Needed for GenICam auto-detect
 from harvesters.core import Harvester
 
-from nepi_api.sys_if_msg import MsgIF
+from nepi_api.messages_if import MsgIF
 
 
 PKG_NAME = 'IDX_GENICAM' # Use in display menus
@@ -68,6 +68,7 @@ class GenicamCamDiscovery:
 
   def __init__(self):
     ####  NODE Initialization ####
+    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
     self.class_name = type(self).__name__
     self.base_namespace = nepi_ros.get_base_namespace()
     self.node_name = nepi_ros.get_node_name()
@@ -82,10 +83,10 @@ class GenicamCamDiscovery:
     ########################
     # Get discovery options
     try:
-      self.drv_dict = nepi_ros.get_param(self,'~drv_dict',dict())
-      self.logger.log_msg_info("Initial Driver Dict: " + str(self.drv_dict))
+      self.drv_dict = nepi_ros.get_param('~drv_dict',dict())
+      self.msg_if.pub_info("Initial Driver Dict: " + str(self.drv_dict))
     except Exception as e:
-      self.logger.log_msg_warn("Failed to load options " + str(e))#
+      self.msg_if.pub_warn("Failed to load options " + str(e))#
       nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
       return
       
@@ -103,17 +104,17 @@ class GenicamCamDiscovery:
 
     nepi_ros.start_timer_process(nepi_ros.ros_duration(1), self.detectAndManageDevices, oneshot = True)
 
-    self.logger.log_msg_info("Initialization Complete")
+    self.msg_if.pub_info("Initialization Complete")
     nepi_ros.spin()
 
   #**********************
   # Discovery functions
 
   def detectAndManageDevices(self, timer):
-    #self.logger.log_msg_warn("Starting detection process")
+    #self.msg_if.pub_warn("Starting detection process")
     # Make sure our genicam harvesters context is up to date.
     self.genicam_harvester.update()
-    #self.logger.log_msg_info("str(genicam_harvester.device_info_list))
+    #self.msg_if.pub_info("str(genicam_harvester.device_info_list))
     # Take note of any genicam nodes currently running. If they are not found
     # in the current genicam harvesters context, we must assume that they have
     # been disconnected and stop the corresponding node(s).
@@ -124,7 +125,7 @@ class GenicamCamDiscovery:
        
     
     for device in self.genicam_harvester.device_info_list:
-      #self.logger.log_msg_info(device)
+      #self.msg_if.pub_info(device)
       model = device.model
       sn = device.serial_number
       vendor = device.vendor
@@ -148,9 +149,9 @@ class GenicamCamDiscovery:
           ### DON'T REMOVE FROM dont_retry_list ###
           launch_id = node_namespace
           if launch_id in self.dont_retry_list:
-            self.logger.log_msg_warn("node " + node_namespace + " is not running. WILL NOT RESTART")
+            self.msg_if.pub_warn("node " + node_namespace + " is not running. WILL NOT RESTART")
           else:
-            self.logger.log_msg_warn("node " + node_namespace + " is not running. RESTARTING")
+            self.msg_if.pub_warn("node " + node_namespace + " is not running. RESTARTING")
 
 
 
@@ -173,7 +174,7 @@ class GenicamCamDiscovery:
     # Stop any nodes associated with devices that have disappeared.
     for node_namespace, running in active_devices.items():
       if not running:
-        self.logger.log_msg_info("Device no longer present. Stopping node " + node_namespace)
+        self.msg_if.pub_info("Device no longer present. Stopping node " + node_namespace)
         self.stopAndPurgeDeviceNode(node_namespace)
           
         # Remove from dont_retry_list
@@ -222,9 +223,9 @@ class GenicamCamDiscovery:
     # TODO: fair to assume uniqueness of device serial numbers?
  
 
-    self.logger.log_msg_warn("Initiating new Genicam node " + device_node_namespace)
+    self.msg_if.pub_warn("Initiating new Genicam node " + device_node_namespace)
 
-    self.logger.log_msg_warn("Starting node " + device_node_name + " via rosrun")
+    self.msg_if.pub_warn("Starting node " + device_node_name + " via rosrun")
 
     # NOTE: have to make serial_number look like a string by prefixing with "sn", otherwise ROS
     #       treats it as an int param and it causes an overflow. Better way to handle this?
@@ -232,7 +233,7 @@ class GenicamCamDiscovery:
     self.drv_dict['DEVICE_DICT']={'model': model}
     self.drv_dict['DEVICE_DICT']['serial_number'] = serial_number
     dict_param_name = device_node_name + "/drv_dict"
-    nepi_ros.set_param(self,dict_param_name,self.drv_dict)
+    nepi_ros.set_param(dict_param_name,self.drv_dict)
     # Try and load save node params
     nepi_drvs.checkLoadConfigFile(device_node_name)
 
@@ -255,18 +256,18 @@ class GenicamCamDiscovery:
     # Process luanch results
     self.launch_time_dict[launch_id] = nepi_ros.get_time()
     if success:
-      self.logger.log_msg_info(" Launched node: " + device_node_name)
+      self.msg_if.pub_info(" Launched node: " + device_node_name)
     else:
-      self.logger.log_msg_info(" Failed to lauch node: " + device_node_name + " with msg: " + msg)
+      self.msg_if.pub_info(" Failed to lauch node: " + device_node_name + " with msg: " + msg)
       if self.retry == False:
-        self.logger.log_msg_info(" Will not try relaunch for node: " + device_node_name)
+        self.msg_if.pub_info(" Will not try relaunch for node: " + device_node_name)
         self.dont_retry_list.append(launch_id)
       else:
-        self.logger.log_msg_info(" Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+        self.msg_if.pub_info(" Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
     return success
 
   def stopAndPurgeDeviceNode(self, node_namespace):
-    self.logger.log_msg_info("stopping " + node_namespace)
+    self.msg_if.pub_info("stopping " + node_namespace)
     for i, device in enumerate(self.deviceList):
       if device['node_namespace'] == node_namespace:
         node_name = device['node_namespace'].split("/")[-1]
@@ -275,7 +276,7 @@ class GenicamCamDiscovery:
         # And remove it from the list
         self.deviceList.pop(i)  
     if success == False:
-      self.logger.log_msg_warn("Unable to stop unknown node " + node_namespace)
+      self.msg_if.pub_warn("Unable to stop unknown node " + node_namespace)
 
   def deviceNodeIsRunning(self, node_namespace):
     for device in self.deviceList:
@@ -285,7 +286,7 @@ class GenicamCamDiscovery:
         else:
           return True
     # If we get here, didn't find the node in our list    
-    self.logger.log_msg_warn("cannot check run status of unknown node " + node_namespace)
+    self.msg_if.pub_warn("cannot check run status of unknown node " + node_namespace)
     return False
   
 
