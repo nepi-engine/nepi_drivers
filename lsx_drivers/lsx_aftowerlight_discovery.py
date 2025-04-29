@@ -51,14 +51,14 @@ class AfTowerLightDiscovery:
     self.log_name = PKG_NAME.lower() + "_discovery"
     self.logger = nepi_ros.logger(log_name = self.log_name)
     time.sleep(1)
-    self.logger.log_msg_info("Starting Initialization")
-    self.logger.log_msg_info("Initialization Complete")
+    self.logger.log_info("Starting Initialization")
+    self.logger.log_info("Initialization Complete")
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
   def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict):
     self.drv_dict = drv_dict
-    #self.logger.log_msg_warn("Got drv_dict : " + str(self.drv_dict))
+    #self.logger.log_warn("Got drv_dict : " + str(self.drv_dict))
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
@@ -66,11 +66,11 @@ class AfTowerLightDiscovery:
     ########################
     # Get discovery options
     try:
-      #Sself.logger.log_msg_warn("": " + self.log_name + ": Starting discovery with drv_dict " + str(drv_dict))#
+      #Sself.logger.log_warn("": " + self.log_name + ": Starting discovery with drv_dict " + str(drv_dict))#
       baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
       self.baud_rate = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
     except Exception as e:
-      self.logger.log_msg_warn("Failed to load options " + str(e))#
+      self.logger.log_warn("Failed to load options " + str(e))#
       return None
 
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
@@ -111,17 +111,17 @@ class AfTowerLightDiscovery:
   ##########  Device specific calls
 
   def checkForDevice(self,path_str):
-    #self.logger.log_msg_warn("log_name + " checkForDevice")###
+    #self.logger.log_warn("log_name + " checkForDevice")###
     found_device = False
-    #self.logger.log_msg_warn("path_str " + path_str)
+    #self.logger.log_warn("path_str " + path_str)
     if path_str.find('ttyUSB') != -1:
       usb_dict = nepi_drvs.getSerialPortDict()
-      #self.logger.log_msg_warn("serial_port_dict " + str(usb_dict))
+      #self.logger.log_warn("serial_port_dict " + str(usb_dict))
       if path_str in usb_dict.keys():
-        #self.logger.log_msg_warn("search ids " + str(self.search_ids))
-        #self.logger.log_msg_warn("serial_port product id " + str(usb_dict[path_str]['product_id']))
+        #self.logger.log_warn("search ids " + str(self.search_ids))
+        #self.logger.log_warn("serial_port product id " + str(usb_dict[path_str]['product_id']))
         if str(usb_dict[path_str]['product_id']) in self.includeDevices:
-          #self.logger.log_msg_warn("found device on path: " + path_str)
+          #self.logger.log_warn("found device on path: " + path_str)
           found_device = True
     return found_device
 
@@ -134,7 +134,7 @@ class AfTowerLightDiscovery:
     elif self.checkForDevice(path_str) == False:
       active = False
     if active == False:
-      self.logger.log_msg_info("No longer detecting device on : " + path_str)
+      self.logger.log_info("No longer detecting device on : " + path_str)
       if path_str in self.active_devices_dict.keys():
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
@@ -166,10 +166,10 @@ class AfTowerLightDiscovery:
     file_name = self.drv_dict['NODE_DICT']['file_name']
     node_name = self.node_launch_name + "_" + path_str.split('/')[-1]
 
-    self.logger.log_msg_warn("launching node: " + node_name)
+    self.logger.log_warn("launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
     dict_param_name = self.base_namespace + node_name + "/drv_dict"
-    self.logger.log_msg_warn("launching node: " + str(self.drv_dict))
+    self.logger.log_warn("launching node: " + str(self.drv_dict))
     self.drv_dict['DEVICE_DICT'] = dict()
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
     self.drv_dict['DEVICE_DICT']['baud_rate_str'] = self.baud_rate
@@ -181,14 +181,14 @@ class AfTowerLightDiscovery:
     # Process luanch results
     self.launch_time_dict[launch_id] = nepi_ros.get_time()
     if success:
-      self.logger.log_msg_warn("Launched node: " + device_node_name)
+      self.logger.log_warn("Launched node: " + device_node_name)
     else:
-      self.logger.log_msg_warn("Failed to lauch node: " + device_node_name + " with msg: " + msg)
+      self.logger.log_warn("Failed to lauch node: " + device_node_name + " with msg: " + msg)
       if self.retry == False:
-        self.logger.log_msg_warn("Will not try relaunch for node: " + device_node_name)
+        self.logger.log_warn("Will not try relaunch for node: " + device_node_name)
         self.dont_retry_list.append(launch_id)
       else:
-        self.logger.log_msg_warn("Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+        self.logger.log_warn("Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
     return success
 
 
