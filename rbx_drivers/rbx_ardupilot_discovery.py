@@ -68,15 +68,15 @@ class ArdupilotDiscovery:
     self.log_name = PKG_NAME.lower() + "_discovery"
     self.logger = nepi_ros.logger(log_name = self.log_name)
     time.sleep(1)
-    self.logger.log_msg_info("Starting Initialization")
-    self.logger.log_msg_info("Initialization Complete")
+    self.logger.log_info("Starting Initialization")
+    self.logger.log_info("Initialization Complete")
 
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
   def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict):
     self.drv_dict = drv_dict
-    #self.logger.log_msg_warn("Got drv_dict : " + str(self.drv_dict))
+    #self.logger.log_warn("Got drv_dict : " + str(self.drv_dict))
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
@@ -86,11 +86,11 @@ class ArdupilotDiscovery:
     ########################
     # Get discovery options
     try:
-      #self.logger.log_msg_warn("Starting discovery with drv_dict " + str(drv_dict))#
+      #self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
       connection_type = drv_dict['DISCOVERY_DICT']['OPTIONS']['connection']['value']
       self.enable_fake_gps = drv_dict['DISCOVERY_DICT']['OPTIONS']['fake_gps']['value']
     except Exception as e:
-      self.logger.log_msg_warn("Failed to load options " + str(e))#
+      self.logger.log_warn("Failed to load options " + str(e))#
       return None
 
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
@@ -115,14 +115,14 @@ class ArdupilotDiscovery:
 
     ### Checking for devices on available paths
     # Check paths for device type
-    #self.logger.log_msg_warn("Running discovery for type: " + connection_type)
+    #self.logger.log_warn("Running discovery for type: " + connection_type)
 
     # RUN SERIAL PROCESSES
     if connection_type == 'SERIAL':
       self.path_list = []
       ports = serial.tools.list_ports.comports()
       for loc, desc, hwid in sorted(ports):
-        #self.logger.log_msg_warn("Found serial_port at: " + loc)
+        #self.logger.log_warn("Found serial_port at: " + loc)
         self.path_list.append(loc)
       for path_str in self.path_list:
         valid_path = True
@@ -133,16 +133,16 @@ class ArdupilotDiscovery:
             if path_str.find(exlcude_device) != -1:
               valid_path = False
           if valid_path:
-            #self.logger.log_msg_warn("Looking for path: " + path_str)
-            #self.logger.log_msg_warn("In path_list: " + str(self.path_list))
+            #self.logger.log_warn("Looking for path: " + path_str)
+            #self.logger.log_warn("In path_list: " + str(self.path_list))
             [found_device, path_str, comp_id, sys_id, baud_str] = self.checkForSerialDevice(path_str)
             if found_device:
               success = False
               success = self.launchSerialDeviceNode(path_str, comp_id, sys_id, baud_str)
-              self.logger.log_msg_info("Serial mavlink luanch process returned: " + str(success))
+              self.logger.log_info("Serial mavlink luanch process returned: " + str(success))
               if success:
                 self.active_paths_list.append(path_str)
-      #self.logger.log_msg_warn(":  " + self.log_name + ":Updated serial active path: " + str(self.active_paths_list))
+      #self.logger.log_warn(":  " + self.log_name + ":Updated serial active path: " + str(self.active_paths_list))
     # RUN IP PROCESSES
     elif connection_type == 'TCP' or connection_type == "UDP":
 
@@ -159,9 +159,9 @@ class ArdupilotDiscovery:
           addr = ip_addr_list[i].split("/")[0]
           addr = addr.rsplit(".",1)[0] + ".5"
           ip_addr_list[i] = addr
-        self.logger.log_msg_warn(":  " + self.log_name + "Got IP list from service call: " + str(ip_addr_list))
+        self.logger.log_warn(":  " + self.log_name + "Got IP list from service call: " + str(ip_addr_list))
       except Exception as e:
-        self.logger.log_msg_warn(":  " + self.log_name + "IP Addr service call failed, falling back to backup ip list: " + str(self.ip_addr_list) + " " + str(e))
+        self.logger.log_warn(":  " + self.log_name + "IP Addr service call failed, falling back to backup ip list: " + str(self.ip_addr_list) + " " + str(e))
       '''
       # RUN TCP PROCESSES
       if connection_type == 'TCP':
@@ -169,8 +169,8 @@ class ArdupilotDiscovery:
           for ip_port_str in self.ip_tcp_port_list:
             path_str = connection_type + "_" + ip_addr_str + "_" + ip_port_str
             if path_str not in self.active_paths_list:
-              #self.logger.log_msg_warn("Looking for path: " + path_str)
-              #self.logger.log_msg_warn("In path_list: " + str(self.active_paths_list))
+              #self.logger.log_warn("Looking for path: " + path_str)
+              #self.logger.log_warn("In path_list: " + str(self.active_paths_list))
               [found_device, path_str] = self.checkForTcpDevice(path_str)
               if found_device:
                 success = self.launchTcpDeviceNode(path_str)
@@ -182,15 +182,15 @@ class ArdupilotDiscovery:
           for ip_udp_port_str in self.ip_udp_port_list:
             path_str = connection_type + "_" + ip_addr_str + "_" + ip_udp_port_str
             if path_str not in self.active_paths_list:
-              #self.logger.log_msg_warn("Looking for path: " + path_str)
-              #self.logger.log_msg_warn("In path_list: " + str(self.active_paths_list))
+              #self.logger.log_warn("Looking for path: " + path_str)
+              #self.logger.log_warn("In path_list: " + str(self.active_paths_list))
               [found_device, path_str] = self.checkForUdpDevice(path_str)
               if found_device:
                 success = self.launchUdpDeviceNode(path_str)
                 if success:
                   self.active_paths_list.append(path_str)
     # Wrap Up
-    #self.logger.log_msg_warn(":  " + self.log_name + ":Completed discovery process with active path: " + str(self.active_paths_list))
+    #self.logger.log_warn(":  " + self.log_name + ":Completed discovery process with active path: " + str(self.active_paths_list))
     return self.active_paths_list
   
 
@@ -215,11 +215,11 @@ class ArdupilotDiscovery:
       
       # Check that the ros_node_name process is still running
       if mavlink_subproc.poll() is not None:
-        self.logger.log_msg_warn("Node process for is no longer running... purging from managed list " + ros_node_name)
+        self.logger.log_warn("Node process for is no longer running... purging from managed list " + ros_node_name)
         purge_node = True
       # Check that the node's port still exists
       elif path_str not in self.active_paths_list:
-        self.logger.log_msg_warn("Port  associated with node no longer detected " + ros_node_name)
+        self.logger.log_warn("Port  associated with node no longer detected " + ros_node_name)
         purge_node = True
       else:
         # Now check that the node is actually responsive
@@ -233,18 +233,18 @@ class ArdupilotDiscovery:
           vehicle_info_query(sysid=sysid, compid=compid, get_all=False)
 
         except Exception as e: # Any exception indicates that the service call failed
-          self.logger.log_msg_warn("Node is no longer responding to vehicle info queries  " + ros_node_name + " "  + str(e))
+          self.logger.log_warn("Node is no longer responding to vehicle info queries  " + ros_node_name + " "  + str(e))
           purge_node = True
 
       if purge_node:
-        self.logger.log_msg_warn("" + "Purging node  " + ros_node_name)
+        self.logger.log_warn("" + "Purging node  " + ros_node_name)
 
         if path_str in self.active_paths_list:
-          self.logger.log_msg_warn("Removing port from active list as part of node purging  " + path_str)
+          self.logger.log_warn("Removing port from active list as part of node purging  " + path_str)
           self.active_paths_list.remove(path_str)
 
         if mavlink_subproc.poll() is None:
-          self.logger.log_msg_warn("Issuing sigterm to process for as part of node purging " + ros_node_name)
+          self.logger.log_warn("Issuing sigterm to process for as part of node purging " + ros_node_name)
           mavlink_subproc.kill()
           # Turns out that is not always enough to get the node out of the ros system, so we use rosnode cleanup, too
           # rosnode cleanup won't find the disconnected node until the process is fully terminated
@@ -278,7 +278,7 @@ class ArdupilotDiscovery:
             cleanup_proc.communicate(input=bytes("y\r\n", 'utf-8'), timeout=10)
             cleanup_proc.wait(timeout=10) 
           except Exception as e:
-            self.logger.log_msg_warn("rosnode cleanup failed " + str(e))
+            self.logger.log_warn("rosnode cleanup failed " + str(e))
           
           # Remove from dont_retry_list
           launch_id = path_str
@@ -307,7 +307,7 @@ class ArdupilotDiscovery:
     ### Start Node Luanch Process
     mav_node_name = "mavlink_" + device_id_str
     mav_node_namespace = self.base_namespace + mav_node_name
-    self.logger.log_msg_info("Starting mavlink node setup: " + mav_node_name)
+    self.logger.log_info("Starting mavlink node setup: " + mav_node_name)
     # Load the proper configs for APM
     rosparam_load_cmd = ['rosparam', 'load', '/opt/nepi/ros/share/mavros/launch/apm_pluginlists.yaml', mav_node_namespace]
     subprocess.run(rosparam_load_cmd)
@@ -322,7 +322,7 @@ class ArdupilotDiscovery:
       nepi_ros.set_param(mav_node_namespace + '/plugin_blacklist', plugin_blacklist)
     
     # Launch Mavlink Node
-    self.logger.log_msg_info("Launching mavlink node: " + mav_node_name)
+    self.logger.log_info("Launching mavlink node: " + mav_node_name)
 
     node_run_cmd = ['rosrun', 'mavros', 'mavros_node', '__name:=' + mav_node_name, '_fcu_url:=' + fcu_url, '_gcs_url:=' + gcs_url] 
     mav_subproc = subprocess.Popen(node_run_cmd)
@@ -334,7 +334,7 @@ class ArdupilotDiscovery:
     ardu_node_name = "ardupilot_" + device_id_str
     has_fake_gps_param_namespace = self.base_namespace + ardu_node_name + "/has_fake_gps"
     nepi_ros.set_param(has_fake_gps_param_namespace,self.enable_fake_gps)
-    self.logger.log_msg_info("" + "Starting ardupilot rbx node: " + ardu_node_name)
+    self.logger.log_info("" + "Starting ardupilot rbx node: " + ardu_node_name)
     processor_run_cmd = ["rosrun", "nepi_drivers", "rbx_ardupilot_node.py",
                           "__name:=" + ardu_node_name, f"__ns:={self.base_namespace}"]
     ardu_subproc = subprocess.Popen(processor_run_cmd)
@@ -346,7 +346,7 @@ class ArdupilotDiscovery:
     if self.enable_fake_gps:
       #Start the an RBX fake gps for this ardupilot node
       fgps_node_name = "fake_gps_" + device_id_str
-      self.logger.log_msg_info("" + "Starting fake gps rbx node: " + fgps_node_name)
+      self.logger.log_info("" + "Starting fake gps rbx node: " + fgps_node_name)
       processor_run_cmd = ["rosrun", "nepi_drivers", "fake_gps.py",
                             "__name:=" + fgps_node_name, f"__ns:={self.base_namespace}"]
       fgps_subproc = subprocess.Popen(processor_run_cmd)
@@ -361,7 +361,7 @@ class ArdupilotDiscovery:
       # No exception, all good
     except Exception as e:
       success = False
-      self.logger.log_msg_warn("Failed to start " + mav_node_name + " " + str(e))
+      self.logger.log_warn("Failed to start " + mav_node_name + " " + str(e))
     '''
     if success == True:
       device_entry = dict()
@@ -389,13 +389,13 @@ class ArdupilotDiscovery:
     mav_sys_id = 0
     for baud_str in self.baudrate_list:
       baud_int = int(baud_str)
-      self.logger.log_msg_warn("Connecting to serial port " + path_str + " with baudrate: " + baud_str)
+      self.logger.log_warn("Connecting to serial port " + path_str + " with baudrate: " + baud_str)
       try:
         # Try and open serial port
-        self.logger.log_msg_warn("Opening serial port " + path_str + " with baudrate: " + baud_str)
+        self.logger.log_warn("Opening serial port " + path_str + " with baudrate: " + baud_str)
         serial_port = serial.Serial(path_str,baud_int,timeout = 1)
       except Exception as e:
-        self.logger.log_msg_warn("Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
+        self.logger.log_warn("Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
         continue
       
       for i in range(0,500): # Read up to 64 packets waiting for heartbeat
@@ -437,10 +437,10 @@ class ArdupilotDiscovery:
             baud_str = baud_str
             mav_comp_id = comp_id
             mav_sys_id = sys_id
-            self.logger.log_msg_info("Found mavlink autonoumou device at: " + path_str + " with baudrage " + baud_str + " with sys_id " + str(mav_sys_id))
+            self.logger.log_info("Found mavlink autonoumou device at: " + path_str + " with baudrage " + baud_str + " with sys_id " + str(mav_sys_id))
             break
       # Clean up the serial port
-      self.logger.log_msg_warn("Closing serial port " + path_str)
+      self.logger.log_warn("Closing serial port " + path_str)
       serial_port.close()
       time.sleep(1)
     return found_device, path_str, mav_comp_id, mav_sys_id, baud_str 
@@ -465,7 +465,7 @@ class ArdupilotDiscovery:
           fcu_url = path_str + ':' + baud_str
           gcs_url = ""
           launch_list_str = str([path_str, device_id_str, mav_comp_id, mav_sys_id, fcu_url, gcs_url])
-          #self.logger.log_msg_info("Launching mavlink with launch list str: " + launch_list_str)
+          #self.logger.log_info("Launching mavlink with launch list str: " + launch_list_str)
           success = self.launchDeviceNode(path_str, device_id_str, mav_comp_id, mav_sys_id, fcu_url, gcs_url)
     return success
 
@@ -474,16 +474,16 @@ class ArdupilotDiscovery:
   def checkForTcpDevice(self,path_str):
     found_device = False
     [con_type,ip_addr_str,ip_port_str] = path_str.split("_")
-    self.logger.log_msg_warn(":  " + "Mavlink_AD: Checkinbg TCP connection: " + ip_addr_str + " " + ip_port_str)
+    self.logger.log_warn(":  " + "Mavlink_AD: Checkinbg TCP connection: " + ip_addr_str + " " + ip_port_str)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(2) 
     result = sock.connect_ex((ip_addr_str,int(ip_port_str)))
     if result == 0:
         found_device = True
-        self.logger.log_msg_warn(":  " + "Mavlink_AD: Found TCP device on ip address: " + ip_addr_str + " port: " + ip_port_str + " is open")
+        self.logger.log_warn(":  " + "Mavlink_AD: Found TCP device on ip address: " + ip_addr_str + " port: " + ip_port_str + " is open")
         sock.close()
     else:
-      self.logger.log_msg_warn(":  " + "Mavlink_AD: Did not find TCP device on ip address: " + ip_addr_str + " port: " + ip_port_str)
+      self.logger.log_warn(":  " + "Mavlink_AD: Did not find TCP device on ip address: " + ip_addr_str + " port: " + ip_port_str)
     return found_device, path_str
 
 
@@ -509,12 +509,12 @@ class ArdupilotDiscovery:
     '''
     [con_type,ip_addr_str,ip_port_str] = path_str.split("_")
     result = os.system("netcat -vnzu "+ ip_addr_str +" "+ ip_addr_str)
-    self.logger.log_msg_warn(":  " + "Mavlink_AD: netcat returned " + str(result) + " for ip address: " + ip_addr_str + " port: " + ip_port_str + " is open")
+    self.logger.log_warn(":  " + "Mavlink_AD: netcat returned " + str(result) + " for ip address: " + ip_addr_str + " port: " + ip_port_str + " is open")
     if result == 0:
       found_device = True
-      self.logger.log_msg_warn(":  " + "Mavlink_AD: Found UDP device on ip address: " + ip_addr_str + " port: " + ip_port_str + " is open")
+      self.logger.log_warn(":  " + "Mavlink_AD: Found UDP device on ip address: " + ip_addr_str + " port: " + ip_port_str + " is open")
     else:
-      self.logger.log_msg_warn(":  " + "Mavlink_AD: Did not find UDP device on ip address: " + ip_addr_str + " port: " + ip_port_str)
+      self.logger.log_warn(":  " + "Mavlink_AD: Did not find UDP device on ip address: " + ip_addr_str + " port: " + ip_port_str)
     '''
     return found_device, path_str
 

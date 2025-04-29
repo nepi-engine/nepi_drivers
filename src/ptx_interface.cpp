@@ -19,7 +19,7 @@
 #include "ptx_interface.h"
 #include "ptx_node.h"
 
-#include "nepi_ros_interfaces/PanTiltStatus.h"
+#include "nepi_ros_interfaces/PTXStatus.h"
 
 #include <tf2/LinearMath/Quaternion.h>
 
@@ -164,7 +164,7 @@ void PTXInterface::initPublishers()
 {
     SDKInterface::initPublishers();
 
-    statusPub = _parent_priv_nh->advertise<nepi_ros_interfaces::PanTiltStatus>("ptx/status", 10);
+    statusPub = _parent_priv_nh->advertise<nepi_ros_interfaces::PTXStatus>("ptx/status", 10);
 }
 
 void PTXInterface::initServices()
@@ -238,7 +238,7 @@ void PTXInterface::publishJointStateAndStatus()
         odomPub.publish(odometry);
     }
 
-    nepi_ros_interfaces::PanTiltStatus status_msg;
+    nepi_ros_interfaces::PTXStatus status_msg;
     status_msg.header.seq = status.loop_count;
     status_msg.header.stamp = ros::Time::now();
     status_msg.header.frame_id = frame_id;

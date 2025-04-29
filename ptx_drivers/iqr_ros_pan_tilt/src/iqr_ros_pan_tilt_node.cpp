@@ -88,7 +88,7 @@ void IqrRosPanTiltNode::retrieveParams()
 
 void IqrRosPanTiltNode::reportPanTiltIdentity() const
 {
-  IQR::PanTiltStatus pt_st;
+  IQR::PTXStatus pt_st;
   if (true == driver->getStatus(pt_st))
   {
     ROS_INFO("Connected to IQR ROS Pan/Tilt:"
@@ -131,7 +131,7 @@ void IqrRosPanTiltNode::gotoPosition(float yaw_deg, float pitch_deg, float speed
 
 void IqrRosPanTiltNode::getCurrentPosition(float &yaw_deg_out, float &pitch_deg_out)
 {
-    IQR::PanTiltStatus status;
+    IQR::PTXStatus status;
     driver->getStatus(status);
 
     yaw_deg_out = status.yaw_now;
@@ -140,7 +140,7 @@ void IqrRosPanTiltNode::getCurrentPosition(float &yaw_deg_out, float &pitch_deg_
 
 void IqrRosPanTiltNode::getStatus(PTXStatus &status_out)
 {
-    IQR::PanTiltStatus pt_st;
+    IQR::PTXStatus pt_st;
     if (true == driver->getStatus(pt_st))
     {
         status_out.loop_count = loop_count;
@@ -182,7 +182,7 @@ void IqrRosPanTiltNode::getStatus(PTXStatus &status_out)
 
 bool IqrRosPanTiltNode::inMotion(float &yaw_goal_out, float &pitch_goal_out)
 {
-    IQR::PanTiltStatus pt_st;
+    IQR::PTXStatus pt_st;
     if (true == driver->getStatus(pt_st))
     {
         yaw_goal_out = pt_st.yaw_goal;

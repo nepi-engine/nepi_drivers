@@ -35,7 +35,7 @@
 
 namespace IQR
 {
-  typedef struct PanTiltStatus
+  typedef struct PTXStatus
   {                         //offect
     uint8_t id;             //0
     std::string serial_num; //1
@@ -57,7 +57,7 @@ namespace IQR
     int16_t pitch_raw;      //17
     uint16_t loop_ec;       //18
     uint16_t loop_time;     //19
-  } PanTiltStatus;
+  } PTXStatus;
 
   class PanTiltDriver : public QThread
   {
@@ -65,7 +65,7 @@ namespace IQR
     PanTiltDriver(const uint8_t id, const std::string &portName);
     ~PanTiltDriver();
 
-    bool getStatus(PanTiltStatus &st) { std::lock_guard<std::mutex> lck(mtx_); st = st_; return st_.id; };
+    bool getStatus(PTXStatus &st) { std::lock_guard<std::mutex> lck(mtx_); st = st_; return st_.id; };
     void getPose(float &yaw, float &pitch);
     void setPose(const float &yaw, const float &pitch, const uint16_t &speed);
 
@@ -77,7 +77,7 @@ namespace IQR
     const uint8_t id_;
     bool readFlage_;
     std::mutex mtx_;
-    PanTiltStatus st_;
+    PTXStatus st_;
 
     ModbusRTUMaster *master_;
   };
