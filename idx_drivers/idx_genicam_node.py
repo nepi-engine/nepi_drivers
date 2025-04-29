@@ -436,13 +436,13 @@ class GenicamCamNode:
 
         # Check for control framerate adjustment
         last_time = self.cl_img_last_time
-        current_time = nepi_ros.ros_time_now()
+        current_time = nepi_utils.get_time()
 
         need_data = False
         if last_time != None and self.idx_if is not None:
           adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
-          timer =(current_time.to_sec() - last_time.to_sec())
+          timer = current_time - last_time
           if timer > fr_delay:
             need_data = True
         else:
@@ -500,13 +500,13 @@ class GenicamCamNode:
 
         # Check for control framerate adjustment
         last_time = self.bw_img_last_time
-        current_time = nepi_ros.ros_time_now()
+        current_time = nepi_utils.get_time()
 
         need_data = False
         if last_time != None and self.idx_if is not None:
           adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
-          timer =(current_time.to_sec() - last_time.to_sec())
+          timer = current_time - last_time
           if timer > fr_delay:
             need_data = True
         else:
