@@ -94,6 +94,7 @@ class V4l2CamNode:
 
     framerate_ratio = 1.0
 
+
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                             
@@ -490,7 +491,7 @@ class V4l2CamNode:
           adj_fr =   nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
           fr_delay = float(1) / adj_fr
           timer = current_time - last_time
-          if timer > fr_delay:
+          if timer > fr_delay or self.framerate_ratio > 0.95:
             need_data = True
         else:
           need_data = True

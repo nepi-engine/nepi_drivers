@@ -599,7 +599,7 @@ class V4l2CamDriver(object):
     else:
         ret = False
         self.latest_frame = None
-    
+
     self.img_acq_lock.release()
     if not ret:
         self.consec_failed_frames += 1
