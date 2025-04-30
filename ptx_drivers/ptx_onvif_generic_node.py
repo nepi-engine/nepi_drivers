@@ -511,6 +511,5 @@ class OnvifPanTiltNode:
             self.ptx_if.updateFromParamServer()
 
 
-
 if __name__ == '__main__':
 	node = OnvifPanTiltNode()

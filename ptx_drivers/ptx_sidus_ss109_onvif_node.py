@@ -17,6 +17,7 @@
 #
 
 from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
 
@@ -50,12 +51,6 @@ class SidusSs109OnvifNode:
     last_pan_ratio_onvif = 0
     last_tilt_ratio_onvif = 0
 
-    both_str = '!'
-    pan_str = '#'
-    tilt_str = '$'
-
-    max_speed = 40
-
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                                                    
@@ -70,8 +65,11 @@ class SidusSs109OnvifNode:
         ##############################  
         # Create Msg Class
         self.msg_if = MsgIF(log_name = self.class_name)
-        self.msg_if.pub_info("Starting IF Initialization Processes")
-        ##############################
+        self.msg_if.pub_info("Starting Node Initialization Processes")
+
+        ##############################  
+        # Initialize Class Variables
+        
         # Get required drv driver dict info
         try:
             self.drv_dict = nepi_ros.get_param('~drv_dict') # Crash if not provide
@@ -103,8 +101,8 @@ class SidusSs109OnvifNode:
         nepi_ros.set_param('~/network/port', onvif_port)
 
 
-        #self.msg_if.pub_info("Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
-        [success, msg, self.driver_class] = nepi_drv.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
+        self.msg_if.pub_info("Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
+        [success, msg, self.driver_class] = nepi_drvs.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
         
         driver_constructed = False
         if success:
@@ -113,16 +111,16 @@ class SidusSs109OnvifNode:
                 try:
                     self.driver = self.driver_class(username, password, host, onvif_port)
                     driver_constructed = True
-                    #self.msg_if.pub_info("Driver constructed")
+                    self.msg_if.pub_info("Driver constructed")
                 except Exception as e:
-                    #self.msg_if.pub_info("Failed to construct driver: " + self.driver_module + "with exception: " + str(e))
+                    self.msg_if.pub_info("Failed to construct driver: " + self.driver_module + "with exception: " + str(e))
                     nepi_ros.sleep(1)
                 attempts += 1 
         if driver_constructed == False:
             nepi_ros.signal_shutdown("Shutting down Onvif node " + self.node_name + ", unable to connect to driver")
         else:
             ################################################
-            #self.msg_if.pub_info("... Connected!")
+            self.msg_if.pub_info("... Connected!")
             self.dev_info = self.driver.getDeviceInfo()
             self.logDeviceInfo()
 
@@ -163,6 +161,8 @@ class SidusSs109OnvifNode:
             
             self.has_absolute_positioning_and_feedback = self.driver.hasAbsolutePositioning() and self.driver.reportsPosition()
             ptx_capabilities_dict['has_absolute_positioning'] = self.has_absolute_positioning_and_feedback
+            self.msg_if.pub_warn("hasAbsolutePositioning gnode check" + str(self.driver.hasAbsolutePositioning()))
+            self.msg_if.pub_warn("reportsPosition gnode check" + str(self.driver.reportsPosition()))
                     
             if not self.driver.canHome() and not self.has_absolute_positioning_and_feedback:
                 ptx_callback_names["GoHome"] = None
@@ -191,7 +191,7 @@ class SidusSs109OnvifNode:
             # that case, assign these to null in the config file
             # TODO: Not sure we actually need remappings for PTX: Makes sense for IDX because there are lots of controllable params.
             ptx_remappings = nepi_ros.get_param('~ptx_remappings', {})
-            self.msg_if.pub_info("Establishing PTX remappings")
+            self.msg_if.pub_info('Establishing PTX remappings')
             for from_name in ptx_remappings:
                 to_name = ptx_remappings[from_name]
                 if from_name not in ptx_callback_names or (to_name not in ptx_callback_names and to_name != None and to_name != 'None'):
@@ -205,7 +205,7 @@ class SidusSs109OnvifNode:
 
             # Launch the PTX interface --  this takes care of initializing all the ptx settings from config. file, subscribing and advertising topics and services, etc.
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
-            #self.msg_if.pub_info("Launching NEPI PTX (ROS) interface...")
+            self.msg_if.pub_info("Launching NEPI PTX () interface...")
             self.device_info_dict["node_name"] = self.node_name
             if self.node_name.find("_") != -1:
                 split_name = self.node_name.rsplit('_', 1)
@@ -254,20 +254,20 @@ class SidusSs109OnvifNode:
 
             # Initialize settings
             self.cap_settings = self.getCapSettings()
-            #self.msg_if.pub_info("" +"CAPS SETTINGS")
+            self.msg_if.pub_info("" +"CAPS SETTINGS")
             #for setting in self.cap_settings:
-                ##self.msg_if.pub_info("" +setting)
+                #self.msg_if.pub_info("" +setting)
             self.factory_settings = self.getFactorySettings()
-            #self.msg_if.pub_info("" +"FACTORY SETTINGS")
+            self.msg_if.pub_info("" +"FACTORY SETTINGS")
             #for setting in self.factory_settings:
-                ##self.msg_if.pub_info("" +setting)
+                #self.msg_if.pub_info("" +setting)
 
             self.speed_ratio = 0.5
             self.home_yaw_deg = 0.0
             self.home_pitch_deg = 0.0
             self.waypoints = {} # Dictionary of dictionaries with numerical key and {waypoint_pitch, waypoint_yaw} dict value
 
-            self.ptx_if = ROSPTXActuatorIF(device_info = self.device_info_dict, 
+            self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict, 
                                         capSettings = self.cap_settings,
                                         factorySettings = self.factory_settings,
                                         settingUpdateFunction=self.settingUpdateFunction,
@@ -288,7 +288,7 @@ class SidusSs109OnvifNode:
                                         gotoWaypointCb = ptx_callback_names["GotoWaypoint"],
                                         setWaypointCb = ptx_callback_names["SetWaypoint"],
                                         setWaypointHereCb = ptx_callback_names["SetWaypointHere"])
-            #self.msg_if.pub_info(" ... PTX interface running")
+            self.msg_if.pub_info(" ... PTX interface running")
 
 
             nepi_ros.spin()
@@ -301,7 +301,7 @@ class SidusSs109OnvifNode:
         dev_info_string += "Model: " + self.dev_info["Model"] + "\n"
         dev_info_string += "Firmware Version: " + self.dev_info["FirmwareVersion"] + "\n"
         dev_info_string += "Serial Number: " + self.dev_info["HardwareId"] + "\n"
-        #self.msg_if.pub_info(dev_info_string)
+        self.msg_if.pub_info(dev_info_string)
 
 
     #**********************
@@ -342,39 +342,31 @@ class SidusSs109OnvifNode:
         return success, msg
 
 
-
     #######################
     ### PTX IF Functions
 
     def stopMoving(self):
-        self.driver_stopMotion()
+        self.driver.stopMotion()
 
     def moveYaw(self, direction, duration):
         if self.ptx_if is not None:
-            direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
-            self.driver_jog(axis_str = self.pan_str, direction = direction, time_s = duration)
+            driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.driver.PT_DIRECTION_NEGATIVE
+            self.driver.jog(pan_direction = driver_direction, tilt_direction = self.driver.PT_DIRECTION_NONE, speed_ratio = self.speed_ratio, time_s = duration)
 
     def movePitch(self, direction, duration):
         if self.ptx_if is not None:
-            direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
-            self.driver_jog(axis_str = self.tilt_str, direction = direction, time_s = duration)
+            driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.driver.PT_DIRECTION_NEGATIVE
+            self.driver.jog(pan_direction = self.driver.PT_DIRECTION_NONE, tilt_direction = driver_direction, speed_ratio = self.speed_ratio, time_s = duration)
 
     def setSpeed(self, speed_ratio):
         # TODO: Limits checking and driver unit conversion?
-        if speed_ratio > 1:
-            self.driver_setSpeedRatio(speed_ratio)
+        self.speed_ratio = speed_ratio
 
     def getSpeed(self):
         # TODO: Driver unit conversion?
-        speed_ratio = self.driver_getSpeedRatio()
-        return speed_ratio
-          
-
-    def getCurrentPosition(self):
-        yaw_deg, pitch_deg = self.driver_getCurrentPosition()
-        #print("Got pos degs : " + str([pan_deg, tilt_deg]))
-        return yaw_deg, pitch_deg
-
+        return self.speed_ratio
+            
+     
     def pitchDegToOvRatio(self, deg):
         ratio = 0.5
         max_ph = nepi_ros.get_param('~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
@@ -458,8 +450,12 @@ class SidusSs109OnvifNode:
         self.driver.moveToPosition(yaw_ratio_onvif, pitch_ratio_onvif, self.speed_ratio)
         
     def goHome(self):
-        if self.driver_hasAbsolutePositioning() is True and self.ptx_if is not None:
-            self.driver_moveToPosition(self.home_yaw_deg, self.home_pitch_deg)
+        if self.driver.canHome() is True:
+            self.driver.goHome(self.speed_ratio)
+        elif self.driver.hasAbsolutePositioning() is True and self.ptx_if is not None:
+            home_yaw_ratio_onvif = self.yawDegToOvRatio(self.home_yaw_deg)
+            home_pitch_ratio_onvif = self.pitchDegToOvRatio(self.home_pitch_deg)
+            self.driver.moveToPosition(home_yaw_ratio_onvif, home_pitch_ratio_onvif, self.speed_ratio)
 
     def setHomePosition(self, yaw_deg, pitch_deg):
         # Have to implement these fully in s/w since ONVIF doesn't support absolute home position setting
@@ -467,206 +463,52 @@ class SidusSs109OnvifNode:
         self.home_pitch_deg = pitch_deg
 
     def setHomePositionHere(self):
-        if self.driver_reportsPosition() is True:
-            yaw_deg, pitch_deg = self.driver_getCurrentPosition()
-            self.home_yaw_deg = yaw_deg
-            self.home_pitch_deg = pitch_deg 
+        if self.driver.reportsPosition() is True:
+            curr_yaw_ratio_onvif, curr_pitch_ratio_onvif = self.driver.getCurrentPosition()
+            if self.ptx_if is not None:
+                self.home_yaw_deg = self.yawOvRatioToDeg(curr_yaw_ratio_onvif)
+                self.home_pitch_deg = self.pitchOvRatioToDeg(curr_pitch_ratio_onvif) 
+
+        if self.driver.homePositionAdjustable is True:
+            self.driver.setHomeHere()
 
     def gotoWaypoint(self, waypoint_index):
-        if self.driver_hasAbsolutePositioning() is True and self.ptx_if is not None:
+        if self.driver.hasWaypoints() is True:
+           self.driver.gotoPreset(waypoint_index, self.speed_ratio)
+        elif self.driver.hasAbsolutePositioning() is True and self.ptx_if is not None:
             if waypoint_index not in self.waypoints:
                 return
+            
             waypoint_yaw_deg = self.waypoints[waypoint_index]['yaw_deg']
+            waypoint_yaw_ratio_onvif = self.yawDegToOvRatio(waypoint_yaw_deg)
             waypoint_pitch_deg = self.waypoints[waypoint_index]['pitch_deg']
-            self.driver_moveToPosition(waypoint_yaw_deg, waypoint_pitch_deg)
+            waypoint_pitch_ratio_onvif = self.pitchDegToOvRatio(waypoint_pitch_deg)
+            self.driver.moveToPosition(waypoint_yaw_ratio_onvif, waypoint_pitch_ratio_onvif, self.speed_ratio)
     
     def setWaypoint(self, waypoint_index, yaw_deg, pitch_deg):
+        # Have to implement these fully in s/w since ONVIF doesn't support absolute home position setting
         self.waypoints[waypoint_index] = {'yaw_deg': yaw_deg, 'pitch_deg': pitch_deg}
         
     def setWaypointHere(self, waypoint_index):
-        if self.driver_reportsPosition() and self.ptx_if is not None:
-            yaw_deg, pitch_deg = self.driver_getCurrentPosition()
-            self.waypoints[waypoint_index] = {'yaw_deg': yaw_deg, 'pitch_deg': pitch_deg}
+        if self.driver.reportsPosition() and self.ptx_if is not None:
+            yaw_ratio_onvif, pitch_ratio_onvif = self.driver.getCurrentPosition()
+            current_yaw_deg = self.yawOvRatioToDeg(yaw_ratio_onvif)
+            current_pitch_deg = self.pitchOvRatioToDeg(pitch_ratio_onvif)
+            self.waypoints[waypoint_index] = {'yaw_deg': current_yaw_deg, 'pitch_deg': current_pitch_deg}
 
-        #self.msg_if.pub_info("Waypoint set to current position")
+        if self.driver.hasWaypoints():
+            self.driver.setPresetHere(waypoint_index)
+
+        self.msg_if.pub_info("Waypoint set to current position")
 
     def setCurrentSettingsAsDefault(self):
         # Don't need to worry about any of our params in this class, just child interfaces' params
         if self.ptx_if is not None:
-            self.ptx_if.setCurrentSettingsToParamServer()
+            self.ptx_if.initConfig()
 
     def updateFromParamServer(self):
         if self.ptx_if is not None:
             self.ptx_if.updateFromParamServer()
-
-#######################
-### Driver Interface Functions
-
-    def degToCount(self, deg):
-        encoder_scale_facter = .0879
-        count = int(deg / encoder_scale_facter + 5000)
-        return count
-
-    def countToDeg(self, deg):
-        encoder_scale_facter = .0879
-        deg = int((count -5000)* encoder_scale_facter)
-        return count
-
-
-    def driver_getDeviceInfo(self):
-        dev_info = dict()
-        dev_info["Manufacturer"] = SIDUS
-        dev_info["Model"] = SS109
-
-        firmware = ""
-        data_str = '0000'
-        ser_msg= ('!' + self.addr_str + 'MRV' + data_str + 'R')
-
-        if len(response) > 5:
-            if response[0:5] == ser_msg[0:5]:
-                try:
-                    firmware = response[5:8]
-                except Exception as e:
-                    print("Failed to convert message to int: " + data_str + " " + str(e))
-        else:
-             print("Failed to get valid response message from: " + ser_msg)
-        dev_info["FirmwareVersion"] = firmware
-
-        dev_info["SerialNum"] = ""
-        return dev_info
-
-    def driver_getPositionLimitsInDegrees(self):
-        limits_dict = dict()
-        limits_dict['max_yaw_hardstop_deg'] = 175
-        limits_dict['min_yaw_hardstop_deg'] = -175
-        limits_dict['max_pitch_hardstop_deg'] = 175
-        limits_dict['min_pitch_hardstop_deg'] = -175
-        limits_dict['max_yaw_softstop_deg'] = 174
-        limits_dict['min_yaw_softstop_deg'] = -174
-        limits_dict['max_pitch_softstop_deg'] = 174
-        limits_dict['min_pitch_softstop_deg'] = -174
-        return limits_dict
-                
-
-    def driver_hasAdjustableSpeed(self):
-        hasAdjSpeed = True
-        return hasAdjSpeed
-
-    def driver_getSpeedRatio(self):
-        speedRatio = -999
-        success = False
-        data_str = '0000'
-        ser_msg= (self.both_str + self.addr_str + 'MS' + data_str + 'R')
-        response = self.send_msg(ser_msg)
-        if len(response) > 5:
-            if response[0:5] == ser_msg[0:5]:
-                try:
-                    data_str = response[5:-1]
-                    cur_speed = int(data_str)
-                    speedRatio = cur_speed/self.max_speed
-                except Exception as e:
-                    print("Failed to convert message to int: " + data_str + " " + str(e))
-        else:
-             print("Failed to get valid response message from: " + ser_msg)
-        return speedRatio
-
-    def driver_setSpeedRatio(self,speedRatio):
-        success = False
-        try:
-            set_speed_str = str(int(speedRatio * self.max_speed))
-        except Exception as e:
-            print("Failed to convert message: " + self.speedRatio + " " + str(e))
-        
-        zero_prefix_len = self.data_length-len(set_speed_str)
-        for z in range(zero_prefix_len):
-            data_str = ('0' + set_speed_str)
-        ser_msg= (self.both_str + self.addr_str + 'MSP' + data_str + 'W')
-        response = self.send_msg(ser_msg)
-
-        if len(response) > 5:
-            if response[0:5] == ser_msg[0:5]:
-                success = True
-            else:
-                print("Failed to get valid response message from: " + ser_msg)
-
-        return success
-
-
-
-
-    def driver_reportsPosition(self):
-        reportsPos = True
-        return reportsPos
-
-    def driver_getCurrentPosition(self):
-        yaw_deg = -999
-        success = False
-        data_str = '0000'
-        ser_msg= (self.pan_str + self.addr_str + 'MRL' + data_str + 'R')
-        response = self.send_msg(ser_msg)
-        if len(response) > 5:
-            if response[0:5] == ser_msg[0:5]:
-                try:
-                    data_str = response[5:-1]
-                    yaw_pos = int(data_str)
-                    yaw_deg = self.countToDeg(yaw_pos)
-                except Exception as e:
-                    print("Failed to convert message to int: " + data_str + " " + str(e))
-        else:
-             print("Failed to get valid response message from: " + ser_msg)
-
-        pitch_deg = -999
-        success = False
-        data_str = '0000'
-        ser_msg= (self.tilt_str + self.addr_str + 'MRL' + data_str + 'R')
-        response = self.send_msg(ser_msg)
-        if len(response) > 5:
-            if response[0:5] == ser_msg[0:5]:
-                try:
-                    data_str = response[5:-1]
-                    pitch_pos = int(data_str)
-                    pitch_deg = self.countToDeg(pitch_pos)
-                except Exception as e:
-                    print("Failed to convert message to int: " + data_str + " " + str(e))
-        else:
-             print("Failed to get valid response message from: " + ser_msg)
-        return yaw_deg, pitch_deg
-
-
-    def driver_hasAbsolutePositioning(self):
-        hasAbsPos = True
-        return hasAbsPos
-
-    def driver_moveToPosition(self,yaw_deg, pitch_deg):
-        success = False
-        data_str = str(countToDeg(self, yaw_deg))
-        ser_msg= (self.pan_str + self.addr_str + 'MML' + data_str + 'W')
-        response = self.send_msg(ser_msg)  
-        check_1 = data_str == ser_msg
-        
-        data_str = str(countToDeg(self, pitch_deg))
-        ser_msg= (self.tilt_str + self.addr_str + 'MML' + data_str + 'W')
-        response = self.send_msg(ser_msg)  
-        check_2 = data_str == ser_msg
-        success = (check_1 == True and check_2 == True) 
-        return success
-
-
-    def driver_stopMotion(self):
-        success = False
-        data_str = '0000'
-        ser_msg= (self.both_str + self.addr_str + 'MST' + data_str + 'W')
-        response = self.send_msg(ser_msg)  
-        success = data_str == ser_msg
-        return success
-
-
-    #######################
-    ### Cleanup processes on node shutdown
-    def cleanup_actions(self):
-        #self.msg_if.pub_info("Shutting down: Executing script cleanup actions")
-        if self.serial_port is not None:
-            self.serial_port.close()
 
 
 if __name__ == '__main__':
