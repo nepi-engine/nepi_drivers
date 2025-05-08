@@ -436,7 +436,7 @@ class GenicamCamDriver(object):
         except Exception as e:
             self.consec_failed_frames += 1
             return None, None, False, f"Error: {e} (getImage)"
-        timestamp = time.time()
+        timestamp = nepi_utils.get_time()
 
         # Grab the image itself from the buffer, copy it, and make it 2D.
         image = buf.payload.components[0]

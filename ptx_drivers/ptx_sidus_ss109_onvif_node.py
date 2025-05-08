@@ -16,6 +16,8 @@
 # - mailto:nepi@numurus.com
 #
 
+import time 
+
 from nepi_sdk import nepi_ros
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_utils
@@ -23,6 +25,8 @@ from nepi_sdk import nepi_settings
 
 from nepi_api.device_if_ptx import PTXActuatorIF
 from nepi_api.messages_if import MsgIF
+
+from nepi_ros_interfaces.msg import IDXStatus
 
 PKG_NAME = 'PTX_ONVIF_GENERIC' # Use in display menus
 FILE_TYPE = 'NODE'
@@ -51,6 +55,8 @@ class SidusSs109OnvifNode:
     last_pan_ratio_onvif = 0
     last_tilt_ratio_onvif = 0
 
+    cam_status = None
+
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                                                    
@@ -66,6 +72,21 @@ class SidusSs109OnvifNode:
         # Create Msg Class
         self.msg_if = MsgIF(log_name = self.class_name)
         self.msg_if.pub_info("Starting Node Initialization Processes")
+
+
+        ##############################
+        # Wait for camera status ready
+        self.cam_namespace = self.node_namespace.replace('_pan_tilt_','_camera_')
+        cam_status_ns = nepi_ros.create_namespace(self.cam_namespace,'idx/status')
+        self.msg_if.pub_warn("Waiting for camera status to publish on namespace: " + cam_status_ns)
+
+        cam_status_sub = nepi_ros.create_subscriber(cam_status_ns, IDXStatus, self.camStatusCb)
+        while self.cam_status == None and not nepi_ros.is_shutdown():
+            time.sleep(1)
+        cam_status_sub.unregister()
+        self.msg_if.pub_warn("Got camera status, starting ptz initialization")
+
+
 
         ##############################  
         # Initialize Class Variables
@@ -226,7 +247,7 @@ class SidusSs109OnvifNode:
                 'reverse_yaw_control' : False,
                 'reverse_pitch_control' : False,
                 'speed_ratio' : 0.5,
-                'status_update_rate_hz' : 10
+                'status_update_rate_hz' : 2
             }
             
             # Driver can specify position limits via getPositionLimitsInDegrees. Otherwise, we hard-code them 
@@ -303,6 +324,9 @@ class SidusSs109OnvifNode:
         dev_info_string += "Serial Number: " + self.dev_info["HardwareId"] + "\n"
         self.msg_if.pub_info(dev_info_string)
 
+
+    def camStatusCb(self,msg):
+        self.cam_status = msg
 
     #**********************
     # Device setting functions

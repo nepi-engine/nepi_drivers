@@ -471,16 +471,14 @@ class GenicamCamNode:
             if ret is False:
                 self.img_lock.release()
                 return ret, msg, None, None, None
-            if timestamp is not None:
-                ros_timestamp = nepi_ros.ros_time_from_ros_stamp(timestamp)
-            else:
-                ros_timestamp = nepi_ros.ros_time_now()
+            if timestamp is None:
+                timestamp = nepi_utils.get_time()
             # Make a copy for the bw thread to use rather than grabbing a new cv2_img
             if self.bw_image_acquisition_running:
                 self.cached_2d_color_frame = cv2_img
-                self.cached_2d_color_frame_timestamp = ros_timestamp
+                self.cached_2d_color_frame_timestamp = timestamp
             self.img_lock.release()
-            return ret, msg, cv2_img, ros_timestamp, encoding
+            return ret, msg, cv2_img, timestamp, encoding
         
     def stopColorImg(self):
         self.img_lock.acquire()
@@ -527,20 +525,18 @@ class GenicamCamNode:
                 self.img_lock.release()
                 return ret, msg, None, None
             self.bw_image_acquisition_running = True
-            ros_timestamp = None
+            timestamp = None
             # Only grab a frame if we don't already have a cached color frame... avoids cutting the update rate in half when
             # both image streams are running
             if self.color_image_acquisition_running is False or self.cached_2d_color_frame is None:
                 #self.msg_if.pub_warn("Debugging: getBWImg acquiring")
                 cv2_img, timestamp, ret, msg = self.driver.getImage()
-                if timestamp is not None:
-                    ros_timestamp = nepi_ros.ros_time_from_ros_stamp(timestamp)
-                else:
-                    ros_timestamp = nepi_ros.ros_time_now()
+                if timestamp is None:
+                    timestamp = nepi_utils.get_time()
             else:
                 #self.msg_if.pub_warn("Debugging: getBWImg reusing")
                 cv2_img = self.cached_2d_color_frame.copy()
-                ros_timestamp = self.cached_2d_color_frame_timestamp
+                timestamp = self.cached_2d_color_frame_timestamp
                 self.cached_2d_color_frame = None # Clear it to avoid using it multiple times in the event that threads are running at different rates
                 self.cached_2d_color_frame_timestamp = None
                 ret = True
@@ -552,7 +548,7 @@ class GenicamCamNode:
             # Fix the channel count if necessary
             if cv2_img.ndim == 3:
                 cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2GRAY)
-            return ret, msg, cv2_img, ros_timestamp, encoding
+            return ret, msg, cv2_img, timestamp, encoding
     
     def stopBWImg(self):
         self.img_lock.acquire()

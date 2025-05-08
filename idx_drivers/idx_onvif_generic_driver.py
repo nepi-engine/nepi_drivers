@@ -378,9 +378,9 @@ class GenericONVIF_NVT(object):
                 keep_going = False
             else:
                 # Acquire without decoding via grab(). Image is available via a subsequent retrieve()
-                start = time.time()
+                start =  = nepi_utils.get_time()
                 self.latest_frame_successes[uri_index] = self.rtsp_caps[uri_index].grab()
-                self.latest_frame_timestamps[uri_index] = time.time()
+                self.latest_frame_timestamps[uri_index] =  = nepi_utils.get_time()
                 stop = self.latest_frame_timestamps[uri_index]
                 #print('G: ', stop - start)
                                 

@@ -771,20 +771,20 @@ class ZedCamNode(object):
         status = False
         msg = ""
         cv2_img = None
-        ros_timestamp = None
+        timestamp = None
         if img_msg is not None:
           if img_msg.header.stamp != self.color_img_last_stamp:
-            ros_timestamp = img_msg.header.stamp
+            timestamp = nepi_ros.sec_from_ros_stamp(img_msg.header.stamp)
             status = True
             msg = ""
-            ros_timestamp = img_msg.header.stamp
+            timestamp = nepi_ros.sec_from_ros_stamp(img_msg.header.stamp)
             cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
-            self.color_img_last_stamp = ros_timestamp
+            self.color_img_last_stamp = timestamp
           else:
             msg = "No new data for " + data_product + " available"
         else:
           msg = "Received None type data for " + data_product + " process"
-        return status, msg, cv2_img, ros_timestamp, encoding
+        return status, msg, cv2_img, timestamp, encoding
 
     
     # Good base class candidate - Shared with ONVIF
@@ -820,20 +820,19 @@ class ZedCamNode(object):
         status = False
         msg = ""
         cv2_img = None
-        ros_timestamp = None
+        timestamp = None
         if img_msg is not None:
           if img_msg.header.stamp != self.bw_img_last_stamp:
-            ros_timestamp = img_msg.header.stamp
             status = True
             msg = ""
-            ros_timestamp = img_msg.header.stamp
+            timestamp = nepi_ros.sec_from_ros_stamp(img_msg.header.stamp)
             cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
-            self.bw_img_last_stamp = ros_timestamp
+            self.bw_img_last_stamp = timestamp
           else:
             msg = "No new data for " + data_product + " available"
         else:
           msg = "Received None type data for " + data_product + " process"
-        return status, msg, cv2_img, ros_timestamp, encoding
+        return status, msg, cv2_img, timestamp, encoding
     
     # Good base class candidate - Shared with ONVIF
     def stopBWImg(self):
@@ -867,11 +866,11 @@ class ZedCamNode(object):
         status = False
         msg = ""
         cv2_img = None
-        ros_timestamp = None
+        timestamp = None
         if img_msg is not None:
           if img_msg.header.stamp != self.depth_map_last_stamp:
-            ros_timestamp = img_msg.header.stamp
-            self.depth_map_last_stamp = ros_timestamp
+            timestamp = nepi_ros.sec_from_ros_stamp(img_msg.header.stamp)
+            self.depth_map_last_stamp = timestamp
             status = True
             msg = ""
             # Adjust range Limits if IDX Controls enabled and range ratios are not min/max
@@ -900,9 +899,9 @@ class ZedCamNode(object):
         else:
           msg = "Received None type data for " + data_product + " process"
         if cv2_img is not None:
-          return status, msg, cv2_img, ros_timestamp, encoding
+          return status, msg, cv2_img, timestamp, encoding
         else: 
-          return status, msg, img_msg, ros_timestamp, encoding
+          return status, msg, img_msg, timestamp, encoding
     
     def stopDepthMap(self):
         self.depth_map_lock.acquire()
@@ -936,11 +935,11 @@ class ZedCamNode(object):
         status = False
         msg = ""
         cv2_img = None
-        ros_timestamp = None
+        timestamp = None
         if img_msg is not None:
           if img_msg.header.stamp != self.depth_img_last_stamp:
-            ros_timestamp = img_msg.header.stamp
-            self.depth_img_last_stamp = ros_timestamp
+            timestamp = nepi_ros.sec_from_ros_stamp(img_msg.header.stamp)
+            self.depth_img_last_stamp = timestamp
             status = True
             msg = ""
             # Convert ros depth_map to cv2_img and numpy depth data
@@ -970,7 +969,7 @@ class ZedCamNode(object):
             msg = "No new data for " + data_product + " available"
         else:
           msg = "Received None type data for " + data_product + " process"
-        return status, msg, cv2_img, ros_timestamp, encoding
+        return status, msg, cv2_img, timestamp, encoding
 
     
     def stopDepthImg(self):
@@ -1005,15 +1004,15 @@ class ZedCamNode(object):
         status = False
         msg = ""
         o3d_pc = None
-        ros_timestamp = None
-        ros_frame = None
+        timestamp = None
+        frame_id = None
         if pc_msg is not None:
           if pc_msg.header.stamp != self.pc_last_stamp:
-            ros_timestamp = pc_msg.header.stamp
-            ros_frame = pc_msg.header.frame_id
+            timestamp = nepi_ros.sec_from_ros_stamp(pc_msg.header.stamp)
+            frame_id = pc_msg.header.frame_id
             status = True
             msg = ""
-            self.pc_last_stamp = ros_timestamp
+            self.pc_last_stamp = timestamp
             start_range_ratio = self.current_controls.get("start_range_ratio")
             stop_range_ratio = self.current_controls.get("stop_range_ratio")
             min_range_m = self.current_controls.get("min_range_m")
@@ -1029,9 +1028,9 @@ class ZedCamNode(object):
         else:
           msg = "Received None type data for " + data_product + " process"
         if o3d_pc is not None:
-          return status, msg, o3d_pc, ros_timestamp, ros_frame
+          return status, msg, o3d_pc, timestamp, frame_id
         else: 
-          return status, msg, pc_msg, ros_timestamp, ros_frame
+          return status, msg, pc_msg, timestamp, frame_id
 
     
     def stopPointcloud(self):
@@ -1065,15 +1064,15 @@ class ZedCamNode(object):
         status = False
         msg = ""
         cv2_img = None
-        ros_timestamp = None
-        ros_frame = None
+        timestamp = None
+        frame_id = None
         if pc_msg is not None:
           if pc_msg.header.stamp != self.pc_img_last_stamp:
-            ros_timestamp = pc_msg.header.stamp
-            ros_frame = pc_msg.header.frame_id
+            timestamp = nepi_ros.sec_from_ros_stamp(pc_msg.header.stamp)
+            frame_id = pc_msg.header.frame_id
             status = True
             msg = ""
-            self.pc_img_last_stamp = ros_timestamp
+            self.pc_img_last_stamp = timestamp
             o3d_pc = nepi_pc.rospc_to_o3dpc(pc_msg, remove_nans=True)
 
             img_width = self.render_img_width
@@ -1121,7 +1120,7 @@ class ZedCamNode(object):
             msg = "No new data for " + data_product + " available"
         else:
           msg = "Received None type data for " + data_product + " process"
-        return status, msg, cv2_img, ros_timestamp,  encoding
+        return status, msg, cv2_img, timestamp,  encoding
 
     
     def stopPointcloudImg(self):
