@@ -93,7 +93,11 @@ class ZedCamDiscovery:
       self.msg_if.pub_warn("Failed to load options " + str(e))#
       nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
       return None
-
+    if 'data_products' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
+      data_products = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['data_products']['value']
+    else:
+      data_products = 'image,depth'
+    self.data_products = data_products.split(',')
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
       self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
     else:
@@ -265,9 +269,10 @@ class ZedCamDiscovery:
           self.msg_if.pub_info("Launching node " + device_node_name)
           if dtype in self.includeDevices:
             #Setup required param server drv_dict for discovery node
-            self.drv_dict['DEVICE_DICT']={'zed_type': root_name, 'res_val': self.res_val, 'framerate': self.FRAMERATE}
+            self.drv_dict['DEVICE_DICT']={'zed_type': root_name, 'res_val': self.res_val, 'framerate': self.FRAMERATE, 'data_products': self.data_products}
             dict_param_name = device_node_name + "/drv_dict"
             nepi_ros.set_param(dict_param_name,self.drv_dict)
+            
             # Try and load save node params
             nepi_drvs.checkLoadConfigFile(device_node_name)
 
@@ -279,7 +284,7 @@ class ZedCamDiscovery:
             if success:
               self.DEVICE_DICT[path_str]['node_subprocess'] = sub_process
               self.DEVICE_DICT[path_str]['zed_type'] = root_name
-              self.msg_if.pub_info("msg)
+              self.msg_if.pub_info(msg)
 
             # Process luanch results
             self.launch_time_dict[launch_id] = nepi_utils.get_time()

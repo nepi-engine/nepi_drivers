@@ -115,46 +115,6 @@ class ZedCamNode(object):
     ZED_MIN_RANGE_M_OVERRIDES = { 'zed': .2, 'zedm': .15, 'zed2': .2, 'zedx': .2} 
     ZED_MAX_RANGE_M_OVERRIDES = { 'zed':  15, 'zedm': 15, 'zed2': 20, 'zedx': 15} 
 
-    navpose_dict = {
-                          'frame_3d': 'ENU',
-                          'frame_alt': 'WGS84',
-
-                          'geoid_height_meters': 0,
-
-                          'has_heading': False,
-                          'time_heading': 0,
-                          'heading_deg': 0,
-
-                          'has_oreientation': True,
-                          'time_oreientation': nepi_utils.get_time(),
-                          # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
-                          'roll_deg': 0,
-                          'pitch_deg': 0,
-                          'yaw_deg': 0,
-
-                          'has_position': True,
-                          'time_position': nepi_utils.get_time(),
-                          # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
-                          'x_m': 0,
-                          'y_m': 0,
-                          'z_m': 0,
-
-                          'has_location': False,
-                          'time_location': 0,
-                          # Global Location in set altitude frame (lat,long,alt) with alt in meters
-                          'lat': 0,
-                          'long': 0,
-
-                          'has_altitude': False,
-                          'time_altitude': 0,
-                          'alt_m': 0,
-    
-                          'has_depth': False,
-                          'time_depth': 0,
-                          'alt_m': 0
-    }
-
-
     zed_type = 'zed'
 
     # Create shared class variables and thread locks 
@@ -218,6 +178,24 @@ class ZedCamNode(object):
     pc_last_time = None
 
     framerate_ratio = 1.0
+
+    position_dict = {
+        'time_position': nepi_utils.get_time(),
+        # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
+        'x_m': 0.0,
+        'y_m': 0.0,
+        'z_m': 0.0,
+    }
+
+
+    orientation_dict = {
+        'time_oreientation': nepi_utils.get_time(),
+        # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
+        'roll_deg': 0.0,
+        'pitch_deg': 0.0,
+        'yaw_deg': 0.0,
+    }
+
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"         
     drv_dict = dict()                          
@@ -254,6 +232,7 @@ class ZedCamNode(object):
         self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
         self.res_val = self.drv_dict['DEVICE_DICT']['res_val']
         self.framerate = self.drv_dict['DEVICE_DICT']['framerate']
+        self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
         ZED_BASE_NAMESPACE = nepi_ros.get_base_namespace() + self.zed_type + "/zed_node/"
 
 
@@ -331,7 +310,6 @@ class ZedCamNode(object):
         self.bw_img_topic = ZED_BASE_NAMESPACE + "left/image_rect_gray"
         self.depth_map_topic = ZED_BASE_NAMESPACE + "depth/depth_registered"
         self.pc_topic = ZED_BASE_NAMESPACE + "point_cloud/cloud_registered"
-        ZED_ODOM_TOPIC = ZED_BASE_NAMESPACE + "odom"
         ZED_MIN_RANGE_PARAM = ZED_BASE_NAMESPACE + "depth/min_depth"
         ZED_MAX_RANGE_PARAM = ZED_BASE_NAMESPACE + "depth/max_depth"
 
@@ -350,38 +328,11 @@ class ZedCamNode(object):
         self.pc_sub = None
         self.pc_img_sub = None
 
-        
+        ZED_ODOM_TOPIC = ZED_BASE_NAMESPACE + "odom"
         odom_sub = rospy.Subscriber(ZED_ODOM_TOPIC, Odometry, self.odom_topic_callback)
 
         # Launch the  node
         self.msg_if.pub_info("... Connected!")
-
-
-        idx_callback_names = {
-            "Controls" : {
-                # IDX Standard
-                "Framerate":  self.setFramerateRatio,
-                "Range": self.setRange
-                
-            },
-            
-
-            "Data" : {
-                # Data callbacks
-                "Color2DImg": self.getColorImg,
-                "StopColor2DImg": self.stopColorImg,
-                "BW2DImg": self.getBWImg,
-                "StopBW2DImg": self.stopBWImg,
-                "DepthMap": self.getDepthMap, 
-                "StopDepthMap":  self.stopDepthMap,
-                "DepthImg": self.getDepthImg,
-                "StopDepthImg": self.stopDepthImg,
-                "Pointcloud":  self.getPointcloud, 
-                "StopPointcloud":  self.stopPointcloud,
-                "PointcloudImg":  self.getPointcloudImg, 
-                "StopPointcloudImg":  self.stopPointcloudImg
-            }
-        }
 
         # Initialize controls
         self.factory_controls = self.FACTORY_CONTROLS
@@ -414,24 +365,25 @@ class ZedCamNode(object):
                                     settingUpdateFunction=self.settingUpdateFunction,
                                     getSettingsFunction=self.getSettings,
                                     factoryControls = self.factory_controls,
-                                    setFramerateRatio=idx_callback_names["Controls"]["Framerate"], 
+                                    setFramerateRatio =self.setFramerateRatio, 
                                     getFramerate = self.getFramerate,
-                                    setRange=idx_callback_names["Controls"]["Range"],
-                                    getColor2DImg=idx_callback_names["Data"]["Color2DImg"], 
-                                    stopColor2DImgAcquisition=idx_callback_names["Data"]["StopColor2DImg"],
-                                    getBW2DImg=idx_callback_names["Data"]["BW2DImg"], 
-                                    stopBW2DImgAcquisition=idx_callback_names["Data"]["StopBW2DImg"],
-                                    getDepthMap=idx_callback_names["Data"]["DepthMap"], 
-                                    stopDepthMapAcquisition=idx_callback_names["Data"]["StopDepthMap"],
-                                    getDepthImg=idx_callback_names["Data"]["DepthImg"], 
-                                    stopDepthImgAcquisition=idx_callback_names["Data"]["StopDepthImg"],
-                                    getPointcloud=idx_callback_names["Data"]["Pointcloud"], 
-                                    stopPointcloudAcquisition=idx_callback_names["Data"]["StopPointcloud"],
-                                    getPointcloudImg=idx_callback_names["Data"]["PointcloudImg"], 
-                                    stopPointcloudImgAcquisition=idx_callback_names["Data"]["StopPointcloudImg"],
-                                    getNavPoseDictFunction=self.getNavPoseDictFunction, 
-                                    has_heading = False, has_position = True, has_orientation = True, 
-                                    has_location = False, has_altitude = False, has_depth = False,)
+                                    setRange = self.setRange,
+                                    getColor2DImg = self.getColorImg, 
+                                    stopColor2DImgAcquisition = self.stopColorImg,
+                                    getBW2DImg = None, 
+                                    stopBW2DImgAcquisition = None,
+                                    getDepthMap = self.getDepthMap, 
+                                    stopDepthMapAcquisition = self.stopDepthMap,
+                                    getDepthImg = self.getDepthImg,
+                                    stopDepthImgAcquisition = self.stopDepthImg,
+                                    getPointcloud = self.getPointcloud, 
+                                    stopPointcloudAcquisition = self.stopPointcloud,
+                                    getPointcloudImg = self.getPointcloudImg, 
+                                    stopPointcloudImgAcquisition = self.stopPointcloudImg,                                    
+                                    getPositionCb = self.getPositionDict, 
+                                    getOrientationCb = self.getOrientationDict,
+                                    navpose_update_rate = 10 
+                                    )
         self.msg_if.pub_info("... IDX interface running")
 
         # Update available IDX callbacks based on capabilities that the driver reports
@@ -654,53 +606,49 @@ class ZedCamNode(object):
           self.pc_msg = pointcloud_msg
           self.pc_lock.release()
 
-        # callback to get and process point_cloud image
-    def pointcloud_image_callback(self, pointcloud_msg):
-        # Check for control framerate adjustment
-        last_time = self.pc_img_last_time
-        current_time = nepi_utils.get_time()
 
-
-        need_data = False
-        if last_time != None and self.idx_if is not None:
-          adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
-          fr_delay = float(1) / adj_fr
-          timer = current_time - last_time
-          if timer > fr_delay:
-            need_data = True
-        else:
-          need_data = True
-
-        # Get and Process Data if Needed
-        if need_data == True:
           self.pc_img_last_time = current_time
 
           self.pc_img_lock.acquire()
           self.pc_img_msg = pointcloud_msg
           self.pc_img_lock.release()
 
+        # callback to get and process point_cloud image
 
-    def getNavPoseDictFunction():
-      return self.navpose_dict
+
+    def getPositionDict(self):
+      return self.position_dict
+
+    def getOrientationDict(self):
+      return self.orientation_dict
 
         
     ### Callback to publish RBX odom topic
     def odom_topic_callback(self,odom_msg):
-        rpy = nepi_nav.convert_quat2rpy(msg.pose.pose.orientation)
-        xyz = nepi_nav.convert_point_body2enu(msg.pose.pose.position,rpy[2])
-        time_ns = nepi_ros.sec_from_ros_stamp(odom_msg.header.stamp)
+        # Convert quaternion to roll,pitch,yaw
+        pose = odom_msg.pose.pose.orientation
+        xyzw = list([pose.x,pose.y,pose.z,pose.w])
+        rpy = nepi_nav.convert_quat2rpy(xyzw)
 
-        self.navpose_dict['time_oreantation'] = time_ns
+        # Convert position body to position ENU
+        body = odom_msg.pose.pose.position
+        xyz_body_o = list([body.x, body.y, body.z])
+        xyz = nepi_nav.convert_point_body2enu(xyz_body_o,rpy[2])
+
+        timestamp = nepi_ros.sec_from_ros_stamp(odom_msg.header.stamp)
+
+
+        self.orientation_dict['time_oreantation'] = timestamp
         # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
-        self.navpose_dict['roll_deg'] = rpy[0]
-        self.navpose_dict['pitch_deg'] = rpy[1]
-        self.navpose_dict['yaw_deg'] = rpy[2]
+        self.orientation_dict['roll_deg'] = rpy[0]
+        self.orientation_dict['pitch_deg'] = rpy[1]
+        self.orientation_dict['yaw_deg'] = rpy[2]
 
-        self.navpose_dict['time_position'] = time_ns
+        self.position_dict['time_position'] = timestamp
         # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
-        self.navpose_dict['x_m'] = xyz[0]
-        self.navpose_dict['y_m'] = xyz[1]
-        self.navpose_dict['z_m'] = xyz[2]
+        self.position_dict['x_m'] = xyz[0]
+        self.position_dict['y_m'] = xyz[1]
+        self.position_dict['z_m'] = xyz[2]
 
 
     #**********************
@@ -761,8 +709,8 @@ class ZedCamNode(object):
         self.color_img_lock.acquire()
         img_msg = None
         if self.color_img_msg != None:
-          if self.color_img_msg.header.stamp != self.color_img_last_stamp:
-            img_msg = copy.deepcopy(self.color_img_msg)          
+          img_msg = copy.deepcopy(self.color_img_msg)    
+          self.color_img_msg = None   
         self.color_img_lock.release()
         encoding = 'bgr8'
 
@@ -810,8 +758,8 @@ class ZedCamNode(object):
         self.bw_img_lock.acquire()
         img_msg = None
         if self.bw_img_msg != None:
-          if self.bw_img_msg.header.stamp != self.bw_img_last_stamp:
-            img_msg = copy.deepcopy(self.bw_img_msg)
+          img_msg = copy.deepcopy(self.bw_img_msg)    
+          self.bw_img_msg = None 
         self.bw_img_lock.release()
         encoding = "mono8"
 
@@ -857,8 +805,8 @@ class ZedCamNode(object):
         self.depth_map_lock.acquire()
         img_msg = None
         if self.depth_map_msg != None:
-          if self.depth_map_msg.header.stamp != self.depth_map_last_stamp:
-            img_msg = copy.deepcopy(self.depth_map_msg)
+          img_msg = copy.deepcopy(self.depth_map_msg)    
+          self.depth_map_msg = None 
         self.depth_map_lock.release()
         encoding = '32FC1'
         # Run get process
@@ -926,8 +874,8 @@ class ZedCamNode(object):
         self.depth_img_lock.acquire()
         img_msg = None
         if self.depth_img_msg != None:
-          if self.depth_img_msg.header.stamp != self.depth_img_last_stamp:
-            img_msg = copy.deepcopy(self.depth_img_msg)
+          img_msg = copy.deepcopy(self.depth_img_msg)    
+          self.depth_img_msg = None 
         self.depth_img_lock.release()
         encoding = 'bgr8'
         # Run get process
@@ -996,8 +944,8 @@ class ZedCamNode(object):
         self.pc_lock.acquire()
         pc_msg = None
         if self.pc_msg != None:
-          if self.pc_msg.header.stamp != self.pc_last_stamp:
-            pc_msg = copy.deepcopy(self.pc_msg)
+          pc_msg = copy.deepcopy(self.pc_msg)    
+          self.pc_msg = None 
         self.pc_lock.release()
         # Run get process
         # Initialize some process return variables
@@ -1046,8 +994,8 @@ class ZedCamNode(object):
       return ret,msg
 
     def getPointcloudImg(self,render_controls=[0.5,0.5,0.5]):     
-        if self.pc_img_sub == None:
-          self.pc_img_sub =rospy.Subscriber(self.pc_topic, PointCloud2, self.pointcloud_image_callback, queue_size = 1) 
+        if self.pc_sub == None:
+          self.pc_sub =rospy.Subscriber(self.pc_topic, PointCloud2, self.pointcloud_callback, queue_size = 1)
           time.sleep(0.1)
 
         # Set process input variables
@@ -1056,8 +1004,8 @@ class ZedCamNode(object):
         pc_msg = None
         encoding = 'rgb8'
         if self.pc_img_msg != None:
-          if self.pc_img_msg.header.stamp != self.pc_img_last_stamp:
-            pc_msg = copy.deepcopy(self.pc_img_msg)
+          pc_msg = copy.deepcopy(self.pc_img_msg)    
+          self.pc_img_msg = None 
         self.pc_img_lock.release()
         # Run get process
         # Initialize some process return variables

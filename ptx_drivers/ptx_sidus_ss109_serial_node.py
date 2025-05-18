@@ -40,6 +40,8 @@ FILE_TYPE = 'NODE'
 
 class SidusSS109SerialNode:
 
+    POSITION_UPDATE_RATE = 10
+
     CAP_SETTINGS = dict(
         None = {"type":"None","name":"None","options":[""]}
     )
@@ -190,8 +192,7 @@ class SidusSS109SerialNode:
                 'pitch_joint_name' : self.node_name + '_pitch_joint',
                 'reverse_yaw_control' : False,
                 'reverse_pitch_control' : False,
-                'speed_ratio' : 0.5,
-                'status_update_rate_hz' : 10
+                'speed_ratio' : 0.5
             }
             
             # Driver can specify position limits via getPositionLimitsInDegrees. Otherwise, we hard-code them 
@@ -271,8 +272,13 @@ class SidusSS109SerialNode:
                                         setHomePositionHereCb = ptx_callback_names["SetHomePositionHere"],
                                         gotoWaypointCb = ptx_callback_names["GotoWaypoint"],
                                         setWaypointCb = ptx_callback_names["SetWaypoint"],
-                                        setWaypointHereCb = ptx_callback_names["SetWaypointHere"])
-            nepi_msg.publishMsgInfo(self," ... PTX interface running")
+                                        capSettingsNavPose=None, factorySettingsNavPose=None,
+                                        settingUpdateFunctionNavPose=None, getSettingsFunctionNavPose=None,
+                                        getHeadingCb = None, getPositionCb = None, getOrientationCb = self.getOrientationCb,
+                                        getLocationCb = None, getAltitudeCb = None, getDepthCb = None,
+                                        navpose_update_rate = self.POSITION_UPDATE_RATE)
+                                        
+            self.msg_if.pub_info(" ... PTX interface running")
 
             # Start an sealite activity check process that kills node after some number of failed comms attempts
             nepi_msg.publishMsgInfo(self,"Starting an activity check process")
@@ -285,6 +291,14 @@ class SidusSS109SerialNode:
             nepi_ros.spin()
 
 
+    def getOrientationCb(self)
+        yaw_deg, pitch_deg = self.getCurrentPosition()
+        orientation_dict = dict()
+        orientation_dict['time_oreantation'] = nepi_utils.get_time()
+        orientation_dict['roll_deg'] = 0.0
+        orientation_dict['pitch_deg'] = pitch_deg
+        orientation_dict['yaw_deg'] = yaw_deg
+        return orientation_dict
 
 
     def logDeviceInfo(self):

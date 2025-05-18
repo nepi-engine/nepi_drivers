@@ -34,6 +34,8 @@ FILE_TYPE = 'NODE'
 
 
 class SidusSs109OnvifNode:
+    POSITION_UPDATE_RATE = 2
+
     DEFAULT_DRIVER_PATHS = ["/opt/nepi/ros/lib/nepi_drivers/"]
 
     FACTORY_SETTINGS_OVERRIDES = dict( )
@@ -246,8 +248,7 @@ class SidusSs109OnvifNode:
                 'pitch_joint_name' : self.node_name + '_pitch_joint',
                 'reverse_yaw_control' : False,
                 'reverse_pitch_control' : False,
-                'speed_ratio' : 0.5,
-                'status_update_rate_hz' : 2
+                'speed_ratio' : 0.5
             }
             
             # Driver can specify position limits via getPositionLimitsInDegrees. Otherwise, we hard-code them 
@@ -308,21 +309,25 @@ class SidusSs109OnvifNode:
                                         setHomePositionHereCb = ptx_callback_names["SetHomePositionHere"],
                                         gotoWaypointCb = ptx_callback_names["GotoWaypoint"],
                                         setWaypointCb = ptx_callback_names["SetWaypoint"],
-                                        setWaypointHereCb = ptx_callback_names["SetWaypointHere"])
+                                        capSettingsNavPose=None, factorySettingsNavPose=None,
+                                        settingUpdateFunctionNavPose=None, getSettingsFunctionNavPose=None,
+                                        getHeadingCb = None, getPositionCb = None, getOrientationCb = self.getOrientationCb,
+                                        getLocationCb = None, getAltitudeCb = None, getDepthCb = None,
+                                        navpose_update_rate = self.POSITION_UPDATE_RATE)
+                                        
             self.msg_if.pub_info(" ... PTX interface running")
 
 
             nepi_ros.spin()
 
-
-
-    def logDeviceInfo(self):
-        dev_info_string = self.node_name + " Device Info:\n"
-        dev_info_string += "Manufacturer: " + self.dev_info["Manufacturer"] + "\n"
-        dev_info_string += "Model: " + self.dev_info["Model"] + "\n"
-        dev_info_string += "Firmware Version: " + self.dev_info["FirmwareVersion"] + "\n"
-        dev_info_string += "Serial Number: " + self.dev_info["HardwareId"] + "\n"
-        self.msg_if.pub_info(dev_info_string)
+    def getOrientationCb(self)
+        yaw_deg, pitch_deg = self.getCurrentPosition()
+        orientation_dict = dict()
+        orientation_dict['time_oreantation'] = nepi_utils.get_time()
+        orientation_dict['roll_deg'] = 0.0
+        orientation_dict['pitch_deg'] = pitch_deg
+        orientation_dict['yaw_deg'] = yaw_deg
+        return orientation_dict
 
 
     def camStatusCb(self,msg):

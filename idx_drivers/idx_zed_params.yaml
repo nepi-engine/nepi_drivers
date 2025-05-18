@@ -23,6 +23,13 @@ driver:
           - HD720
           - VGA
         default: HD720
+      data_products:
+        type: Discrete
+        options:
+          - 'image'
+          - 'image,depth'
+          - 'image,depth,pointcloud'
+        default: 'image,depth'
       auto_restart:
         type: Bool
         default: 'True'

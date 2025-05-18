@@ -88,8 +88,7 @@ class ArdupilotNode:
   RBX_SETUP_ACTION_FUNCTIONS = ["takeoff","launch"]  
   RBX_GO_ACTION_FUNCTIONS = []
 
-
-  SETPOINT_PUBLISH_RATE_HZ = 1
+  SETPOINT_PUBLISH_RATE_HZ = 50
   # Create shared class variables and thread locks 
   
   device_info_dict = dict(node_name = "",
@@ -99,44 +98,45 @@ class ArdupilotNode:
                           hw_version = "",
                           sw_version = "")
 
+  heading_dict = {
+      'time_heading': nepi_utils.get_time(),
+      # Heading should be provided in Degrees True North
+      'heading_deg': 0.0,
+  }
 
-  navpose_dict = {
-                        'frame_3d': 'ENU',
-                        'frame_alt': 'WGS84',
+  position_dict = {
+      'time_position': nepi_utils.get_time(),
+      # Position should be provided in Meters ENU (x,y,z) with x forward, y left, and z up
+      'x_m': 0.0,
+      'y_m': 0.0,
+      'z_m': 0.0,
+  }
 
-                        'geoid_height_meters': 0,
+  orienation_dict = {
+      'time_orientation': nepi_utils.get_time(),
+      # Orientation should be provided in Degrees ENU
+      'roll_deg': 0.0,
+      'pitch_deg': 0.0,
+      'yaw_deg': 0.0,
+  }
 
-                        'has_heading': True,
-                        'time_heading': nepi_utils.get_time(),
-                        'heading_deg': 0,
+  locaton_dict = {
+      'time_location': nepi_utils.get_time(),
+      # Location Lat,Long
+      'lat': 0.0,
+      'long': 0.0,
+  }
 
-                        'has_oreientation': True,
-                        'time_oreientation': nepi_utils.get_time(),
-                        # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
-                        'roll_deg': 0,
-                        'pitch_deg': 0,
-                        'yaw_deg': 0,
+  altitude_dict = {
+      'time_altitude': nepi_utils.get_time(),
+      # Altitude should be provided in postivie meters WGS84
+      'altitude_m': 0.0,
+  }
 
-                        'has_position': True,
-                        'time_position': nepi_utils.get_time(),
-                        # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
-                        'x_m': 0,
-                        'y_m': 0,
-                        'z_m': 0,
-
-                        'has_location': True,
-                        'time_location': nepi_utils.get_time(),
-                        # Global Location in set altitude frame (lat,long,alt) with alt in meters
-                        'lat': 0,
-                        'long': 0,
-
-                        'has_altitude': True,
-                        'time_altitude': nepi_utils.get_time(),
-                        'alt_m': 0,
-  
-                        'has_depth': False,
-                        'time_depth': 0,
-                        'alt_m': 0
+  depth_dict = {
+      'time_depth': nepi_utils.get_time(),
+      # Depth should be provided in positive distance from surface in meters
+      'depth_m': 0.0
   }
 
                         
@@ -368,9 +368,17 @@ class ArdupilotNode:
                                   gotoPoseFunction = self.gotoPose,
                                   gotoPositionFunction = self.gotoPosition, 
                                   gotoLocationFunction = self.gotoLocation,
-                                  getNavPoseDictFunction= self.getNavPoseDictFunction, 
-                                  has_heading = True, has_position = True, has_orientation = True, 
-                                  has_location = True, has_altitude = True, has_depth = False,
+                                  capSettingsNavPose=None, 
+                                  factorySettingsNavPose=None, 
+                                  settingUpdateFunctionNavPose=None, 
+                                  getSettingsFunctionNavPose=None,                                  
+                                  getHeadingCb = self.getHeadingCb,
+                                  getPositionCb = self.getPositionCb,
+                                  getOrientationCb = self.getOrientationCb,
+                                  getLocationCb = self.getLocationCb,
+                                  getAltitudeCb = self.getAltitudeCb, 
+                                  getDepthCb = self.getDepthCb,
+                                  navpose_update_rate = self.POSITION_UPDATE_RATE,
                                   setFakeGPSFunction = setFakeGPSFunction
                                 )
 
@@ -382,7 +390,7 @@ class ArdupilotNode:
 
     ## Start goto setpoint check/send loop
     setpoint_pub_interval = float(1) / self.SETPOINT_PUBLISH_RATE_HZ
-    rospy.Timer(rospy.Duration(setpoint_pub_interval), self.sendGotoCommandLoop)
+    nepi_ros.start_timer_process(setpoint_pub_interval, self.sendGotoCommandLoop)
     ## Initiation Complete
     self.msg_if.pub_info("Initialization Complete")
     # Spin forever (until object is detected)
@@ -624,8 +632,7 @@ class ArdupilotNode:
   # RBX NavPose Topic Publishers
   ### Callback to publish RBX navpose data
   
-  def getNavPoseDictFunction():
-    return self.navpose_dict
+
 
   def gps_topic_callback(self,navsatfix_msg):
       if navsatfix_msg.latitude != 0:
@@ -637,13 +644,20 @@ class ArdupilotNode:
         geoid_height_m = self.rbx_if.current_geoid_height_m
       altitude_wgs84 = navsatfix_msg.altitude - geoid_height_m
       time_ns = nepi_ros.sec_from_ros_stamp(navsatfix_msg.header.stamp)
-      self.navpose_dict['time_location'] = time_ns
-      self.navpose_dict['lat'] = navsatfix_msg.latitude
-      self.navpose_dict['long'] = navsatfix_msg.longitude
-      self.navpose_dict['time_altitude'] = time_ns
-      self.navpose_dict['alt_m'] = altitude_wgs84
+      self.location_dict['time_location'] = time_ns
+      self.location_dict['lat'] = navsatfix_msg.latitude
+      self.location_dict['long'] = navsatfix_msg.longitude
+      self.altitude_dict['time_altitude'] = time_ns
+      self.altitude_dict['altitude_m'] = altitude_wgs84
 
-      self.navpose_dict['geoid_height_meters'] = geoid_height_m
+  def getLocationCb(self):
+    return self.location_dict
+    
+  def getAltitudeCb(self):
+    return self.altitude_dict
+
+  def getDepthCb(self):
+    return self.depth_dict
 
       
   ### Callback to publish RBX odom topic
@@ -652,25 +666,33 @@ class ArdupilotNode:
       xyz = nepi_nav.convert_point_body2enu(msg.pose.pose.position,rpy[2])
       time_ns = nepi_ros.sec_from_ros_stamp(odom_msg.header.stamp)
 
-      self.navpose_dict['time_oreantation'] = time_ns
+      self.orienation_dict['time_oreantation'] = time_ns
       # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
-      self.navpose_dict['roll_deg'] = rpy[0]
-      self.navpose_dict['pitch_deg'] = rpy[1]
-      self.navpose_dict['yaw_deg'] = rpy[2]
+      self.orienation_dict['roll_deg'] = rpy[0]
+      self.orienation_dict['pitch_deg'] = rpy[1]
+      self.orienation_dict['yaw_deg'] = rpy[2]
 
-      self.navpose_dict['time_position'] = time_ns
+      self.position_dict['time_position'] = time_ns
       # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
-      self.navpose_dict['x_m'] = xyz[0]
-      self.navpose_dict['y_m'] = xyz[1]
-      self.navpose_dict['z_m'] = xyz[2]
+      self.position_dict['x_m'] = xyz[0]
+      self.position_dict['y_m'] = xyz[1]
+      self.position_dict['z_m'] = xyz[2]
 
+  def getOrienationCb(self):
+    return self.orientation_dict
+    
+  def getPositionCb(self):
+    return self.position_dict
 
 
   ### Callback to publish RBX heading topic
   def heading_topic_callback(self,heading_msg):
       time_ns = nepi_ros.sec_from_ros_stamp(heading.header.stamp)
-      self.navpose_dict['time_heading'] = time_ns
-      self.navpose_dict['heading_deg'] = heading_msg.data
+      self.heading_dict['time_heading'] = time_ns
+      self.heading_dict['heading_deg'] = heading_msg.data
+  
+  def getHeadingCb(self):
+    return self.heading_dict
 
   #######################
   # Mavlink Interface Methods

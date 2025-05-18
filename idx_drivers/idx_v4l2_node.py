@@ -144,32 +144,6 @@ class V4l2CamNode:
             
         self.msg_if.pub_info("... Connected!")
 
-        idx_callback_names = {
-            "Controls" : {
-                # IDX Standard
-                "Framerate":  self.setFramerateRatio
-            },
-    
-
-            "Data" : {
-                # Data callbacks
-                "Color2DImg": self.getColorImg,
-                "StopColor2DImg": self.stopColorImg,
-                "BW2DImg": self.getBWImg,
-                "StopBW2DImg": self.stopBWImg,
-                "DepthMap": None, 
-                "StopDepthMap": None,
-                "DepthImg": None, 
-                "StopDepthImg": None,
-                "Pointcloud": None, 
-                "StopPointcloud": None,
-                "PointcloudImg": None, 
-                "StopPointcloudImg": None,
-                "GPS": None,
-                "Odom": None,
-                "Heading": None,
-            }
-        }
 
         # Initialize controls
         self.factory_controls = self.FACTORY_CONTROLS
@@ -191,26 +165,15 @@ class V4l2CamNode:
         else:
             self.device_info_dict["sensor_name"] = self.node_name
         self.idx_if = IDXDeviceIF(device_info = self.device_info_dict,
-                                     capSettings = self.cap_settings,
-                                     factorySettings = self.factory_settings,
-                                     settingUpdateFunction=self.settingUpdateFunction,
-                                     getSettingsFunction=self.getSettings,
-                                     factoryControls = self.factory_controls,
-                                     setFramerateRatio=idx_callback_names["Controls"]["Framerate"], 
-                                     getFramerate = self.getFramerate,
-                                     getColor2DImg=idx_callback_names["Data"]["Color2DImg"], 
-                                     stopColor2DImgAcquisition=idx_callback_names["Data"]["StopColor2DImg"],
-                                     getBW2DImg=idx_callback_names["Data"]["BW2DImg"], 
-                                     stopBW2DImgAcquisition=idx_callback_names["Data"]["StopBW2DImg"],
-                                     getDepthMap=idx_callback_names["Data"]["DepthMap"], 
-                                     stopDepthMapAcquisition=idx_callback_names["Data"]["StopDepthMap"],
-                                     getDepthImg=idx_callback_names["Data"]["DepthImg"], 
-                                     stopDepthImgAcquisition=idx_callback_names["Data"]["StopDepthImg"],
-                                     getPointcloud=idx_callback_names["Data"]["Pointcloud"], 
-                                     stopPointcloudAcquisition=idx_callback_names["Data"]["StopPointcloud"],
-                                     getPointcloudImg=idx_callback_names["Data"]["PointcloudImg"], 
-                                     stopPointcloudImgAcquisition=idx_callback_names["Data"]["StopPointcloudImg"],
-                                     getNavPoseDictFunction = None)
+                                    capSettings = self.cap_settings,
+                                    factorySettings = self.factory_settings,
+                                    settingUpdateFunction= self.settingUpdateFunction,
+                                    getSettingsFunction=self.getSettings,
+                                    factoryControls = self.factory_controls,
+                                    setFramerateRatio =self.setFramerateRatio, 
+                                    getFramerate = self.getFramerate,
+                                    getColor2DImg = self.getColorImg, 
+                                    stopColor2DImgAcquisition = self.stopColorImg)
         self.msg_if.pub_info(" " + " ... IDX interface running")
 
         # Update available IDX callbacks based on capabilities that the driver reports
