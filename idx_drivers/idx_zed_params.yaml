@@ -29,7 +29,7 @@ driver:
           - 'image'
           - 'image,depth'
           - 'image,depth,pointcloud'
-        default: 'image,depth'
+        default: 'image,depth,pointcloud'
       auto_restart:
         type: Bool
         default: 'True'

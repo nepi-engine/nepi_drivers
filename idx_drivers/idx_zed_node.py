@@ -129,10 +129,6 @@ class ZedCamNode(object):
     color_img_msg = None
     color_img_last_stamp = None
     color_img_lock = threading.Lock()
-    bw_img_acquire = False
-    bw_img_msg = None
-    bw_img_last_stamp = None
-    bw_img_lock = threading.Lock()
     depth_map_acquire = False
     depth_map_msg = None
     depth_map_last_stamp = None
@@ -171,7 +167,6 @@ class ZedCamNode(object):
 
     current_fps = 100
     cl_img_last_time = None
-    bw_img_last_time = None
     dm_img_last_time = None
     di_img_last_time = None
     pc_img_last_time = None
@@ -307,7 +302,6 @@ class ZedCamNode(object):
         # ZED_PARAMETER_UPDATES_TOPIC = ZED_BASE_NAMESPACE + "parameter_updates"
         # Zed data stream topics
         self.color_img_topic = ZED_BASE_NAMESPACE + "left/image_rect_color"
-        self.bw_img_topic = ZED_BASE_NAMESPACE + "left/image_rect_gray"
         self.depth_map_topic = ZED_BASE_NAMESPACE + "depth/depth_registered"
         self.pc_topic = ZED_BASE_NAMESPACE + "point_cloud/cloud_registered"
         ZED_MIN_RANGE_PARAM = ZED_BASE_NAMESPACE + "depth/min_depth"
@@ -322,7 +316,6 @@ class ZedCamNode(object):
 
         self.msg_if.pub_info("Starting Zed IDX subscribers and publishers")
         self.color_img_sub = None
-        self.bw_img_sub = None
         self.depth_map_sub = None
         self.depth_img_sub = None
         self.pc_sub = None
@@ -500,32 +493,6 @@ class ZedCamNode(object):
           self.color_img_lock.acquire()
           self.color_img_msg = image_msg
           self.color_img_lock.release()
-
-    # callback to get 2d image data
-    def bw_2d_image_callback(self, image_msg):
-        # Check for control framerate adjustment
-        last_time = self.bw_img_last_time
-        current_time = nepi_utils.get_time()
- 
-        need_data = False
-        if last_time != None and self.idx_if is not None:
-          adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
-          fr_delay = float(1) / adj_fr
-          timer = current_time - last_time
-          if timer > fr_delay:
-            need_data = True
-        else:
-          need_data = True
-
-
-        # Get and Process Data if Needed
-        if need_data == True:
-          self.bw_img_last_time = current_time
-
-          self.bw_img_lock.acquire()
-          self.bw_img_msg = image_msg
-          self.bw_img_lock.release()
-
 
     # callback to get depthmap
     def depth_map_callback(self, image_msg):
@@ -746,55 +713,6 @@ class ZedCamNode(object):
         msg = "Success"
         return ret,msg
     
-    # Good base class candidate - Shared with ONVIF
-    def getBWImg(self):
-        if self.bw_img_sub == None:
-          self.bw_img_sub =rospy.Subscriber(self.bw_img_topic, Image, self.bw_2d_image_callback, queue_size = 1)
-          time.sleep(0.1)
-
-
-        # Set process input variables
-        data_product = "bw_2d_image"
-        self.bw_img_lock.acquire()
-        img_msg = None
-        if self.bw_img_msg != None:
-          img_msg = copy.deepcopy(self.bw_img_msg)    
-          self.bw_img_msg = None 
-        self.bw_img_lock.release()
-        encoding = "mono8"
-
-        # Run get process
-        # Initialize some process return variables
-        status = False
-        msg = ""
-        cv2_img = None
-        timestamp = None
-        if img_msg is not None:
-          if img_msg.header.stamp != self.bw_img_last_stamp:
-            status = True
-            msg = ""
-            timestamp = nepi_ros.sec_from_ros_stamp(img_msg.header.stamp)
-            cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
-            self.bw_img_last_stamp = timestamp
-          else:
-            msg = "No new data for " + data_product + " available"
-        else:
-          msg = "Received None type data for " + data_product + " process"
-        return status, msg, cv2_img, timestamp, encoding
-    
-    # Good base class candidate - Shared with ONVIF
-    def stopBWImg(self):
-      self.bw_img_lock.acquire()
-
-      self.bw_img_sub.unregister()
-      self.bw_img_sub = None
-
-      self.bw_img_msg = None
-      self.bw_img_lock.release()
-      ret = True
-      msg = "Success"
-      return ret,msg
-
     def getDepthMap(self):
         if self.depth_map_sub == None:
           self.depth_map_sub =rospy.Subscriber(self.depth_map_topic, Image, self.depth_map_callback, queue_size = 1)

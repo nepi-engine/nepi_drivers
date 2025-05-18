@@ -61,11 +61,6 @@ class GenicamCamNode:
 
     current_fps = 20
     cl_img_last_time = None
-    bw_img_last_time = None
-    dm_img_last_time = None
-    di_img_last_time = None
-    pc_img_last_time = None
-    pc_last_time = None
 
     framerate_ratio = 1.0
     ################################################
@@ -121,7 +116,6 @@ class GenicamCamNode:
 
         self.img_lock = threading.Lock()
         self.color_image_acquisition_running = False
-        self.bw_image_acquisition_running = False
         self.cached_2d_color_frame = None
         self.cached_2d_color_frame_timestamp = None
 
@@ -393,7 +387,6 @@ class GenicamCamNode:
         return adj_fps
 
     def getColorImg(self):
-
         # Check for control framerate adjustment
         last_time = self.cl_img_last_time
         current_time = nepi_utils.get_time()
@@ -433,94 +426,19 @@ class GenicamCamNode:
                 return ret, msg, None, None, None
             if timestamp is None:
                 timestamp = nepi_utils.get_time()
-            # Make a copy for the bw thread to use rather than grabbing a new cv2_img
-            if self.bw_image_acquisition_running:
-                self.cached_2d_color_frame = cv2_img
-                self.cached_2d_color_frame_timestamp = timestamp
             self.img_lock.release()
             return ret, msg, cv2_img, timestamp, encoding
         
     def stopColorImg(self):
         self.img_lock.acquire()
         # Don't stop acquisition if the b/w image is still being requested
-        if self.bw_image_acquisition_running is False:
-            ret,msg = self.driver.stopImageAcquisition()
-        else:
-            ret = True
-            msg = "Success"
+        ret,msg = self.driver.stopImageAcquisition()
         self.color_image_acquisition_running = False
         self.cached_2d_color_frame = None
         self.cached_2d_color_frame_timestamp = None
         self.img_lock.release()
         return ret,msg
     
-    def getBWImg(self):
-
-        # Check for control framerate adjustment
-        last_time = self.bw_img_last_time
-        current_time = nepi_utils.get_time()
-
-        need_data = False
-        if last_time != None and self.idx_if is not None:
-          adj_fr = nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
-          fr_delay = float(1) / adj_fr
-          timer = current_time - last_time
-          if timer > fr_delay:
-            need_data = True
-        else:
-          need_data = True
-
-        # Get and Process Data if Needed
-        if need_data == False:
-          return False, "Waiting for Timer", None, None, None  # Return None data
-        else:
-            self.bw_img_last_time = current_time
-
-
-            encoding = "mono8"
-            self.img_lock.acquire()
-            # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
-            ret, msg = self.driver.startImageAcquisition()
-            if ret is False:
-                self.img_lock.release()
-                return ret, msg, None, None
-            self.bw_image_acquisition_running = True
-            timestamp = None
-            # Only grab a frame if we don't already have a cached color frame... avoids cutting the update rate in half when
-            # both image streams are running
-            if self.color_image_acquisition_running is False or self.cached_2d_color_frame is None:
-                #self.msg_if.pub_warn("Debugging: getBWImg acquiring")
-                cv2_img, timestamp, ret, msg = self.driver.getImage()
-                if timestamp is None:
-                    timestamp = nepi_utils.get_time()
-            else:
-                #self.msg_if.pub_warn("Debugging: getBWImg reusing")
-                cv2_img = self.cached_2d_color_frame.copy()
-                timestamp = self.cached_2d_color_frame_timestamp
-                self.cached_2d_color_frame = None # Clear it to avoid using it multiple times in the event that threads are running at different rates
-                self.cached_2d_color_frame_timestamp = None
-                ret = True
-                msg = "Success: Reusing cached cv2_img"
-            self.img_lock.release()
-            # Abort if there was some error or issue in acquiring the image
-            if ret is False or cv2_img is None:
-                return False, msg, None, None, None
-            # Fix the channel count if necessary
-            if cv2_img.ndim == 3:
-                cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2GRAY)
-            return ret, msg, cv2_img, timestamp, encoding
-    
-    def stopBWImg(self):
-        self.img_lock.acquire()
-        # Don't stop acquisition if the color image is still being requested
-        if self.color_image_acquisition_running is False:
-            ret,msg = self.driver.stopImageAcquisition()
-        else:
-            ret = True
-            msg = "Success"
-        self.bw_image_acquisition_running = False
-        self.img_lock.release()
-        return ret, msg
 
 if __name__ == '__main__':
     node = GenicamCamNode()

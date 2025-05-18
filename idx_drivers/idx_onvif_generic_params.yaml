@@ -14,5 +14,10 @@ driver:
     file_name: None
     class_name: None
     process: None
-    OPTIONS: None
+    OPTIONS:
+      data_products:
+          type: Discrete
+          options:
+            - 'image'
+          default: 'image'
     
