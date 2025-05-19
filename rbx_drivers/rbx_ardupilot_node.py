@@ -89,6 +89,7 @@ class ArdupilotNode:
   RBX_GO_ACTION_FUNCTIONS = []
 
   SETPOINT_PUBLISH_RATE_HZ = 50
+  POSITION_UPDATE_RATE = 10
   # Create shared class variables and thread locks 
   
   device_info_dict = dict(node_name = "",
@@ -112,7 +113,7 @@ class ArdupilotNode:
       'z_m': 0.0,
   }
 
-  orienation_dict = {
+  orientation_dict = {
       'time_orientation': nepi_utils.get_time(),
       # Orientation should be provided in Degrees ENU
       'roll_deg': 0.0,
@@ -120,7 +121,7 @@ class ArdupilotNode:
       'yaw_deg': 0.0,
   }
 
-  locaton_dict = {
+  location_dict = {
       'time_location': nepi_utils.get_time(),
       # Location Lat,Long
       'lat': 0.0,
@@ -379,7 +380,7 @@ class ArdupilotNode:
                                   getAltitudeCb = self.getAltitudeCb, 
                                   getDepthCb = self.getDepthCb,
                                   navpose_update_rate = self.POSITION_UPDATE_RATE,
-                                  setFakeGPSFunction = setFakeGPSFunction
+                                  setFakeGPSFunction = setFakeGPSFunction,
                                 )
 
 
@@ -662,15 +663,19 @@ class ArdupilotNode:
       
   ### Callback to publish RBX odom topic
   def odom_topic_callback(self,odom_msg):
-      rpy = nepi_nav.convert_quat2rpy(msg.pose.pose.orientation)
-      xyz = nepi_nav.convert_point_body2enu(msg.pose.pose.position,rpy[2])
+      or_msg = odom_msg.pose.pose.orientation
+      or_list = [or_msg.x, or_msg.y, or_msg.z, or_msg.w]
+      pos_msg = odom_msg.pose.pose.position
+      pos_list = [pos_msg.x, pos_msg.y, pos_msg.z]
+      rpy = nepi_nav.convert_quat2rpy(or_list)
+      xyz = nepi_nav.convert_point_body2enu(pos_list,rpy[2])
       time_ns = nepi_ros.sec_from_ros_stamp(odom_msg.header.stamp)
 
-      self.orienation_dict['time_oreantation'] = time_ns
+      self.orientation_dict['time_oreantation'] = time_ns
       # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
-      self.orienation_dict['roll_deg'] = rpy[0]
-      self.orienation_dict['pitch_deg'] = rpy[1]
-      self.orienation_dict['yaw_deg'] = rpy[2]
+      self.orientation_dict['roll_deg'] = rpy[0]
+      self.orientation_dict['pitch_deg'] = rpy[1]
+      self.orientation_dict['yaw_deg'] = rpy[2]
 
       self.position_dict['time_position'] = time_ns
       # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
@@ -678,7 +683,7 @@ class ArdupilotNode:
       self.position_dict['y_m'] = xyz[1]
       self.position_dict['z_m'] = xyz[2]
 
-  def getOrienationCb(self):
+  def getOrientationCb(self):
     return self.orientation_dict
     
   def getPositionCb(self):
@@ -687,8 +692,7 @@ class ArdupilotNode:
 
   ### Callback to publish RBX heading topic
   def heading_topic_callback(self,heading_msg):
-      time_ns = nepi_ros.sec_from_ros_stamp(heading.header.stamp)
-      self.heading_dict['time_heading'] = time_ns
+      self.heading_dict['time_heading'] = nepi_utils.get_time()
       self.heading_dict['heading_deg'] = heading_msg.data
   
   def getHeadingCb(self):
