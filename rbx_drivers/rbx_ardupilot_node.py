@@ -646,8 +646,8 @@ class ArdupilotNode:
       altitude_wgs84 = navsatfix_msg.altitude - geoid_height_m
       time_ns = nepi_ros.sec_from_ros_stamp(navsatfix_msg.header.stamp)
       self.location_dict['time_location'] = time_ns
-      self.location_dict['lat'] = navsatfix_msg.latitude
-      self.location_dict['long'] = navsatfix_msg.longitude
+      self.location_dict['latitude'] = navsatfix_msg.latitude
+      self.location_dict['longitude'] = navsatfix_msg.longitude
       self.altitude_dict['time_altitude'] = time_ns
       self.altitude_dict['altitude_m'] = altitude_wgs84
 
