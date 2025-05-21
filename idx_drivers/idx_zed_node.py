@@ -228,6 +228,7 @@ class ZedCamNode(object):
         self.res_val = self.drv_dict['DEVICE_DICT']['res_val']
         self.framerate = self.drv_dict['DEVICE_DICT']['framerate']
         self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
+        self.msg_if.pub_warn("Got discovery data products: " + str(self.data_products))
         ZED_BASE_NAMESPACE = nepi_ros.get_base_namespace() + self.zed_type + "/zed_node/"
 
 
@@ -301,7 +302,7 @@ class ZedCamNode(object):
         # Zed control topics
         # ZED_PARAMETER_UPDATES_TOPIC = ZED_BASE_NAMESPACE + "parameter_updates"
         # Zed data stream topics
-        self.color_img_topic = ZED_BASE_NAMESPACE + "left/image_rect_color"
+        self.image_topic = ZED_BASE_NAMESPACE + "left/image_rect_color"
         self.depth_map_topic = ZED_BASE_NAMESPACE + "depth/depth_registered"
         self.pc_topic = ZED_BASE_NAMESPACE + "point_cloud/cloud_registered"
         ZED_MIN_RANGE_PARAM = ZED_BASE_NAMESPACE + "depth/min_depth"
@@ -311,8 +312,8 @@ class ZedCamNode(object):
 
 
         # Wait for zed camera topic to publish, then subscribeCAPS SETTINGS
-        self.msg_if.pub_info("Waiting for topic: " + self.color_img_topic)
-        nepi_ros.wait_for_topic(self.color_img_topic)
+        self.msg_if.pub_info("Waiting for topic: " + self.image_topic)
+        nepi_ros.wait_for_topic(self.image_topic)
 
         self.msg_if.pub_info("Starting Zed IDX subscribers and publishers")
         self.color_img_sub = None
@@ -361,20 +362,15 @@ class ZedCamNode(object):
                                     setFramerateRatio =self.setFramerateRatio, 
                                     getFramerate = self.getFramerate,
                                     setRange = self.setRange,
-                                    getColor2DImg = self.getColorImg, 
-                                    stopColor2DImgAcquisition = self.stopColorImg,
-                                    getBW2DImg = None, 
-                                    stopBW2DImgAcquisition = None,
+                                    getImage = self.getImage, 
+                                    stopImageAcquisition = self.stopImage,
                                     getDepthMap = self.getDepthMap, 
                                     stopDepthMapAcquisition = self.stopDepthMap,
-                                    getDepthImg = self.getDepthImg,
-                                    stopDepthImgAcquisition = self.stopDepthImg,
                                     getPointcloud = self.getPointcloud, 
-                                    stopPointcloudAcquisition = self.stopPointcloud,
-                                    getPointcloudImg = self.getPointcloudImg, 
-                                    stopPointcloudImgAcquisition = self.stopPointcloudImg,                                    
+                                    stopPointcloudAcquisition = self.stopPointcloud,                                  
                                     getPositionCb = self.getPositionDict, 
                                     getOrientationCb = self.getOrientationDict,
+                                    data_products =  self.data_products,
                                     navpose_update_rate = 10 
                                     )
         self.msg_if.pub_info("... IDX interface running")
@@ -664,9 +660,9 @@ class ZedCamNode(object):
  
 
     # Good base class candidate - Shared with ONVIF
-    def getColorImg(self):
+    def getImage(self):
         if self.color_img_sub == None:
-          self.color_img_sub = rospy.Subscriber(self.color_img_topic, Image, self.color_2d_image_callback, queue_size = 1)
+          self.color_img_sub = rospy.Subscriber(self.image_topic, Image, self.color_2d_image_callback, queue_size = 1)
           time.sleep(0.1)
 
         
@@ -703,7 +699,7 @@ class ZedCamNode(object):
 
     
     # Good base class candidate - Shared with ONVIF
-    def stopColorImg(self):
+    def stopImage(self):
         self.color_img_lock.acquire()
         self.color_img_sub.unregister()
         self.color_img_sub = None
@@ -781,77 +777,6 @@ class ZedCamNode(object):
         msg = "Success"
         return ret,msg
 
-    def getDepthImg(self):
-        if self.depth_img_sub == None:
-          self.depth_img_sub =rospy.Subscriber(self.depth_map_topic, Image, self.depth_image_callback, queue_size = 1)
-          time.sleep(0.1)
-
-
-        # Set process input variables
-        data_product = "depth_image"
-        self.depth_img_lock.acquire()
-        img_msg = None
-        if self.depth_img_msg != None:
-          img_msg = copy.deepcopy(self.depth_img_msg)    
-          self.depth_img_msg = None 
-        self.depth_img_lock.release()
-        encoding = 'bgr8'
-        # Run get process
-        # Initialize some process return variables
-        status = False
-        msg = ""
-        cv2_img = None
-        timestamp = None
-        if img_msg is not None:
-          if img_msg.header.stamp != self.depth_img_last_stamp:
-            timestamp = nepi_ros.sec_from_ros_stamp(img_msg.header.stamp)
-            self.depth_img_last_stamp = timestamp
-            status = True
-            msg = ""
-            # Convert ros depth_map to cv2_img and numpy depth data
-            cv2_depth_map = nepi_img.rosimg_to_cv2img(img_msg, encoding="passthrough")
-            depth_data = (np.array(cv2_depth_map, dtype=np.float32)) # replace nan values
-            # Get range data
-            start_range_ratio = self.current_controls.get("start_range_ratio")
-            stop_range_ratio = self.current_controls.get("stop_range_ratio")
-            min_range_m = self.current_controls.get("min_range_m")
-            max_range_m = self.current_controls.get("max_range_m")
-            delta_range_m = max_range_m - min_range_m
-            # Adjust range Limits if IDX Controls enabled and range ratios are not min/max
-            if (start_range_ratio > 0 or stop_range_ratio < 1):
-              max_range_m = min_range_m + stop_range_ratio * delta_range_m
-              min_range_m = min_range_m + start_range_ratio * delta_range_m
-              delta_range_m = max_range_m - min_range_m
-            # Filter depth_data in range
-            depth_data[np.isnan(depth_data)] = max_range_m 
-            depth_data[depth_data <= min_range_m] = max_range_m # set to max
-            depth_data[depth_data >= max_range_m] = max_range_m # set to max
-            # Create colored cv2 depth image
-            depth_data = depth_data - min_range_m # Shift down 
-            depth_data = np.abs(depth_data - max_range_m) # Reverse for colormap
-            depth_data = np.array(255*depth_data/delta_range_m,np.uint8) # Scale for bgr colormap
-            cv2_img = cv2.applyColorMap(depth_data, cv2.COLORMAP_JET)
-          else:
-            msg = "No new data for " + data_product + " available"
-        else:
-          msg = "Received None type data for " + data_product + " process"
-        return status, msg, cv2_img, timestamp, encoding
-
-    
-    def stopDepthImg(self):
-        self.depth_img_lock.acquire()
-
-        self.depth_img_sub.unregister()
-        self.depth_img_sub = None
-
-        self.depth_img_msg = None
-        self.depth_img_lock.release()
-        ret = True
-        msg = "Success"
-        return ret,msg
-
-
-
     def getPointcloud(self):     
         if self.pc_sub == None:
           self.pc_sub =rospy.Subscriber(self.pc_topic, PointCloud2, self.pointcloud_callback, queue_size = 1)
@@ -910,97 +835,6 @@ class ZedCamNode(object):
       ret = True
       msg = "Success"
       return ret,msg
-
-    def getPointcloudImg(self,render_controls=[0.5,0.5,0.5]):     
-        if self.pc_sub == None:
-          self.pc_sub =rospy.Subscriber(self.pc_topic, PointCloud2, self.pointcloud_callback, queue_size = 1)
-          time.sleep(0.1)
-
-        # Set process input variables
-        data_product = "pointcloud_image"
-        self.pc_img_lock.acquire()
-        pc_msg = None
-        encoding = 'rgb8'
-        if self.pc_img_msg != None:
-          pc_msg = copy.deepcopy(self.pc_img_msg)    
-          self.pc_img_msg = None 
-        self.pc_img_lock.release()
-        # Run get process
-        # Initialize some process return variables
-        status = False
-        msg = ""
-        cv2_img = None
-        timestamp = None
-        frame_id = None
-        if pc_msg is not None:
-          if pc_msg.header.stamp != self.pc_img_last_stamp:
-            timestamp = nepi_ros.sec_from_ros_stamp(pc_msg.header.stamp)
-            frame_id = pc_msg.header.frame_id
-            status = True
-            msg = ""
-            self.pc_img_last_stamp = timestamp
-            o3d_pc = nepi_pc.rospc_to_o3dpc(pc_msg, remove_nans=True)
-
-            img_width = self.render_img_width
-            img_height = self.render_img_height
-            render_eye = self.render_eye
-            render_center = self.render_center
-            render_up = self.render_up
-
-            start_range_ratio = self.current_controls.get("start_range_ratio")
-            stop_range_ratio = self.current_controls.get("stop_range_ratio")
-            min_range_m = self.current_controls.get("min_range_m")
-            max_range_m = self.current_controls.get("max_range_m")
-            delta_range_m = max_range_m - min_range_m
-            range_clip_min_range_m = min_range_m + start_range_ratio  * delta_range_m
-            range_clip_max_range_m = min_range_m + stop_range_ratio  * delta_range_m
-            if start_range_ratio > 0 or stop_range_ratio < 1:
-              o3d_pc = nepi_pc.rospc_to_o3dpc(pc_msg, remove_nans=False)
-              o3d_pc = nepi_pc.range_clip_spherical( o3d_pc, range_clip_min_range_m, range_clip_max_range_m)
-
-            zoom_ratio = render_controls[0]
-            zoom_scaler = 1 - zoom_ratio
-            render_eye = [number*zoom_scaler for number in self.render_eye] # Apply IDX zoom control
-            
-            rotate_ratio = render_controls[1]
-            rotate_angle = (0.5 - rotate_ratio) * 2 * 180
-            rotate_vector = [0, 0, rotate_angle]
-            o3d_pc = nepi_pc.rotate_pc(o3d_pc, rotate_vector)
-            
-            tilt_ratio = render_controls[2]
-            tilt_angle = (0.5 - tilt_ratio) * 2 * 180
-            tilt_vector = [0, tilt_angle, 0]
-            o3d_pc = nepi_pc.rotate_pc(o3d_pc, tilt_vector)
-            
-            if self.img_renderer is not None and self.img_renderer_mtl is not None:
-              self.img_renderer = nepi_pc.remove_img_renderer_geometry(self.img_renderer)
-              self.img_renderer = nepi_pc.add_img_renderer_geometry(o3d_pc,self.img_renderer, self.img_renderer_mtl)
-              o3d_img = nepi_pc.render_img(self.img_renderer,render_center,render_eye,render_up)
-              cv2_img = nepi_pc.o3dimg_to_cv2img(o3d_img)
-            else:
-              # Create point cloud renderer
-              self.img_renderer = nepi_pc.create_img_renderer(img_width=img_width,img_height=img_height, fov=self.render_fov, background = self.render_background)
-              self.img_renderer_mtl = nepi_pc.create_img_renderer_mtl()
-
-          else:
-            msg = "No new data for " + data_product + " available"
-        else:
-          msg = "Received None type data for " + data_product + " process"
-        return status, msg, cv2_img, timestamp,  encoding
-
-    
-    def stopPointcloudImg(self):
-        self.pc_img_lock.acquire()
-
-        self.pc_img_sub.unregister()
-        self.pc_img_sub = None
-
-        self.pc_img_msg = None
-        self.pc_img_lock.release()
-        ret = True
-        msg = "Success"
-        return ret,msg
-
 
 
     def cleanup_actions(self):

@@ -433,9 +433,9 @@ class OnvifCamNode:
                 return ret, msg, None, None, None
             self.color_image_acquisition_running = True
             timestamp = None
-            start =  = nepi_utils.get_time()
+            start = nepi_utils.get_time()
             cv2_img, timestamp, ret, msg = self.driver.getImage(uri_index = self.img_uri_index)
-            stop =  = nepi_utils.get_time()
+            stop = nepi_utils.get_time()
             #print('GI: ', stop - start)
             if ret is False:
                 self.img_uri_lock.release()

@@ -320,7 +320,7 @@ class SidusSs109OnvifNode:
 
             nepi_ros.spin()
 
-    def getOrientationCb(self)
+    def getOrientationCb(self):
         yaw_deg, pitch_deg = self.getCurrentPosition()
         orientation_dict = dict()
         orientation_dict['time_oreantation'] = nepi_utils.get_time()
