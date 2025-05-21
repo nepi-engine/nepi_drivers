@@ -24,6 +24,8 @@ import time
 import threading
 
 from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_utils
 
 import numpy as np
 from harvesters.core import Harvester

@@ -181,8 +181,8 @@ class OnvifCamNode:
                                     factoryControls = self.factory_controls,
                                     setFramerateRatio =self.setFramerateRatio, 
                                     getFramerate = self.getFramerate,
-                                    getColor2DImg = self.getColorImg, 
-                                    stopColor2DImgAcquisition = self.stopColorImg)
+                                    getImage = self.getColorImg, 
+                                    stopImageAcquisition = self.stopColorImg)
             self.msg_if.pub_info(" ... IDX interface running")
             # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
             self.idx_if.initConfig()
@@ -442,7 +442,7 @@ class OnvifCamNode:
                 return ret, msg, None, None, None
             if timestamp is None:
                 timestamp = nepi_utils.get_time()  
-            self.img_lock.release() 
+            self.img_uri_lock.release() 
             return ret, msg, cv2_img, timestamp, encoding
         
     def stopColorImg(self):

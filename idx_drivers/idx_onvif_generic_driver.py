@@ -24,6 +24,8 @@ import copy
 from onvif import ONVIFCamera # python-onvif
 
 from nepi_sdk import nepi_msg
+from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_utils
 
 
 PKG_NAME = 'IDX_ONVIF_GENERIC' # Use in display menus
@@ -378,9 +380,9 @@ class GenericONVIF_NVT(object):
                 keep_going = False
             else:
                 # Acquire without decoding via grab(). Image is available via a subsequent retrieve()
-                start =  = nepi_utils.get_time()
+                start = nepi_utils.get_time()
                 self.latest_frame_successes[uri_index] = self.rtsp_caps[uri_index].grab()
-                self.latest_frame_timestamps[uri_index] =  = nepi_utils.get_time()
+                self.latest_frame_timestamps[uri_index] = nepi_utils.get_time()
                 stop = self.latest_frame_timestamps[uri_index]
                 #print('G: ', stop - start)
                                 

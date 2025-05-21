@@ -28,6 +28,7 @@ import sys
 from nepi_sdk.device_if_ptx import ROSPTXActuatorIF
 
 from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_drv
 from nepi_sdk import nepi_settings
@@ -291,7 +292,7 @@ class SidusSS109SerialNode:
             nepi_ros.spin()
 
 
-    def getOrientationCb(self)
+    def getOrientationCb(self):
         yaw_deg, pitch_deg = self.getCurrentPosition()
         orientation_dict = dict()
         orientation_dict['time_oreantation'] = nepi_utils.get_time()
