@@ -119,14 +119,19 @@ class RBXFakeGPS:
   # Init Fake GPS Node
   def __init__(self):
     ####  IF INIT SETUP ####
-    rospy.init_node(self.DEFAULT_NODE_NAME)
-    self.node_name = nepi_ros.get_node_name()
+    nepi_ros.init_node(name = self.DEFAULT_NODE_NAME)
+    self.class_name = type(self).__name__
     self.base_namespace = nepi_ros.get_base_namespace()
-    nepi_msg.createMsgPublishers(self)
-    nepi_msg.publishMsgInfo(self,"Starting IF Initialization Processes")
+    self.node_name = nepi_ros.get_node_name()
+    self.node_namespace = nepi_ros.get_node_namespace()
+
+    ##############################  
+    # Create Msg Class
+    self.msg_if = MsgIF(log_name = self.class_name)
+    self.msg_if.pub_info("Starting IF Initialization Processes")
     ##############################
 
-    nepi_msg.publishMsgInfo(self,"Starting Initialization Processes")
+
     ## Initialize Class Variables
     # RBX State and Mode Dictionaries
     self.rbx_cap_modes = []
@@ -141,7 +146,7 @@ class RBXFakeGPS:
     self.takeoff_m = 0
     # Initialize Current Location
     cur_loc_str = str(self.FAKE_GPS_START_GEOPOINT_WGS84)
-    nepi_msg.publishMsgInfo(self,"Start Home GEO Location: " + cur_loc_str)
+    self.msg_if.pub_info("Start Home GEO Location: " + cur_loc_str)
     self.current_location_wgs84_geo=GeoPoint()
     self.current_location_wgs84_geo.latitude = self.FAKE_GPS_START_GEOPOINT_WGS84[0]
     self.current_location_wgs84_geo.longitude = self.FAKE_GPS_START_GEOPOINT_WGS84[1]
@@ -150,22 +155,22 @@ class RBXFakeGPS:
 
     # Start navpose callbacks
     self.nepi_nav_service_name = nepi_ros.get_base_namespace() + "nav_pose_query"
-    nepi_msg.publishMsgInfo(self,"will call NEPI navpose service for current heading at: " + self.nepi_nav_service_name)
+    self.msg_if.pub_info("will call NEPI navpose service for current heading at: " + self.nepi_nav_service_name)
     rospy.Timer(rospy.Duration(self.navpose_update_interval), self.update_current_heading_callback)
     
     #Start Mavlink Fake GPS publisher if needed
     # Check if need to send Mavlink message
     mav_node_name = self.node_name.replace("fake_gps","mavlink")
-    nepi_msg.publishMsgInfo(self,"checking for mavlink node that includes: " + mav_node_name)
+    self.msg_if.pub_info("checking for mavlink node that includes: " + mav_node_name)
     mav_node_name = nepi_ros.find_node(mav_node_name)
     if mav_node_name != "":
       MAVLINK_NAMESPACE = (mav_node_name + '/')
-      nepi_msg.publishMsgInfo(self,"Found mavlink namespace: " + MAVLINK_NAMESPACE)
+      self.msg_if.pub_info("Found mavlink namespace: " + MAVLINK_NAMESPACE)
       # MAVLINK Fake GPS Publish Topic
       MAVLINK_HILGPS_TOPIC = MAVLINK_NAMESPACE + "hil/gps"
-      nepi_msg.publishMsgInfo(self,"Will publish fake gps on mavlink topic: " + MAVLINK_HILGPS_TOPIC)
+      self.msg_if.pub_info("Will publish fake gps on mavlink topic: " + MAVLINK_HILGPS_TOPIC)
       self.mavlink_pub = rospy.Publisher(MAVLINK_HILGPS_TOPIC, HilGPS, queue_size=1)
-      nepi_msg.publishMsgInfo(self,"Fake gps publishing to " + MAVLINK_HILGPS_TOPIC)
+      self.msg_if.pub_info("Fake gps publishing to " + MAVLINK_HILGPS_TOPIC)
       self.send_mavlink_gps_msg = True
     else:
       self.send_mavlink_gps_msg = False
@@ -180,13 +185,13 @@ class RBXFakeGPS:
     rospy.Timer(rospy.Duration(self.gps_publish_interval_sec), self.fake_gps_pub_callback)
 
    # Setup RBX driver interfaces
-    nepi_msg.publishMsgInfo(self,"Got fake gps node name: " + self.node_name)
+    self.msg_if.pub_info("Got fake gps node name: " + self.node_name)
     robot_namespace = self.node_name.replace("fake_gps","ardupilot")
-    nepi_msg.publishMsgInfo(self,"Waiting for RBX node that includes string: " + robot_namespace)
+    self.msg_if.pub_info("Waiting for RBX node that includes string: " + robot_namespace)
     robot_namespace = nepi_ros.wait_for_node(robot_namespace)
     robot_namespace = robot_namespace.split("/rbx")[0] + "/"
     rbx_namespace = (robot_namespace + 'rbx/')
-    nepi_msg.publishMsgInfo(self,"Found rbx namespace: " + rbx_namespace)
+    self.msg_if.pub_info("Found rbx namespace: " + rbx_namespace)
         
     # Create Fake GPS controls subscribers
     rospy.Subscriber("~enable", Bool, self.fakeGPSEnableCb)
@@ -200,7 +205,7 @@ class RBXFakeGPS:
     time.sleep(1)
     self.status_pub.publish(self.fake_gps_enabled)
     ## Initiation Complete
-    nepi_msg.publishMsgInfo(self,"Initialization Complete")
+    self.msg_if.pub_info("Initialization Complete")
 
     #Set up node shutdown
     #rospy.on_shutdown(self.cleanup_actions)
@@ -224,7 +229,7 @@ class RBXFakeGPS:
       navsatfix.latitude = self.current_location_wgs84_geo.latitude
       navsatfix.longitude = self.current_location_wgs84_geo.longitude
       navsatfix.altitude = self.current_location_wgs84_geo.altitude
-      #nepi_msg.publishMsgInfo(self,navsatfix)
+      #self.msg_if.pub_info(navsatfix)
       # Calculate position change from reset position
       self.odom_msg.header.stamp = rospy.Time.now()
       self.odom_msg.pose.pose.position.x = self.current_point.x
@@ -243,8 +248,8 @@ class RBXFakeGPS:
         hilgps.geo.longitude=self.current_location_wgs84_geo.longitude
         hilgps.geo.altitude=self.current_location_wgs84_geo.altitude
         hilgps.satellites_visible=self.SAT_COUNT
-        #nepi_msg.publishMsgInfo(self,"Created new HilGPS message")
-        #nepi_msg.publishMsgInfo(self,hilgps)
+        #self.msg_if.pub_info("Created new HilGPS message")
+        #self.msg_if.pub_info(hilgps)
         # Create and publish Fake GPS Publisher
         hilgps.header = Header(stamp=rospy.Time.now(), frame_id="mavlink_fake_gps")
         if not rospy.is_shutdown():
@@ -258,12 +263,12 @@ class RBXFakeGPS:
   # Node Process Functions
   ### function to simulate move to new global geo position
   def move(self,geopoint_msg):
-    nepi_msg.publishMsgInfo(self,"")
-    nepi_msg.publishMsgInfo(self,'***********************')
+    self.msg_if.pub_info("")
+    self.msg_if.pub_info('***********************')
     loc = self.current_location_wgs84_geo
-    nepi_msg.publishMsgInfo(self,"Fake GPS Moving FROM: " + str(loc.latitude) + ", " + str(loc.longitude) + ", " + str(loc.altitude)) 
+    self.msg_if.pub_info("Fake GPS Moving FROM: " + str(loc.latitude) + ", " + str(loc.longitude) + ", " + str(loc.altitude)) 
     loc = geopoint_msg
-    nepi_msg.publishMsgInfo(self,"T0: " + str(loc.latitude) + ", " + str(loc.longitude) + ", " + str(loc.altitude)) 
+    self.msg_if.pub_info("T0: " + str(loc.latitude) + ", " + str(loc.longitude) + ", " + str(loc.altitude)) 
 
     org_geo=np.array([self.current_location_wgs84_geo.latitude, \
                       self.current_location_wgs84_geo.longitude, self.current_location_wgs84_geo.altitude])
@@ -277,22 +282,22 @@ class RBXFakeGPS:
 
     org_point = np.array([self.current_point.x,self.current_point.y,self.current_point.z])
     cur_point = copy.deepcopy(org_point)
-    nepi_msg.publishMsgInfo(self,"cur point movement: " + str(org_point))
+    self.msg_if.pub_info("cur point movement: " + str(org_point))
     new_point = np.array([org_point[0] + self.new_point.x, org_point[1] + self.new_point.y, org_point[2] + self.new_point.z]) 
-    nepi_msg.publishMsgInfo(self,"new point movement: " + str(new_point))
+    self.msg_if.pub_info("new point movement: " + str(new_point))
     delta_point = new_point - org_point
-    nepi_msg.publishMsgInfo(self,"delta point movement: " + str(delta_point))
+    self.msg_if.pub_info("delta point movement: " + str(delta_point))
 
-    #nepi_msg.publishMsgInfo(self,"TO:")
-    #nepi_msg.publishMsgInfo(self,delta_geo)
+    #self.msg_if.pub_info("TO:")
+    #self.msg_if.pub_info(delta_geo)
     if move_dist_m > 0 and self.checkStopTrigger() == False:
       move_time = self.MOVE_UPDATE_TIME_SEC_PER_METER * move_dist_m
       if move_time > MAX_MOVE_TIME_S:
         move_time = MAX_MOVE_TIME_S
       move_steps = move_time * self.GPS_PUB_RATE_HZ
       stp_interval_sec = float(move_time)/float(move_steps)
-      nepi_msg.publishMsgInfo(self,"Moving " + "%.2f" % move_dist_m + " meters in " + "%.2f" % move_time + " seconds")
-      nepi_msg.publishMsgInfo(self,"with " + "%.2f" % move_steps + " steps")
+      self.msg_if.pub_info("Moving " + "%.2f" % move_dist_m + " meters in " + "%.2f" % move_time + " seconds")
+      self.msg_if.pub_info("with " + "%.2f" % move_steps + " steps")
 
       ramp=np.hanning(move_steps)
       ramp=ramp**2
@@ -319,17 +324,17 @@ class RBXFakeGPS:
         self.current_point.y = cur_point[1]
         self.current_point.z = cur_point[2]
 
-          #nepi_msg.publishMsgInfo(self,"")
-          #nepi_msg.publishMsgInfo(self,"Updated to")
-          #nepi_msg.publishMsgInfo(self,self.current_location_wgs84_geo)
+          #self.msg_if.pub_info("")
+          #self.msg_if.pub_info("Updated to")
+          #self.msg_if.pub_info(self.current_location_wgs84_geo)
           #current_error_m = nepi_nav.distance_geopoints(cur_geo,new_geo)
-          #nepi_msg.publishMsgInfo(self,"Current move error : " + "%.2f" % (current_error_m) + " meters")
+          #self.msg_if.pub_info("Current move error : " + "%.2f" % (current_error_m) + " meters")
           #rospy.loginfo_timer=0
     current_error_m = nepi_nav.distance_geopoints(cur_geo,new_geo)
-    nepi_msg.publishMsgInfo(self,"Move Error: " + "%.2f" % (current_error_m) + " meters")
+    self.msg_if.pub_info("Move Error: " + "%.2f" % (current_error_m) + " meters")
 
-    nepi_msg.publishMsgInfo(self,"FAKE GPS Move Complete")
-    nepi_msg.publishMsgInfo(self,'***********************')
+    self.msg_if.pub_info("FAKE GPS Move Complete")
+    self.msg_if.pub_info('***********************')
 
 
   def checkStopTrigger(self):
@@ -349,11 +354,11 @@ class RBXFakeGPS:
         nav_pose_response = get_navpose_service(NavPoseQueryRequest())
         self.current_heading_deg = nav_pose_response.nav_pose.heading.heading
         self.current_yaw_enu_deg = nepi_nav.get_navpose_orientation_enu_degs(nav_pose_response)[2]
-        #nepi_msg.publishMsgInfo(self,'')
-        #nepi_msg.publishMsgInfo(self,"Update current heading to: " + "%.2f" % (self.current_heading_deg))
+        #self.msg_if.pub_info('')
+        #self.msg_if.pub_info("Update current heading to: " + "%.2f" % (self.current_heading_deg))
       except Exception as e:
         pass
-        #nepi_msg.publishMsgInfo(self,"navpose service call failed: " + str(e))
+        #self.msg_if.pub_info("navpose service call failed: " + str(e))
 
 
   #######################
@@ -365,17 +370,17 @@ class RBXFakeGPS:
 
     ### Callback to set fake gps enable
   def fakeGPSEnableCb(self,msg):
-    nepi_msg.publishMsgInfo(self,"Received set fake gps enable message: " + str(msg.data))
+    self.msg_if.pub_info("Received set fake gps enable message: " + str(msg.data))
     self.fake_gps_enabled = msg.data
     self.status_pub.publish(self.fake_gps_enabled)
 
   def fakeGPSResetLocCb(self,geo_msg):
     geo_str = str([geo_msg.latitude,geo_msg.longitude,geo_msg.altitude])
-    nepi_msg.publishMsgInfo(self,"Received Fake GPS Reset to Location Msg: " + geo_str)
+    self.msg_if.pub_info("Received Fake GPS Reset to Location Msg: " + geo_str)
     success = self.reset_gps_loc(geo_msg)
     if success:
       self.reset_point = self.ZERO_POINT
-      nepi_msg.publishMsgInfo(self,"Reset Complete")
+      self.msg_if.pub_info("Reset Complete")
     return success
 
   ### Function to reset gps and wait for position ned x,y to reset
@@ -384,7 +389,7 @@ class RBXFakeGPS:
     self.stop_triggered = True
     nepi_ros.sleep(5,50)
     self.current_location_wgs84_geo = geo_msg
-    #nepi_msg.publishMsgInfo(self,"Waiting for GPS to reset") 
+    #self.msg_if.pub_info("Waiting for GPS to reset") 
     nepi_ros.sleep(5,50)
     self.stop_triggered = False
     self.fake_gps_ready = True
@@ -394,7 +399,7 @@ class RBXFakeGPS:
   ### Callback to stop
   def fakeGPSGoStopCb(self,empty_msg):
     if self.fake_gps_enabled:
-      nepi_msg.publishMsgInfo(self,"Received go stop message")
+      self.msg_if.pub_info("Received go stop message")
       self.stop_triggered = True
       time.sleep(1)
       self.stop_triggered = False
@@ -404,18 +409,18 @@ class RBXFakeGPS:
     if self.fake_gps_enabled:
       self.checkStopTrigger() # Clear stop trigger
       point_str = str(enu_point_msg)
-      nepi_msg.publishMsgInfo(self,"Recieved GoTo Position Message: " + point_str)
+      self.msg_if.pub_info("Recieved GoTo Position Message: " + point_str)
       geo_str = str (self.current_location_wgs84_geo)
-      nepi_msg.publishMsgInfo(self,"At Geo Location Message: " + geo_str)
+      self.msg_if.pub_info("At Geo Location Message: " + geo_str)
       self.new_point = enu_point_msg
 
       new_enu_position = [enu_point_msg.x,enu_point_msg.y,enu_point_msg.z]
-      nepi_msg.publishMsgInfo(self,"Sending Fake GPS Setpoint Position Update")
+      self.msg_if.pub_info("Sending Fake GPS Setpoint Position Update")
       new_geopoint_wgs84=nepi_nav.get_geopoint_at_enu_point(self.current_location_wgs84_geo, new_enu_position) 
       geo_str = str (self.current_location_wgs84_geo)
-      nepi_msg.publishMsgInfo(self,"Current Geo Location Message: " + geo_str)
+      self.msg_if.pub_info("Current Geo Location Message: " + geo_str)
       geo_str = str (new_geopoint_wgs84)
-      nepi_msg.publishMsgInfo(self,"New Geo Location Message: " + geo_str)
+      self.msg_if.pub_info("New Geo Location Message: " + geo_str)
       self.move(new_geopoint_wgs84)
 
 
@@ -424,7 +429,7 @@ class RBXFakeGPS:
     if self.fake_gps_enabled:
       self.checkStopTrigger() # Clear stop trigger
       geo_str = str(geo_msg)
-      nepi_msg.publishMsgInfo(self,"Recieved GoTo Location Message: " + geo_str)
+      self.msg_if.pub_info("Recieved GoTo Location Message: " + geo_str)
       self.move(geo_msg)
 
   
@@ -432,7 +437,7 @@ class RBXFakeGPS:
     # Node Cleanup Function
     
   def cleanup_actions(self):
-    nepi_msg.publishMsgInfo(self,"Shutting down: Executing script cleanup actions")
+    self.msg_if.pub_info("Shutting down: Executing script cleanup actions")
 
 
 #########################################
