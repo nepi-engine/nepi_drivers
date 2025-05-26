@@ -30,7 +30,7 @@ FILE_TYPE = 'NODE'
 
 
 class OnvifPanTiltNode:
-    POSITION_UPDATE_RATE = 10
+    MAX_POSITION_UPDATE_RATE = 10
 
     DEFAULT_DRIVER_PATHS = ["/opt/nepi/ros/lib/nepi_drivers/"]
 
@@ -292,7 +292,7 @@ class OnvifPanTiltNode:
                                         settingUpdateFunctionNavPose=None, getSettingsFunctionNavPose=None,
                                         getHeadingCb = None, getPositionCb = None, getOrientationCb = self.getOrientationCb,
                                         getLocationCb = None, getAltitudeCb = None, getDepthCb = None,
-                                        navpose_update_rate = self.POSITION_UPDATE_RATE)
+                                        max_navpose_update_rate = self.MAX_POSITION_UPDATE_RATE)
                                         
             self.msg_if.pub_info(" ... PTX interface running")
 

@@ -45,14 +45,14 @@ class KistKPT20Discovery:
   retry = True
   dont_retry_list = []
 
-  CONFIGS_DICT = {
-      '1:160' : False,
-      '1:160-HR' : True,
-      '1:120' : False,
-      '1:120-HR' : True
+  DATA_LENGTH_DICT = {
+      '1:160' : 4,
+      '1:160-HR' : 6,
+      '1:120' : 4,
+      '1:120-HR' : 6
   }
 
-  high_res = False
+  data_len = 4
 
   active_devices_dict = dict()
   node_launch_name = "kist_kpt20"
@@ -77,44 +77,51 @@ class KistKPT20Discovery:
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
   def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace,drv_dict):
+    self.logger.log_warn(self, "Entering discovery function with drv_dict: " + str(drv_dict))###
     self.drv_dict = drv_dict
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
 
+
     ########################
     # Get discovery options
     try:
-      #Sself.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
+      #self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
       baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
+      self.logger.log_warn(self, "Baud Rate options: " + str(baudrate_options))###
+
       baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
+      self.logger.log_warn(self, "Baud Rate selected: " + str(baudrate_sel))###
       baudrate_list = []
       if baudrate_sel != "All":
         baudrate_list.append(baudrate_sel)
       else:
-        for baudrate in baudrate_options:
-          if baudrate != "All":
-            baudrate_list.append(baudrate)
+          for baudrate in baudrate_options:
+            if baudrate != 'All':
+              baudrate_list.append(baudrate)
       self.baudrate_list = baudrate_list
+      self.logger.log_warn(self, "Baud Rate list: " + str(baudrate_list))###
 
       start_addr = drv_dict['DISCOVERY_DICT']['OPTIONS']['start_addr']['value']
       try:
         start_ind = self.letters_list.index(start_addr)
       except:
         start_ind = 0
+      self.logger.log_warn("Starting discovery addr: " + str(self.letters_list[start_ind]))
+
       stop_addr = drv_dict['DISCOVERY_DICT']['OPTIONS']['stop_addr']['value']
       try:
         stop_ind = self.letters_list.index(stop_addr)
       except:
         stop_ind = 0
+      self.logger.log_warn("Ending discovery addr: " + str(self.letters_list[start_ind]))
+
       addr_range = stop_ind - start_ind
-      if addr_range > 0:
-        self.addr_search_list = list(self.letters_list[start_ind,stop_ind + 1])
-      else:
-        self.addr_search_list = [self.letters_list[start_ind]]
+      self.addr_search_list = list(self.letters_list[start_ind,stop_ind + 1])
 
       system_config = drv_dict['DISCOVERY_DICT']['OPTIONS']['system_config']['value']
-      self.high_res = self.CONFIGS_DICT[system_config]
+      self.data_len = self.DATA_LENGTH_DICT[system_config]
 
 
       self.path_list = []
@@ -204,13 +211,13 @@ class KistKPT20Discovery:
           continue
         #################################################
         for addr_str in self.addr_search_list:
-          if self.high_res == False:
+          if self.data_len == False:
             data_str = '0000'
           else:
             data_str = '000000'
           ser_msg= ('!' + addr_str + 'MVR' + data_str + 'R')
           ser_str = (ser_msg + '\r\n')
-        ################################################  
+          ################################################  
           # Send Serial String
           #print("")
           #print("Sending serial message: " + ser_msg)

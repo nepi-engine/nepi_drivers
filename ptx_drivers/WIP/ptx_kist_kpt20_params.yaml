@@ -28,20 +28,14 @@ driver:
         value: All
 
       start_addr:
-        type: 'Int'
-        options:
-          - 'A'
-          - 'Z'
+        type: 'String'
         default: 'A'
         value: 'A'
 
       stop_addr:
-        type: 'Int'
-        options:
-          - 'A'
-          - 'Z'
-        default: 'A'
-        value: 'A'
+        type: 'String'
+        default: 'B'
+        value: 'B'
 
       system_config:
         type: Discrete
