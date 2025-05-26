@@ -122,7 +122,7 @@ class AfTowerLightNode(object):
       # Initialize Class Variables
 
       # Get required drv driver dict info
-      self.drv_dict = nepi_ros.get_param('~drv_dict',TEST_NEX_DICT) 
+      self.drv_dict = nepi_ros.get_param('~drv_dict',{}) 
       #self.msg_if.pub_warn("AFTOWER_NODE: " + str(self.drv_dict))
       self.ser_port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
       ser_baud_str = self.drv_dict['DEVICE_DICT']['baud_rate_str'] 
