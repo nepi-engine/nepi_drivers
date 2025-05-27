@@ -226,7 +226,7 @@ class SealiteDiscovery:
     if launch_id in self.launch_time_dict.keys():
       launch_time = self.launch_time_dict[launch_id]
       cur_time = nepi_ros.get_time()
-      launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
+      launch_check = (cur_time - launch_time) > str(self.NODE_LAUNCH_TIME_SEC)
     if launch_check == False:
       return False   ###
 
@@ -250,19 +250,19 @@ class SealiteDiscovery:
     nepi_ros.set_param(dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, node_name, device_path = path_str)
     if success == True:
-      self.active_devices_dict[path_str] = {'node_name': device_node_name, 'sub_process': sub_process}
+      self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
 
     # Process luanch results
     self.launch_time_dict[launch_id] = nepi_ros.get_time()
     if success:
-      self.logger.log_warn("Launched node: " + device_node_name)
+      self.logger.log_warn("Launched node: " + node_name)
     else:
-      self.logger.log_warn("Failed to lauch node: " + device_node_name + " with msg: " + msg)
+      self.logger.log_warn("Failed to lauch node: " + node_name + " with msg: " + msg)
       if self.retry == False:
-        self.logger.log_warn("Will not try relaunch for node: " + device_node_name)
+        self.logger.log_warn("Will not try relaunch for node: " + node_name)
         self.dont_retry_list.append(launch_id)
       else:
-        self.logger.log_warn("Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+        self.logger.log_warn("Will attemp relaunch for node: " + node_name + " in " + str(self.NODE_LAUNCH_TIME_SEC) + " secs")
     return success
 
 
