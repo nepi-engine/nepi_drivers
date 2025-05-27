@@ -310,10 +310,10 @@ class OnvifPanTiltNode:
 
     def logDeviceInfo(self):
         dev_info_string = self.node_name + " Device Info:\n"
-        dev_info_string += "Manufacturer: " + self.dev_info["Manufacturer"] + "\n"
-        dev_info_string += "Model: " + self.dev_info["Model"] + "\n"
-        dev_info_string += "Firmware Version: " + self.dev_info["FirmwareVersion"] + "\n"
-        dev_info_string += "Serial Number: " + self.dev_info["HardwareId"] + "\n"
+        dev_info_string += ("Manufacturer: " + self.dev_info["Manufacturer"] + "\n")
+        dev_info_string += ("Model: " + self.dev_info["Model"] + "\n")
+        dev_info_string += ("Firmware Version: " + self.dev_info["FirmwareVersion"] + "\n")
+        dev_info_string += ("Serial Number: " + self.dev_info["HardwareId"] + "\n")
         self.msg_if.pub_info(dev_info_string)
 
 

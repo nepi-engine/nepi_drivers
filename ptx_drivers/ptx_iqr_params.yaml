@@ -5,8 +5,8 @@ driver:
   type: PTX
   group_id: None
   NODE_DICT:
-    file_name: None
-    class_name: None
+    file_name: ptx_iqr_node.py
+    class_name: IqrPanTiltNode
   DRIVER_DICT:
     file_name: None
     class_name: None

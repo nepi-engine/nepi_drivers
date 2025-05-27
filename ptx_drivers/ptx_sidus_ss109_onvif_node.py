@@ -28,7 +28,7 @@ from nepi_api.messages_if import MsgIF
 
 from nepi_ros_interfaces.msg import IDXStatus
 
-PKG_NAME = 'PTX_ONVIF_GENERIC' # Use in display menus
+PKG_NAME = 'PTX_SIDUS_SS109_ONVIF' # Use in display menus
 FILE_TYPE = 'NODE'
 
 
@@ -151,8 +151,8 @@ class SidusSs109OnvifNode:
             ptx_callback_names = {
                 # PTX Standard
                 "StopMoving": self.stopMoving,
-                "MoveYaw": self.moveYaw,
-                "MovePitch": self.movePitch,
+                "MoveYaw": None, #self.moveYaw,
+                "MovePitch": None, #self.movePitch,
                 "SetSpeed": self.setSpeed,
                 "GetSpeed": self.getSpeed,
                 "GetCurrentPosition": self.getCurrentPosition,
@@ -316,9 +316,11 @@ class SidusSs109OnvifNode:
                                         navpose_update_rate = self.POSITION_UPDATE_RATE)
                                         
             self.msg_if.pub_info(" ... PTX interface running")
-
-
             nepi_ros.spin()
+
+
+
+
 
     def getOrientationCb(self):
         yaw_deg, pitch_deg = self.getCurrentPosition()

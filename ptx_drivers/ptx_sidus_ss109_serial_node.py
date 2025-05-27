@@ -32,7 +32,7 @@ from nepi_sdk import nepi_settings
 from nepi_api.device_if_ptx import PTXActuatorIF
 from nepi_api.messages_if import MsgIF
 
-PKG_NAME = 'PTX_KIST_KTP20' # Use in display menus
+PKG_NAME = 'PTX_SIDUS_SS109_SERIAL' # Use in display menus
 FILE_TYPE = 'NODE'
 
 
@@ -108,6 +108,8 @@ class SidusSS109SerialPTXNode:
 
     self_check_count = 10
     self_check_counter = 0
+
+    speed_ratio = 0.5
 
     drv_dict = dict()    
 
@@ -231,9 +233,11 @@ class SidusSS109SerialPTXNode:
                                         movePitchCb = self.movePitch,
                                         setSoftLimitsCb = self.setSoftLimits,
                                         getSoftLimitsCb = None, #self.getSoftLimits, # 109 does not return response
-                                        setSpeedCb = self.setSpeed,
-                                        getSpeedCb = self.getSpeed,
+                                        setSpeedRatioCb = self.setSpeedRatio,
+                                        getSpeedRatioCb = self.getSpeedRatio,
                                         gotoPositionCb = self.gotoPosition,
+                                        gotoPanPositionCb = self.gotoPanPosition,
+                                        gotoTiltPositionCb = self.gotoTiltPosition,
                                         goHomeCb = self.goHome,
                                         setHomePositionCb = self.setHomePosition,
                                         setHomePositionHereCb = self.setHomePositionHere,
@@ -386,7 +390,8 @@ class SidusSS109SerialPTXNode:
 
 
     def movePitch(self, direction, duration):
-            '''
+        pass
+        '''
         axis_str = self.tilt_str
         if self.ptx_if is not None:
             direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
@@ -415,11 +420,12 @@ class SidusSS109SerialPTXNode:
 
 
 
-    def setSpeed(self, ratio):
+    def setSpeedRatio(self, ratio):
         # TODO: Limits checking and driver unit conversion?
-        self.driver_setSpeedRatios(ratio)
+        self.speed_ratio = ratio
 
-    def getSpeed(self):
+
+    def getSpeedRatio(self):
         # TODO: Driver unit conversion?
         ratio = self.driver_getSpeedRatio()
         return ratio
@@ -427,12 +433,18 @@ class SidusSS109SerialPTXNode:
 
     def getCurrentPosition(self):
         yaw_deg, pitch_deg = self.driver_getCurrentPosition(wait_on_busy = False, verbose = False)
-        #self.msg_if.pub_warn("Got pos degs : " + str([pan_deg, tilt_deg]))
+        #self.msg_if.pub_warn("Got pos degs : " + str([yaw_deg, pitch_deg]))
         return yaw_deg, pitch_deg
         
 
     def gotoPosition(self, yaw_deg, pitch_deg):
         self.driver_moveToPosition(yaw_deg * self.DEG_DIR, pitch_deg * self.DEG_DIR)
+
+    def gotoPanPosition(self, yaw_deg, pitch_deg):
+        self.driver_moveToPanPosition(yaw_deg * self.DEG_DIR, pitch_deg)
+
+    def gotoTiltPosition(self, yaw_deg, pitch_deg):
+        self.driver_moveToTiltPosition(pitch_deg * self.DEG_DIR)
         
     def goHome(self):
         self.driver_moveToPosition(self.home_yaw_deg, self.home_pitch_deg)
@@ -709,6 +721,16 @@ class SidusSS109SerialPTXNode:
 
 
     def driver_moveToPosition(self,yaw_deg, pitch_deg):
+        success = self.driver_moveToPanPosition(yaw_deg)
+        success = self.driver_moveToTiltPosition(pitch_deg)
+        return success
+
+
+    def driver_moveToPanPosition(self,yaw_deg, pitch_deg):
+        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+
+        self.driver_setSpeedRatios(self.speed_ratio)
+
         nepi_ros.sleep(self.SERIAL_SEND_DELAY)
 
         method_name = sys._getframe().f_code.co_name
@@ -718,6 +740,14 @@ class SidusSS109SerialPTXNode:
         ser_msg= (self.pan_str + self.addr_str + 'MML' + data_str + 'W')
         [success_1,response] = self.send_msg(ser_msg)
         
+        return success
+
+
+    def driver_moveToTiltPosition(self,yaw_deg, pitch_deg):
+        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+
+        self.driver_setSpeedRatios(self.speed_ratio)
+
         nepi_ros.sleep(self.SERIAL_SEND_DELAY)
 
         pos_count = self.deg2pos_count(pitch_deg)
@@ -762,6 +792,12 @@ class SidusSS109SerialPTXNode:
 
 
     def driver_jog(self,axis_str, direction):
+
+
+        self.driver_setSpeedRatios(self.speed_ratio)
+
+        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+
         method_name = sys._getframe().f_code.co_name
         success = False
         data_str = self.create_blank_str()
@@ -951,8 +987,8 @@ class SidusSS109SerialPTXNode:
 
     def speed_count2ratio(self,count):
         max_count =  math.floor(self.config_dict['max_degpsec'] / self.config_dict['degpsec_per_count'])
-        count = float(count/max_count)
-        return count
+        ratio = float(count/max_count)
+        return ratio
 
     def create_blank_str(self):
         data_str = ""

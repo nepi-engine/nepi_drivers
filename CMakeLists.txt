@@ -110,7 +110,6 @@ catkin_python_setup()
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-	INCLUDE_DIRS include
 	CATKIN_DEPENDS sensor_msgs nepi_ros_interfaces nepi_sdk
 )
 
@@ -118,39 +117,7 @@ catkin_package(
 ## Build ##
 ###########
 
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
-include_directories(
-   include
-   ptx_drivers/iqr_ros_pan_tilt/include
-   ${catkin_INCLUDE_DIRS}
-)
 
-## Add cmake target dependencies of the library
-## as an example, code may need to be generated before libraries
-## either from message generation or dynamic reconfigure
-# add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-## Declare a C++ library
-add_library(${PROJECT_NAME}
-   src/ptx_interface.cpp
-   src/ptx_node.cpp
-)
-
-## IQR Pan/Tilt Node
-add_executable(iqr_ros_pan_tilt_node
-  ptx_drivers/iqr_ros_pan_tilt/src/iqr_ros_pan_tilt_node.cpp
-  ptx_drivers/iqr_ros_pan_tilt/src/modbus_rtu_master.cpp
-  ptx_drivers/iqr_ros_pan_tilt/src/PanTiltDriver.cpp  
-  ptx_drivers/iqr_ros_pan_tilt/src/QThread.cpp
-)
-
-add_dependencies(iqr_ros_pan_tilt_node
-  ${catkin_EXPORTED_TARGETS})
-
-target_link_libraries(iqr_ros_pan_tilt_node
-  ${PROJECT_NAME}
-  ${catkin_LIBRARIES})
 
 
 #############
@@ -162,44 +129,6 @@ catkin_install_python(PROGRAMS
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-
-
-## Mark executables and/or libraries for installation
-install(TARGETS ${PROJECT_NAME}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-## Mark executables and/or libraries for installation
-install(TARGETS
-  iqr_ros_pan_tilt_node
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-## Mark cpp header files for installation - Msgs and Services (generated headers) are under the project name subdir
-install(DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-  FILES_MATCHING PATTERN "*.h"
-  PATTERN ".svn" EXCLUDE
-)
-
-
-## Non-generated headers are located directly in include and get copied to the root of include in the install directory
-install(DIRECTORY include/
-  DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
-  FILES_MATCHING PATTERN "*.h"
-  PATTERN ".svn" EXCLUDE
-)
-
-## Non-generated headers are located directly in include and get copied to the root of include in the install directory
-install(DIRECTORY ptx_drivers/iqr_ros_pan_tilt/include
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-  FILES_MATCHING PATTERN "*.h"
-  PATTERN ".svn" EXCLUDE
-)
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 set( NEPI_DRIVERS_SHARE_FOLDER 
