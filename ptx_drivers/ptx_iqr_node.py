@@ -55,17 +55,17 @@ class PanTiltStatus:
     sw_version: str = ""  # 4
     set_zero: int = 0  # 5
     speed: int = 0  # 6
-    yaw_goal: float = 0.0  # 7
-    pitch_goal: float = 0.0  # 8
+    pan_goal: float = 0.0  # 7
+    tilt_goal: float = 0.0  # 8
     reserved: int = 0  # 9
     driver_ec: int = 0  # 10
     encoder_ec: int = 0  # 11
-    yaw_now: float = 0.0  # 12
-    pitch_now: float = 0.0  # 13
-    yaw_temp: float = 0.0  # 14
-    pitch_temp: float = 0.0  # 15
-    yaw_raw: int = 0  # 16
-    pitch_raw: int = 0  # 17
+    pan_now: float = 0.0  # 12
+    tilt_now: float = 0.0  # 13
+    pan_temp: float = 0.0  # 14
+    tilt_temp: float = 0.0  # 15
+    pan_raw: int = 0  # 16
+    tilt_raw: int = 0  # 17
     loop_ec: int = 0  # 18
     loop_time: int = 0  # 19
 
@@ -74,17 +74,30 @@ class IqrPanTiltNode:
     MAX_POSITION_UPDATE_RATE = 10
     HEARTBEAT_CHECK_INTERVAL = 1.0
 
-    LIMITS_DICT = dict()
-    LIMITS_DICT['max_yaw_hardstop_deg'] = 60
-    LIMITS_DICT['min_yaw_hardstop_deg'] = -60
-    LIMITS_DICT['max_pitch_hardstop_deg'] = 60
-    LIMITS_DICT['min_pitch_hardstop_deg'] = -60
-    LIMITS_DICT['max_yaw_softstop_deg'] = 59
-    LIMITS_DICT['min_yaw_softstop_deg'] = -59
-    LIMITS_DICT['max_pitch_softstop_deg'] = 59
-    LIMITS_DICT['min_pitch_softstop_deg'] = -59
+    FACTORY_LIMITS_DICT = dict()
+    FACTORY_LIMITS_DICT['min_pan_hardstop_deg'] = -60
+    FACTORY_LIMITS_DICT['max_pan_hardstop_deg'] = 60
 
-    DEG_DIR = 1
+    FACTORY_LIMITS_DICT['min_tilt_hardstop_deg'] = -60
+    FACTORY_LIMITS_DICT['max_tilt_hardstop_deg'] = 60
+    
+    FACTORY_LIMITS_DICT['min_pan_softstop_deg'] = -60
+    FACTORY_LIMITS_DICT['max_pan_softstop_deg'] = 60
+    
+    FACTORY_LIMITS_DICT['min_tilt_softstop_deg'] = -60
+    FACTORY_LIMITS_DICT['max_tilt_softstop_deg'] = 60
+    
+
+    FACTORY_OFFSETS_DICT = dict()
+    FACTORY_OFFSETS_DICT['h'] = 0.0889
+    FACTORY_OFFSETS_DICT['x'] = 0.0 # 0.0254
+    FACTORY_OFFSETS_DICT['y'] = 0.0 # 0.0635
+    FACTORY_OFFSETS_DICT['z'] = 0.0254 # 0.0635
+
+    limits_dict = FACTORY_LIMITS_DICT
+
+    PAN_DEG_DIR = 1
+    TILT_DEG_DIR = 1
 
     CONFIGS_DICT = {
          'Standard' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 0.5, 'max_degpsec': 20},
@@ -141,6 +154,9 @@ class IqrPanTiltNode:
     self_check_count = 10
     self_check_counter = 0
 
+    current_position = [0.0,0.0]
+    last_position = current_position
+
     speed_ratio = 0.5
 
     drv_dict = dict()    
@@ -153,6 +169,12 @@ class IqrPanTiltNode:
 
 
     modbus_master = None
+
+    pan_stop_trig = False
+    tilt_stop_trig = False
+
+    pt_status = PanTiltStatus()
+
 
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
@@ -206,14 +228,7 @@ class IqrPanTiltNode:
             self.factory_settings = self.getFactorySettings()
 
 
-            # Must pass a capabilities structure to ptx_interface constructor
-            ptx_capabilities_dict = {}
-            ptx_capabilities_dict['has_absolute_positioning'] = True
-            ptx_capabilities_dict['has_limit_control'] = True
-            ptx_capabilities_dict['has_speed_control'] = True
-            ptx_capabilities_dict['has_homing'] = True
-            ptx_capabilities_dict['has_waypoints'] = True
-                
+               
 
             # Launch the PTX interface --  this takes care of initializing all the ptx settings from config. file, subscribing and advertising topics and services, etc.
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
@@ -234,10 +249,10 @@ class IqrPanTiltNode:
             #Factory Control Values 
             self.FACTORY_CONTROLS = {
                 'frame_id' : self.node_name + '_frame',
-                'yaw_joint_name' : self.node_name + '_yaw_joint',
-                'pitch_joint_name' : self.node_name + '_pitch_joint',
-                'reverse_yaw_control' : False,
-                'reverse_pitch_control' : False,
+                'pan_joint_name' : self.node_name + '_pan_joint',
+                'tilt_joint_name' : self.node_name + '_tilt_joint',
+                'reverse_pan_control' : False,
+                'reverse_tilt_control' : False,
                 'speed_ratio' : 0.5,
                 'status_update_rate_hz' : 10
             }
@@ -253,10 +268,8 @@ class IqrPanTiltNode:
             #for setting in self.factory_settings:
                 #self.msg_if.pub_info("" +setting)
 
-            self.home_yaw_deg = 0.0
-            self.home_pitch_deg = 0.0
-            self.waypoints = {} # Dictionary of dictionaries with numerical key and {waypoint_pitch, waypoint_yaw} dict value
-
+            self.home_pan_deg = 0.0
+            self.home_tilt_deg = 0.0
 
             self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict, 
                                         capSettings = self.cap_settings,
@@ -264,22 +277,22 @@ class IqrPanTiltNode:
                                         settingUpdateFunction=self.settingUpdateFunction,
                                         getSettingsFunction=self.getSettings,
                                         factoryControls = self.FACTORY_CONTROLS,
-                                        factoryLimits = self.LIMITS_DICT,
-                                        capabilities_dict = ptx_capabilities_dict,
+                                        factoryLimits = self.FACTORY_LIMITS_DICT,
+                                        factoryOffsets = self.FACTORY_OFFSETS_DICT,
                                         stopMovingCb = self.stopMoving,
-                                        moveYawCb = None, #self.moveYaw,
-                                        movePitchCb = None, #self.movePitch,
-                                        setSpeedRatioCb = self.setSpeedRatio,
+                                        movePanCb = self.movePan,
+                                        moveTiltCb = self.moveTilt,
+                                        setSoftLimitsCb=self.setSoftLimits,
+                                        getSoftLimitsCb=self.getSoftLimits,                                        
                                         getSpeedRatioCb = self.getSpeedRatio,
+                                        setSpeedRatioCb = self.setSpeedRatio,
+                                        getPositionCb = self.getPosition,
                                         gotoPositionCb = self.gotoPosition,
                                         goHomeCb = self.goHome,
                                         setHomePositionCb = self.setHomePosition,
                                         setHomePositionHereCb = self.setHomePositionHere,
-                                        gotoWaypointCb = self.gotoWaypoint,
-                                        setWaypointCb = self.setWaypoint,
-                                        setWaypointHereCb = self.setWaypointHere,
-                                        getHeadingCb = None, getPositionCb = None, getOrientationCb = self.getOrientationCb,
-                                        getLocationCb = None, getAltitudeCb = None, getDepthCb = None,
+                                        getNpHeadingCb = None, getNpPositionCb = None, getNpOrientationCb = self.getOrientationCb,
+                                        getNpLocationCb = None, getNpAltitudeCb = None, getNpDepthCb = None,
                                         max_navpose_update_rate = self.MAX_POSITION_UPDATE_RATE,
                                         deviceResetCb = self.resetDevice
                                         )
@@ -287,7 +300,10 @@ class IqrPanTiltNode:
 
             # Start an ptx activity check process that kills node after some number of failed comms attempts
             self.msg_if.pub_info("Starting an activity check process")
-            #nepi_ros.start_timer_process(self.HEARTBEAT_CHECK_INTERVAL, self.check_timer_callback)
+            nepi_ros.start_timer_process(self.HEARTBEAT_CHECK_INTERVAL, self.check_timer_callback)
+            self.msg_if.pub_info("Starting an update position process")
+            update_interval = float(1.0) / self.MAX_POSITION_UPDATE_RATE
+            nepi_ros.start_timer_process(update_interval, self.updateStatusHandler)
             # Initialization Complete
             self.msg_if.pub_info("Initialization Complete")
             #Set up node shutdown
@@ -296,6 +312,10 @@ class IqrPanTiltNode:
             nepi_ros.spin()
 
 
+    def updateStatusHandler(self,timer):
+        [success,self.pt_status] = self.driver_getPtStatus()
+        if success == True:
+            self.current_position = [self.pt_status.pan_now * self.PAN_DEG_DIR, self.pt_status.tilt_now * self.TILT_DEG_DIR]
 
 
     def logDeviceInfo(self):
@@ -307,12 +327,12 @@ class IqrPanTiltNode:
         self.msg_if.pub_info(dev_info_string)
 
     def getOrientationCb(self):
-        yaw_deg, pitch_deg = self.getCurrentPosition()
+        pan_deg, tilt_deg = self.current_position
         orientation_dict = dict()
         orientation_dict['time_oreantation'] = nepi_utils.get_time()
         orientation_dict['roll_deg'] = 0.0
-        orientation_dict['pitch_deg'] = pitch_deg * self.DEG_DIR
-        orientation_dict['yaw_deg'] = yaw_deg * self.DEG_DIR
+        orientation_dict['yaw_deg'] = pan_deg * self.PAN_DEG_DIR
+        orientation_dict['pitch_deg'] = tilt_deg * self.TILT_DEG_DIR
         return orientation_dict
 
 
@@ -405,12 +425,54 @@ class IqrPanTiltNode:
     def stopMoving(self):
         self.driver_stopMotion()
 
-    def moveYaw(self, direction, duration):
-        pass
+    def checkResetPanStopTrigger(self):
+        stop_trig = copy.deepcopy(self.pan_stop_trig)
+        self.pan_stop_trig = False
+        return stop_trig
+
+    def checkResetTiltStopTrigger(self):
+        stop_trig = copy.deepcopy(self.tilt_stop_trig)
+        self.tilt_stop_trig = False
+        return stop_trig
+
+    def movePan(self, direction, duration):
+        success = self.driver_jogPan(direction, duration)
 
 
-    def movePitch(self, direction, duration):
-        pass
+
+    def moveTilt(self, direction, duration):
+            success = self.driver_jogTilt(direction, duration)
+
+    def setSoftLimits(self,pan_min,pan_max,tilt_min,tilt_max):
+        pfl_min = self.FACTORY_LIMITS_DICT['min_pan_softstop_deg']
+        pfl_max = self.FACTORY_LIMITS_DICT['max_pan_softstop_deg']
+        tfl_min = self.FACTORY_LIMITS_DICT['min_tilt_softstop_deg']
+        tfl_max = self.FACTORY_LIMITS_DICT['max_tilt_softstop_deg']
+
+        if pan_max > pan_min:
+            if pan_min < pfl_min:
+                pan_min = pfl_min
+            if pan_max > pfl_max:
+                pan_max = pfl_max
+
+
+        if tilt_max > tilt_min:
+            if tilt_min < tfl_min:
+                tilt_min = tfl_min
+            if tilt_max > tfl_max:
+                tilt_max = tfl_max  
+
+        self.limits_dict['min_pan_softstop_deg'] = pan_min
+        self.limits_dict['max_pan_softstop_deg'] = pan_max
+        self.limits_dict['min_tilt_softstop_deg'] = tilt_min
+        self.limits_dict['max_tilt_softstop_deg'] = tilt_max
+              
+    def getSoftLimits(self):
+        pan_min = self.limits_dict['min_pan_softstop_deg']
+        pan_max = self.limits_dict['max_pan_softstop_deg']
+        tilt_min = self.limits_dict['min_tilt_softstop_deg']
+        tilt_max = self.limits_dict['max_tilt_softstop_deg']
+        return pan_min,pan_max,tilt_min,tilt_max
 
 
     def setSpeedRatio(self, ratio):
@@ -424,45 +486,27 @@ class IqrPanTiltNode:
         return ratio
           
 
-    def getCurrentPosition(self):
-        yaw_deg, pitch_deg = self.driver_getCurrentPosition()
-        #self.msg_if.pub_warn("Got pos degs : " + str([yaw_deg, pitch_deg]))
-        return yaw_deg, pitch_deg
+    def getPosition(self):
+        return self.current_position
         
 
-    def gotoPosition(self, yaw_deg, pitch_deg):
-        self.driver_moveToPosition(yaw_deg * self.DEG_DIR, pitch_deg * self.DEG_DIR)
+    def gotoPosition(self, pan_deg, tilt_deg):
+        self.driver_moveToPosition(pan_deg * self.PAN_DEG_DIR, tilt_deg * self.TILT_DEG_DIR)
 
       
     def goHome(self):
-        self.driver_moveToPosition(self.home_yaw_deg, self.home_pitch_deg)
+        self.driver_moveToPosition(self.home_pan_deg, self.home_tilt_deg)
 
-    def setHomePosition(self, yaw_deg, pitch_deg):
-        self.home_yaw_deg = yaw_deg
-        self.home_pitch_deg = pitch_deg
+    def setHomePosition(self, pan_deg, tilt_deg):
+        self.home_pan_deg = pan_deg
+        self.home_tilt_deg = tilt_deg
 
     def setHomePositionHere(self):
         if self.driver_reportsPosition() is True:
-            yaw_deg, pitch_deg = self.driver_getCurrentPosition()
-            self.home_yaw_deg = yaw_deg * self.DEG_DIR
-            self.home_pitch_deg = pitch_deg * self.DEG_DIR 
+            pan_deg, tilt_deg = self.getPosition()
+            self.home_pan_deg = pan_deg * self.PAN_DEG_DIR
+            self.home_tilt_deg = tilt_deg * self.TILT_DEG_DIR 
 
-    def gotoWaypoint(self, waypoint_index):
-        if waypoint_index not in self.waypoints:
-            return
-        waypoint_yaw_deg = self.waypoints[waypoint_index]['yaw_deg']
-        waypoint_pitch_deg = self.waypoints[waypoint_index]['pitch_deg']
-        self.driver_moveToPosition(waypoint_yaw_deg, waypoint_pitch_deg)
-    
-    def setWaypoint(self, waypoint_index, yaw_deg, pitch_deg):
-        self.waypoints[waypoint_index] = {'yaw_deg': yaw_deg * self.DEG_DIR, 'pitch_deg': pitch_deg * self.DEG_DIR}
-        
-    def setWaypointHere(self, waypoint_index):
-        if self.driver_reportsPosition() and self.ptx_if is not None:
-            yaw_deg, pitch_deg = self.driver_getCurrentPosition()
-            self.waypoints[waypoint_index] = {'yaw_deg': yaw_deg, 'pitch_deg': pitch_deg}
-
-        self.msg_if.pub_info("Waypoint set to current position")
 
     def setCurrentSettingsAsDefault(self):
         # Don't need to worry about any of our params in this class, just child interfaces' params
@@ -471,6 +515,10 @@ class IqrPanTiltNode:
 
     def resetDevice(self):
         self.speed_ratio = 0.5
+        self.limits_dict['min_pan_softstop_deg'] = self.FACTORY_LIMITS_DICT['min_pan_softstop_deg']
+        self.limits_dict['max_pan_softstop_deg'] = self.FACTORY_LIMITS_DICT['min_pan_softstop_deg']
+        self.limits_dict['min_tilt_softstop_deg'] = self.FACTORY_LIMITS_DICT['min_tilt_softstop_deg']
+        self.limits_dict['max_tilt_softstop_deg'] = self.FACTORY_LIMITS_DICT['max_tilt_softstop_deg']
 
 
 
@@ -498,17 +546,17 @@ class IqrPanTiltNode:
                                             f"{int((rcvdBuf[4] & 0x0f00) >> 8)}.{int(rcvdBuf[4] & 0x00ff)}")
                         pt_status.set_zero = rcvdBuf[5]
                         pt_status.speed = rcvdBuf[6]
-                        pt_status.yaw_goal = c_int16(rcvdBuf[7]).value / 100.0
-                        pt_status.pitch_goal = c_int16(rcvdBuf[8]).value / 100.0
+                        pt_status.pan_goal = c_int16(rcvdBuf[7]).value / 100.0
+                        pt_status.tilt_goal = c_int16(rcvdBuf[8]).value / 100.0
                         pt_status.reserved = rcvdBuf[9]
                         pt_status.driver_ec = rcvdBuf[10]
                         pt_status.encoder_ec = rcvdBuf[11]
-                        pt_status.yaw_now = c_int16(rcvdBuf[12]).value / 100.0
-                        pt_status.pitch_now = c_int16(rcvdBuf[13]).value / 100.0
-                        pt_status.yaw_temp = c_int16(rcvdBuf[14]).value / 10.0
-                        pt_status.pitch_temp = c_int16(rcvdBuf[15]).value / 10.0
-                        pt_status.yaw_raw = c_int16(rcvdBuf[16]).value
-                        pt_status.pitch_raw = c_int16(rcvdBuf[17]).value
+                        pt_status.pan_now = c_int16(rcvdBuf[12]).value / 100.0
+                        pt_status.tilt_now = c_int16(rcvdBuf[13]).value / 100.0
+                        pt_status.pan_temp = c_int16(rcvdBuf[14]).value / 10.0
+                        pt_status.tilt_temp = c_int16(rcvdBuf[15]).value / 10.0
+                        pt_status.pan_raw = c_int16(rcvdBuf[16]).value
+                        pt_status.tilt_raw = c_int16(rcvdBuf[17]).value
                         pt_status.loop_ec = rcvdBuf[18]
                         pt_status.loop_time = rcvdBuf[19]
                         success = True
@@ -516,48 +564,82 @@ class IqrPanTiltNode:
                 
 
     def driver_stopMotion(self):
-        success = False
-        [success,pt_status] = self.driver_getPtStatus()
-        if pt_status is not None:
-            yaw = pt_status.yaw_now
-            pitch = pt_status.pitch_now
-            self.driver_setPosition(yaw,pitch)
-            success = True
+        pan = self.current_position[0]
+        tilt = self.current_position[1]
+        self.driver_setPosition(pan,tilt)
         return success
 
 
-    def driver_getCurrentPosition(self):
-        yaw = -999
-        pitch = -999
-        [success,pt_status] = self.driver_getPtStatus()
-        if pt_status is not None:
-            yaw = pt_status.yaw_now
-            pitch = pt_status.pitch_now
-        return yaw, pitch
+    def driver_getPosition(self):
+        pan = self.current_position[0]
+        tilt = self.current_position[1]
+        return pan, tilt
 
-    def driver_moveToPosition(self,yaw, pitch):
-        if yaw < -60.0 or yaw > 60.0:
+    def driver_moveToPosition(self,pan, tilt):
+        if pan < -60.0 or pan > 60.0:
             return
-        if pitch < -60.0 or pitch > 60.0:
+        if tilt < -60.0 or tilt > 60.0:
             return
         speed_count = self.ratio2speed_count(self.speed_ratio)
         with self.pt_status_lock:
             if self.modbus_master is not None:
-                sendBuf = [speed_count, round(yaw*100.0), round(pitch*100)]
+                sendBuf = [speed_count, round(pan*100.0), round(tilt*100)]
                 self.modbus_master.set_multiple_registers(self.addr_int, 0x0006, sendBuf)
                 nepi_ros.sleep(0.01)
 
     def driver_getSpeedRatio(self, axis_str = '#'):
         method_name = sys._getframe().f_code.co_name
-        ratio = -999
-        [success,pt_status] = self.driver_getPtStatus()
-        if success:
-            ratio = self.speed_count2ratio(pt_status.speed)
+        self.msg_if.pub_warn("Got speed count: " + str(self.pt_status.speed)) 
+        ratio = self.speed_count2ratio(self.pt_status.speed)
+        self.msg_if.pub_warn("Returning speed ratio: " + str(ratio)) 
         return ratio
         
 
       
+    def driver_jogPan(self, direction, duration):
+        pan_min = self.limits_dict['min_pan_softstop_deg']
+        pan_max = self.limits_dict['max_pan_softstop_deg']
+        direction = direction * self.PAN_DEG_DIR
+        if direction < 0:
+            pan_deg = pan_min
+        else:
+            pan_deg = pan_max
 
+        tilt_deg = self.current_position[1]
+        success = self.driver_moveToPosition(pan_deg, tilt_deg)
+
+        if success:
+            if duration > 0:
+                start_time = nepi_utils.get_time()
+                stop = False
+                while stop == False:
+                    time_check = (nepi_utils.get_time() - start_time) > duration
+                    stop = time_check == True or self.checkResetPanStopTrigger() == True
+                    nepi_ros.sleep(0.1)
+                success = self.driver_stopMotion()
+
+
+    def driver_jogTilt(self, direction, duration):
+        tilt_min = self.limits_dict['min_tilt_softstop_deg']
+        tilt_max = self.limits_dict['max_tilt_softstop_deg']
+        direction = direction * self.TILT_DEG_DIR
+        if direction < 0:
+            tilt_deg = tilt_min
+        else:
+            tilt_deg = tilt_max
+
+        pan_deg = self.current_position[0]
+        success = self.driver_moveToPosition(pan_deg, tilt_deg)
+
+        if success:
+            if duration > 0:
+                start_time = nepi_utils.get_time()
+                stop = False
+                while stop == False:
+                    time_check = (nepi_utils.get_time() - start_time) > duration
+                    stop = time_check == True or self.checkResetTiltStopTrigger() == True
+                    nepi_ros.sleep(0.1)
+                success = self.driver_stopMotion()
 
 
     #######################
@@ -565,25 +647,21 @@ class IqrPanTiltNode:
 
     def check_timer_callback(self,timer):
         if self.modbus_master is None:
-            return True
+            return
         else:
             success = False
             try:
                 # Try to request pt_status
-                self.msg_if.pub_info("Connection Check requesting info for device on port: " + self.port_str)
+                #self.msg_if.pub_info("Connection Check requesting info for device on port: " + self.port_str)
                 [success,pt_status] = self.driver_getPtStatus()
+                #self.msg_if.pub_info("Heartbeat check got status: " + str(pt_status))
             except Exception as e:
                 self.msg_if.pub_warn("Something went wrong with connecting to serial port at: " + self.port_str + "(" + str(e) + ")" )
-            if success == True:
-                success = False
-                # Send Message
-                self.msg_if.pub_info("Requesting info for device on poret: " + self.port_str)
-
-                [success,pt_status] = self.driver_getPtStatus()
         if success:
             self.self_check_counter = 0 # reset comms failure count
         else:
             self.self_check_counter = self.self_check_counter + 1 # increment counter
+
         #self.msg_if.pub_warn("Current failed comms count: " + str(self.self_check_counter))
         if self.self_check_counter > self.self_check_count:  # Crashes node if set above limit??
             self.msg_if.pub_warn("Shutting down device: " +  self.addr_str + " on port " + self.port_str)
@@ -613,9 +691,10 @@ class IqrPanTiltNode:
                 self.msg_if.pub_info("Connect process requesting info for device on port: " + self.port_str)
 
                 [success,pt_status] = self.driver_getPtStatus()
-
                 if success:
                     self.msg_if.pub_info("Connected to device on port: " +  self.port_str)
+                    self.msg_if.pub_warn("Got status on connection: " + str(pt_status))
+                    self.pt_status = pt_status
                     # Update serial, hardware, and software status values
                     self.serial_num = pt_status.serial_num
                     self.hw_version = pt_status.hw_version

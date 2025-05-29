@@ -59,6 +59,7 @@ class SidusSs109OnvifNode:
 
     cam_status = None
 
+    current_position = [0.0,0.0]
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                                                    
@@ -151,18 +152,15 @@ class SidusSs109OnvifNode:
             ptx_callback_names = {
                 # PTX Standard
                 "StopMoving": self.stopMoving,
-                "MoveYaw": None, #self.moveYaw,
-                "MovePitch": None, #self.movePitch,
+                "MovePan": None, #self.movePan,
+                "MoveTilt": None, #self.moveTilt,
                 "SetSpeed": self.setSpeed,
                 "GetSpeed": self.getSpeed,
-                "GetCurrentPosition": self.getCurrentPosition,
+                "GetPosition": self.getPosition,
                 "GotoPosition": self.gotoPosition,
                 "GoHome": self.goHome,
                 "SetHomePosition": self.setHomePosition,
                 "SetHomePositionHere": self.setHomePositionHere,
-                "GotoWaypoint": self.gotoWaypoint,
-                "SetWaypoint": self.setWaypoint,
-                "SetWaypointHere": self.setWaypointHere
             }
 
             # Must pass a capabilities structure to ptx_interface constructor
@@ -177,7 +175,7 @@ class SidusSs109OnvifNode:
                 ptx_capabilities_dict['has_speed_control'] = True
                 
             if not self.driver.reportsPosition():
-                ptx_callback_names["GetCurrentPosition"] = None # Clear the method
+                ptx_callback_names["GetPosition"] = None # Clear the method
                 
             if not self.driver.hasAbsolutePositioning():
                 ptx_callback_names["GotoPosition"] = None # Clear the method
@@ -197,17 +195,10 @@ class SidusSs109OnvifNode:
             if not self.driver.homePositionAdjustable() and not self.has_absolute_positioning_and_feedback:
                 ptx_callback_names["SetHomePositionHere"] = None
             
-            if not self.driver.hasWaypoints() and not self.has_absolute_positioning_and_feedback:
-                ptx_callback_names["GotoWaypoint"] = None
-                ptx_callback_names["SetWaypointHere"] = None
-                ptx_capabilities_dict['has_waypoints'] = False
-            else:
-                ptx_capabilities_dict['has_waypoints'] = True
-            
+
             # Following are implemented entirely in software because ONVIF has no support for setting HOME or PRESET by position
             if not self.has_absolute_positioning_and_feedback:
                 ptx_callback_names["SetHomePosition"] = None    
-                ptx_callback_names["SetWaypoint"] = None
 
             # Now that we've updated the callbacks table, can apply the remappings... this is particularly useful since
             # many ONVIF devices report capabilities that they don't actually have, so need a user-override mechanism. In
@@ -244,10 +235,10 @@ class SidusSs109OnvifNode:
             #Factory Control Values 
             self.FACTORY_CONTROLS = {
                 'frame_id' : self.node_name + '_frame',
-                'yaw_joint_name' : self.node_name + '_yaw_joint',
-                'pitch_joint_name' : self.node_name + '_pitch_joint',
-                'reverse_yaw_control' : False,
-                'reverse_pitch_control' : False,
+                'pan_joint_name' : self.node_name + '_pan_joint',
+                'tilt_joint_name' : self.node_name + '_tilt_joint',
+                'reverse_pan_control' : False,
+                'reverse_tilt_control' : False,
                 'speed_ratio' : 0.5
             }
             
@@ -256,23 +247,23 @@ class SidusSs109OnvifNode:
             self.default_settings = dict()
             if hasattr(self.driver, 'getPositionLimitsInDegrees'):
                 driver_specified_limits = self.driver.getPositionLimitsInDegrees()
-                self.default_settings['max_yaw_hardstop_deg'] = driver_specified_limits['max_yaw_hardstop_deg']
-                self.default_settings['min_yaw_hardstop_deg'] = driver_specified_limits['min_yaw_hardstop_deg']
-                self.default_settings['max_pitch_hardstop_deg'] = driver_specified_limits['max_pitch_hardstop_deg']
-                self.default_settings['min_pitch_hardstop_deg'] = driver_specified_limits['min_pitch_hardstop_deg']
-                self.default_settings['max_yaw_softstop_deg'] = driver_specified_limits['max_yaw_softstop_deg']
-                self.default_settings['min_yaw_softstop_deg'] = driver_specified_limits['min_yaw_softstop_deg']
-                self.default_settings['max_pitch_softstop_deg'] = driver_specified_limits['max_pitch_softstop_deg']
-                self.default_settings['min_pitch_softstop_deg'] = driver_specified_limits['min_pitch_softstop_deg']
+                self.default_settings['max_pan_hardstop_deg'] = driver_specified_limits['max_pan_hardstop_deg']
+                self.default_settings['min_pan_hardstop_deg'] = driver_specified_limits['min_pan_hardstop_deg']
+                self.default_settings['max_tilt_hardstop_deg'] = driver_specified_limits['max_tilt_hardstop_deg']
+                self.default_settings['min_tilt_hardstop_deg'] = driver_specified_limits['min_tilt_hardstop_deg']
+                self.default_settings['max_pan_softstop_deg'] = driver_specified_limits['max_pan_softstop_deg']
+                self.default_settings['min_pan_softstop_deg'] = driver_specified_limits['min_pan_softstop_deg']
+                self.default_settings['max_tilt_softstop_deg'] = driver_specified_limits['max_tilt_softstop_deg']
+                self.default_settings['min_tilt_softstop_deg'] = driver_specified_limits['min_tilt_softstop_deg']
             else:
-                self.default_settings['max_yaw_hardstop_deg'] = 60.0
-                self.default_settings['min_yaw_hardstop_deg'] = -60.0
-                self.default_settings['max_pitch_hardstop_deg'] = 60.0
-                self.default_settings['min_pitch_hardstop_deg'] = -60.0
-                self.default_settings['max_yaw_softstop_deg'] = 59.0
-                self.default_settings['min_yaw_softstop_deg'] = -59.0
-                self.default_settings['max_pitch_softstop_deg'] = 59.0
-                self.default_settings['min_pitch_softstop_deg'] = -59.0
+                self.default_settings['max_pan_hardstop_deg'] = 60.0
+                self.default_settings['min_pan_hardstop_deg'] = -60.0
+                self.default_settings['max_tilt_hardstop_deg'] = 60.0
+                self.default_settings['min_tilt_hardstop_deg'] = -60.0
+                self.default_settings['max_pan_softstop_deg'] = 59.0
+                self.default_settings['min_pan_softstop_deg'] = -59.0
+                self.default_settings['max_tilt_softstop_deg'] = 59.0
+                self.default_settings['min_tilt_softstop_deg'] = -59.0
 
             # Initialize settings
             self.cap_settings = self.getCapSettings()
@@ -285,9 +276,8 @@ class SidusSs109OnvifNode:
                 #self.msg_if.pub_info("" +setting)
 
             self.speed_ratio = 0.5
-            self.home_yaw_deg = 0.0
-            self.home_pitch_deg = 0.0
-            self.waypoints = {} # Dictionary of dictionaries with numerical key and {waypoint_pitch, waypoint_yaw} dict value
+            self.home_pan_deg = 0.0
+            self.home_tilt_deg = 0.0
 
             self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict, 
                                         capSettings = self.cap_settings,
@@ -296,23 +286,20 @@ class SidusSs109OnvifNode:
                                         getSettingsFunction=self.getSettings,
                                         factoryControls = self.FACTORY_CONTROLS,
                                         defaultSettings = self.default_settings,
-                                        capabilities_dict = ptx_capabilities_dict,
                                         stopMovingCb = ptx_callback_names["StopMoving"],
-                                        moveYawCb = ptx_callback_names["MoveYaw"],
-                                        movePitchCb = ptx_callback_names["MovePitch"],
+                                        movePanCb = ptx_callback_names["MovePan"],
+                                        moveTiltCb = ptx_callback_names["MoveTilt"],
                                         setSpeedCb = ptx_callback_names["SetSpeed"],
                                         getSpeedCb = ptx_callback_names["GetSpeed"],
-                                        getCurrentPositionCb = ptx_callback_names["GetCurrentPosition"],
+                                        getCurrentPositionCb = ptx_callback_names["GetPosition"],
                                         gotoPositionCb = ptx_callback_names["GotoPosition"],
                                         goHomeCb = ptx_callback_names["GoHome"],
                                         setHomePositionCb = ptx_callback_names["SetHomePosition"],
                                         setHomePositionHereCb = ptx_callback_names["SetHomePositionHere"],
-                                        gotoWaypointCb = ptx_callback_names["GotoWaypoint"],
-                                        setWaypointCb = ptx_callback_names["SetWaypoint"],
                                         capSettingsNavPose=None, factorySettingsNavPose=None,
                                         settingUpdateFunctionNavPose=None, getSettingsFunctionNavPose=None,
-                                        getHeadingCb = None, getPositionCb = None, getOrientationCb = self.getOrientationCb,
-                                        getLocationCb = None, getAltitudeCb = None, getDepthCb = None,
+                                        getNpHeadingCb = None, getNpPositionCb = None, getNpOrientationCb = self.getOrientationCb,
+                                        getNpLocationCb = None, getNpAltitudeCb = None, getNpDepthCb = None,
                                         navpose_update_rate = self.POSITION_UPDATE_RATE)
                                         
             self.msg_if.pub_info(" ... PTX interface running")
@@ -320,15 +307,18 @@ class SidusSs109OnvifNode:
 
 
 
+    def getPosition(self):
+        return self.current_position
 
 
     def getOrientationCb(self):
-        yaw_deg, pitch_deg = self.getCurrentPosition()
+        pan_deg, tilt_deg = self.getCurrentPosition()
         orientation_dict = dict()
         orientation_dict['time_oreantation'] = nepi_utils.get_time()
         orientation_dict['roll_deg'] = 0.0
-        orientation_dict['pitch_deg'] = pitch_deg
-        orientation_dict['yaw_deg'] = yaw_deg
+        orientation_dict['yaw_deg'] = pan_deg
+        orientation_dict['pitch_deg'] = tilt_deg
+        self.current_position = [pan_deg,tilt_deg]
         return orientation_dict
 
 
@@ -379,12 +369,12 @@ class SidusSs109OnvifNode:
     def stopMoving(self):
         self.driver.stopMotion()
 
-    def moveYaw(self, direction, duration):
+    def movePan(self, direction, duration):
         if self.ptx_if is not None:
             driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.driver.PT_DIRECTION_NEGATIVE
             self.driver.jog(pan_direction = driver_direction, tilt_direction = self.driver.PT_DIRECTION_NONE, speed_ratio = self.speed_ratio, time_s = duration)
 
-    def movePitch(self, direction, duration):
+    def moveTilt(self, direction, duration):
         if self.ptx_if is not None:
             driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.driver.PT_DIRECTION_NEGATIVE
             self.driver.jog(pan_direction = self.driver.PT_DIRECTION_NONE, tilt_direction = driver_direction, speed_ratio = self.speed_ratio, time_s = duration)
@@ -398,59 +388,59 @@ class SidusSs109OnvifNode:
         return self.speed_ratio
             
      
-    def pitchDegToOvRatio(self, deg):
+    def tiltDegToOvRatio(self, deg):
         ratio = 0.5
-        max_ph = nepi_ros.get_param('~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
-        min_ph = nepi_ros.get_param('~ptx/limits/min_pitch_hardstop_deg', self.default_settings['min_pitch_hardstop_deg'])
-        reverse_pitch = False
+        max_ph = nepi_ros.get_param('~ptx/limits/max_tilt_hardstop_deg', self.default_settings['max_tilt_hardstop_deg'])
+        min_ph = nepi_ros.get_param('~ptx/limits/min_tilt_hardstop_deg', self.default_settings['min_tilt_hardstop_deg'])
+        reverse_tilt = False
         if self.ptx_if is not None:
-            reverse_pitch = self.ptx_if.reverse_pitch_control
-        if reverse_pitch == False:
+            reverse_tilt = self.ptx_if.reverse_tilt_control
+        if reverse_tilt == False:
           ratio = 1 - (deg - min_ph) / (max_ph - min_ph)
         else:
           ratio = (deg - min_ph) / (max_ph - min_ph)
         ovRatio = 2 * (ratio - 0.5)
         return ovRatio
 
-    def yawDegToOvRatio(self, deg):
+    def panDegToOvRatio(self, deg):
         ratio = 0.5
-        max_yh = nepi_ros.get_param('~ptx/limits/max_yaw_hardstop_deg', self.default_settings['max_yaw_hardstop_deg'])
-        min_yh = nepi_ros.get_param('~ptx/limits/min_yaw_hardstop_deg', self.default_settings['min_yaw_hardstop_deg'])
-        reverse_yaw = False
+        max_yh = nepi_ros.get_param('~ptx/limits/max_pan_hardstop_deg', self.default_settings['max_pan_hardstop_deg'])
+        min_yh = nepi_ros.get_param('~ptx/limits/min_pan_hardstop_deg', self.default_settings['min_pan_hardstop_deg'])
+        reverse_pan = False
         if self.ptx_if is not None:
-            reverse_yaw = self.ptx_if.reverse_yaw_control 
-        if reverse_yaw == False:
+            reverse_pan = self.ptx_if.reverse_pan_control 
+        if reverse_pan == False:
           ratio = 1 - (deg - min_yh) / (max_yh - min_yh)
         else:
           ratio = (deg - min_yh) / (max_yh - min_yh)
         ovRatio = 2 * (ratio - 0.5)
         return (ovRatio)     
 
-    def yawOvRatioToDeg(self, ovRatio):
-        yaw_deg = 0
-        max_yh = nepi_ros.get_param('~ptx/limits/max_yaw_hardstop_deg', self.default_settings['max_yaw_hardstop_deg'])
-        min_yh = nepi_ros.get_param('~ptx/limits/min_yaw_hardstop_deg', self.default_settings['min_yaw_hardstop_deg'])
-        reverse_yaw = False
+    def panOvRatioToDeg(self, ovRatio):
+        pan_deg = 0
+        max_yh = nepi_ros.get_param('~ptx/limits/max_pan_hardstop_deg', self.default_settings['max_pan_hardstop_deg'])
+        min_yh = nepi_ros.get_param('~ptx/limits/min_pan_hardstop_deg', self.default_settings['min_pan_hardstop_deg'])
+        reverse_pan = False
         if self.ptx_if is not None:
-            reverse_yaw = self.ptx_if.reverse_yaw_control 
-        if reverse_yaw == False:
-           yaw_deg =  min_yh + (1-ovRatio) * (max_yh - min_yh)
+            reverse_pan = self.ptx_if.reverse_pan_control 
+        if reverse_pan == False:
+           pan_deg =  min_yh + (1-ovRatio) * (max_yh - min_yh)
         else:
-           yaw_deg =  max_yh - (1-ovRatio)  * (max_yh - min_yh)
-        return  yaw_deg
+           pan_deg =  max_yh - (1-ovRatio)  * (max_yh - min_yh)
+        return  pan_deg
     
-    def pitchOvRatioToDeg(self, ovRatio):
-        pitch_deg = 0
-        max_ph = nepi_ros.get_param('~ptx/limits/max_pitch_hardstop_deg', self.default_settings['max_pitch_hardstop_deg'])
-        min_ph = nepi_ros.get_param('~ptx/limits/min_pitch_hardstop_deg', self.default_settings['min_pitch_hardstop_deg'])
-        reverse_pitch = False
+    def tiltOvRatioToDeg(self, ovRatio):
+        tilt_deg = 0
+        max_ph = nepi_ros.get_param('~ptx/limits/max_tilt_hardstop_deg', self.default_settings['max_tilt_hardstop_deg'])
+        min_ph = nepi_ros.get_param('~ptx/limits/min_tilt_hardstop_deg', self.default_settings['min_tilt_hardstop_deg'])
+        reverse_tilt = False
         if self.ptx_if is not None:
-            reverse_pitch = self.ptx_if.reverse_pitch_control
-        if reverse_pitch == False:
-           pitch_deg =  min_ph + (1-ovRatio) * (max_ph - min_ph)
+            reverse_tilt = self.ptx_if.reverse_tilt_control
+        if reverse_tilt == False:
+           tilt_deg =  min_ph + (1-ovRatio) * (max_ph - min_ph)
         else:
-           pitch_deg =  max_ph - (1-ovRatio) * (max_ph - min_ph)
-        return  pitch_deg
+           tilt_deg =  max_ph - (1-ovRatio) * (max_ph - min_ph)
+        return  tilt_deg
 
 
 
@@ -468,70 +458,42 @@ class SidusSs109OnvifNode:
             pan_deg = 0
             tilt_deg = 0
         else:
-            pan_deg = self.yawOvRatioToDeg(pan_ratio_onvif)
-            tilt_deg = self.pitchOvRatioToDeg(tilt_ratio_onvif)
+            pan_deg = self.panOvRatioToDeg(pan_ratio_onvif)
+            tilt_deg = self.tiltOvRatioToDeg(tilt_ratio_onvif)
         #print("Got pos degs : " + str([pan_deg, tilt_deg]))
         return pan_deg, tilt_deg
         
 
-    def gotoPosition(self, yaw_deg, pitch_deg):
-        yaw_ratio_onvif = self.yawDegToOvRatio(yaw_deg)
-        pitch_ratio_onvif = self.pitchDegToOvRatio(pitch_deg)
+    def gotoPosition(self, pan_deg, tilt_deg):
+        pan_ratio_onvif = self.panDegToOvRatio(pan_deg)
+        tilt_ratio_onvif = self.tiltDegToOvRatio(tilt_deg)
         # Recenter the ratios to the ONVIF -1.0,1.0 range
-        self.driver.moveToPosition(yaw_ratio_onvif, pitch_ratio_onvif, self.speed_ratio)
+        self.driver.moveToPosition(pan_ratio_onvif, tilt_ratio_onvif, self.speed_ratio)
         
     def goHome(self):
         if self.driver.canHome() is True:
             self.driver.goHome(self.speed_ratio)
         elif self.driver.hasAbsolutePositioning() is True and self.ptx_if is not None:
-            home_yaw_ratio_onvif = self.yawDegToOvRatio(self.home_yaw_deg)
-            home_pitch_ratio_onvif = self.pitchDegToOvRatio(self.home_pitch_deg)
-            self.driver.moveToPosition(home_yaw_ratio_onvif, home_pitch_ratio_onvif, self.speed_ratio)
+            home_pan_ratio_onvif = self.panDegToOvRatio(self.home_pan_deg)
+            home_tilt_ratio_onvif = self.tiltDegToOvRatio(self.home_tilt_deg)
+            self.driver.moveToPosition(home_pan_ratio_onvif, home_tilt_ratio_onvif, self.speed_ratio)
 
-    def setHomePosition(self, yaw_deg, pitch_deg):
+    def setHomePosition(self, pan_deg, tilt_deg):
         # Have to implement these fully in s/w since ONVIF doesn't support absolute home position setting
-        self.home_yaw_deg = yaw_deg
-        self.home_pitch_deg = pitch_deg
+        self.home_pan_deg = pan_deg
+        self.home_tilt_deg = tilt_deg
 
     def setHomePositionHere(self):
         if self.driver.reportsPosition() is True:
-            curr_yaw_ratio_onvif, curr_pitch_ratio_onvif = self.driver.getCurrentPosition()
+            curr_pan_ratio_onvif, curr_tilt_ratio_onvif = self.driver.getCurrentPosition()
             if self.ptx_if is not None:
-                self.home_yaw_deg = self.yawOvRatioToDeg(curr_yaw_ratio_onvif)
-                self.home_pitch_deg = self.pitchOvRatioToDeg(curr_pitch_ratio_onvif) 
+                self.home_pan_deg = self.panOvRatioToDeg(curr_pan_ratio_onvif)
+                self.home_tilt_deg = self.tiltOvRatioToDeg(curr_tilt_ratio_onvif) 
 
         if self.driver.homePositionAdjustable is True:
             self.driver.setHomeHere()
 
-    def gotoWaypoint(self, waypoint_index):
-        if self.driver.hasWaypoints() is True:
-           self.driver.gotoPreset(waypoint_index, self.speed_ratio)
-        elif self.driver.hasAbsolutePositioning() is True and self.ptx_if is not None:
-            if waypoint_index not in self.waypoints:
-                return
-            
-            waypoint_yaw_deg = self.waypoints[waypoint_index]['yaw_deg']
-            waypoint_yaw_ratio_onvif = self.yawDegToOvRatio(waypoint_yaw_deg)
-            waypoint_pitch_deg = self.waypoints[waypoint_index]['pitch_deg']
-            waypoint_pitch_ratio_onvif = self.pitchDegToOvRatio(waypoint_pitch_deg)
-            self.driver.moveToPosition(waypoint_yaw_ratio_onvif, waypoint_pitch_ratio_onvif, self.speed_ratio)
-    
-    def setWaypoint(self, waypoint_index, yaw_deg, pitch_deg):
-        # Have to implement these fully in s/w since ONVIF doesn't support absolute home position setting
-        self.waypoints[waypoint_index] = {'yaw_deg': yaw_deg, 'pitch_deg': pitch_deg}
-        
-    def setWaypointHere(self, waypoint_index):
-        if self.driver.reportsPosition() and self.ptx_if is not None:
-            yaw_ratio_onvif, pitch_ratio_onvif = self.driver.getCurrentPosition()
-            current_yaw_deg = self.yawOvRatioToDeg(yaw_ratio_onvif)
-            current_pitch_deg = self.pitchOvRatioToDeg(pitch_ratio_onvif)
-            self.waypoints[waypoint_index] = {'yaw_deg': current_yaw_deg, 'pitch_deg': current_pitch_deg}
-
-        if self.driver.hasWaypoints():
-            self.driver.setPresetHere(waypoint_index)
-
-        self.msg_if.pub_info("Waypoint set to current position")
-
+ 
     def setCurrentSettingsAsDefault(self):
         # Don't need to worry about any of our params in this class, just child interfaces' params
         if self.ptx_if is not None:

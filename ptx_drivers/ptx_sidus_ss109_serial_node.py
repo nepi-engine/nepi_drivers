@@ -41,17 +41,19 @@ class SidusSS109SerialPTXNode:
     SERIAL_RECEIVE_DELAY = 0.03
     SERIAL_SEND_DELAY = 0.5
     HEARTBEAT_CHECK_INTERVAL = 1.0
-    DEG_DIR = -1
+
+    PAN_DEG_DIR = -1
+    TILT_DEG_DIR = -1
 
     LIMITS_DICT = dict()
-    LIMITS_DICT['max_yaw_hardstop_deg'] = 175
-    LIMITS_DICT['min_yaw_hardstop_deg'] = -175
-    LIMITS_DICT['max_pitch_hardstop_deg'] = 75
-    LIMITS_DICT['min_pitch_hardstop_deg'] = -75
-    LIMITS_DICT['max_yaw_softstop_deg'] = 174
-    LIMITS_DICT['min_yaw_softstop_deg'] = -174
-    LIMITS_DICT['max_pitch_softstop_deg'] = 74
-    LIMITS_DICT['min_pitch_softstop_deg'] = -74
+    LIMITS_DICT['max_pan_hardstop_deg'] = 175
+    LIMITS_DICT['min_pan_hardstop_deg'] = -175
+    LIMITS_DICT['max_tilt_hardstop_deg'] = 75
+    LIMITS_DICT['min_tilt_hardstop_deg'] = -75
+    LIMITS_DICT['max_pan_softstop_deg'] = 174
+    LIMITS_DICT['min_pan_softstop_deg'] = -174
+    LIMITS_DICT['max_tilt_softstop_deg'] = 74
+    LIMITS_DICT['min_tilt_softstop_deg'] = -74
 
 
 
@@ -108,6 +110,8 @@ class SidusSS109SerialPTXNode:
 
     self_check_count = 10
     self_check_counter = 0
+
+    current_position = [0.0,0.0]
 
     speed_ratio = 0.5
 
@@ -170,16 +174,7 @@ class SidusSS109SerialPTXNode:
             # Initialize settings
             self.cap_settings = self.getCapSettings()
             self.factory_settings = self.getFactorySettings()
-
-
-            # Must pass a capabilities structure to ptx_interface constructor
-            ptx_capabilities_dict = {}
-            ptx_capabilities_dict['has_absolute_positioning'] = True
-            ptx_capabilities_dict['has_limit_control'] = True
-            ptx_capabilities_dict['has_speed_control'] = True
-            ptx_capabilities_dict['has_homing'] = True
-            ptx_capabilities_dict['has_waypoints'] = True
-                
+              
 
             # Launch the PTX interface --  this takes care of initializing all the ptx settings from config. file, subscribing and advertising topics and services, etc.
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
@@ -196,10 +191,10 @@ class SidusSS109SerialPTXNode:
             #Factory Control Values 
             self.FACTORY_CONTROLS = {
                 'frame_id' : self.node_name + '_frame',
-                'yaw_joint_name' : self.node_name + '_yaw_joint',
-                'pitch_joint_name' : self.node_name + '_pitch_joint',
-                'reverse_yaw_control' : False,
-                'reverse_pitch_control' : False,
+                'pan_joint_name' : self.node_name + '_pan_joint',
+                'tilt_joint_name' : self.node_name + '_tilt_joint',
+                'reverse_pan_control' : False,
+                'reverse_tilt_control' : False,
                 'speed_ratio' : 0.5,
                 'status_update_rate_hz' : 10
             }
@@ -215,9 +210,8 @@ class SidusSS109SerialPTXNode:
             #for setting in self.factory_settings:
                 #self.msg_if.pub_info("" +setting)
 
-            self.home_yaw_deg = 0.0
-            self.home_pitch_deg = 0.0
-            self.waypoints = {} # Dictionary of dictionaries with numerical key and {waypoint_pitch, waypoint_yaw} dict value
+            self.home_pan_deg = 0.0
+            self.home_tilt_deg = 0.0
 
 
             self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict, 
@@ -227,25 +221,22 @@ class SidusSS109SerialPTXNode:
                                         getSettingsFunction=self.getSettings,
                                         factoryControls = self.FACTORY_CONTROLS,
                                         factoryLimits = self.LIMITS_DICT,
-                                        capabilities_dict = ptx_capabilities_dict,
                                         stopMovingCb = self.stopMoving,
-                                        moveYawCb = self.moveYaw,
-                                        movePitchCb = self.movePitch,
-                                        setSoftLimitsCb = self.setSoftLimits,
+                                        movePanCb = None, #self.movePan,  # Stop command not working on jog
+                                        moveTiltCb = None, #self.moveTilt, # Stop command not working on jog
                                         getSoftLimitsCb = None, #self.getSoftLimits, # 109 does not return response
-                                        setSpeedRatioCb = self.setSpeedRatio,
+                                        setSoftLimitsCb = self.setSoftLimits,
                                         getSpeedRatioCb = self.getSpeedRatio,
+                                        setSpeedRatioCb = self.setSpeedRatio,
+                                        getPositionCb = self.getPosition,
                                         gotoPositionCb = self.gotoPosition,
                                         gotoPanPositionCb = self.gotoPanPosition,
                                         gotoTiltPositionCb = self.gotoTiltPosition,
                                         goHomeCb = self.goHome,
                                         setHomePositionCb = self.setHomePosition,
                                         setHomePositionHereCb = self.setHomePositionHere,
-                                        gotoWaypointCb = self.gotoWaypoint,
-                                        setWaypointCb = self.setWaypoint,
-                                        setWaypointHereCb = self.setWaypointHere,
-                                        getHeadingCb = None, getPositionCb = None, getOrientationCb = self.getOrientationCb,
-                                        getLocationCb = None, getAltitudeCb = None, getDepthCb = None,
+                                        getNpHeadingCb = None, getNpPositionCb = None, getNpOrientationCb = self.getOrientationCb,
+                                        getNpLocationCb = None, getNpAltitudeCb = None, getNpDepthCb = None,
                                         max_navpose_update_rate = self.MAX_POSITION_UPDATE_RATE,
                                         deviceResetCb = self.resetDevice
                                         )
@@ -253,7 +244,9 @@ class SidusSS109SerialPTXNode:
 
             # Start an ptx activity check process that kills node after some number of failed comms attempts
             self.msg_if.pub_info("Starting an activity check process")
-            #nepi_ros.start_timer_process(self.HEARTBEAT_CHECK_INTERVAL, self.check_timer_callback)
+            nepi_ros.start_timer_process(self.HEARTBEAT_CHECK_INTERVAL, self.check_timer_callback)
+            update_interval = float(1.0) / self.MAX_POSITION_UPDATE_RATE
+            nepi_ros.start_timer_process(update_interval, self.updatePositionHandler)
             # Initialization Complete
             self.msg_if.pub_info("Initialization Complete")
             #Set up node shutdown
@@ -262,7 +255,8 @@ class SidusSS109SerialPTXNode:
             nepi_ros.spin()
 
 
-
+    def updatePositionHandler(self,timer):
+        self.current_position = self.driver_getPosition()
 
     def logDeviceInfo(self):
         dev_info_string = self.node_name + " Device Info:\n"
@@ -273,12 +267,12 @@ class SidusSS109SerialPTXNode:
         self.msg_if.pub_info(dev_info_string)
 
     def getOrientationCb(self):
-        yaw_deg, pitch_deg = self.getCurrentPosition()
+        pan_deg, tilt_deg = self.current_position
         orientation_dict = dict()
         orientation_dict['time_oreantation'] = nepi_utils.get_time()
         orientation_dict['roll_deg'] = 0.0
-        orientation_dict['pitch_deg'] = pitch_deg * self.DEG_DIR
-        orientation_dict['yaw_deg'] = yaw_deg * self.DEG_DIR
+        orientation_dict['yaw_deg'] = pan_deg * self.PAN_DEG_DIR
+        orientation_dict['pitch_deg'] = tilt_deg * self.TILT_DEG_DIR
         return orientation_dict
 
 
@@ -371,13 +365,13 @@ class SidusSS109SerialPTXNode:
     def stopMoving(self):
         self.driver_stopMotion()
 
-    def moveYaw(self, direction, duration):
+    def movePan(self, direction, duration):
         pass
         '''
         axis_str = self.pan_str
         if self.ptx_if is not None:
             direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
-            direction = direction * self.DEG_DIR
+            direction = direction * self.PAN_DEG_DIR
             success = self.driver_jog(axis_str = axis_str, direction = direction)
 
             if success:
@@ -389,13 +383,13 @@ class SidusSS109SerialPTXNode:
             '''
 
 
-    def movePitch(self, direction, duration):
+    def moveTilt(self, direction, duration):
         pass
         '''
         axis_str = self.tilt_str
         if self.ptx_if is not None:
             direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
-            direction = direction * self.DEG_DIR
+            direction = direction * self.TILT_DEG_DIR
             success = self.driver_jog(axis_str = axis_str, direction = direction)
 
             if success:
@@ -407,14 +401,14 @@ class SidusSS109SerialPTXNode:
             '''
 
 
-    def setSoftLimits(self, min_yaw,max_yaw,min_pitch,max_pitch):
+    def setSoftLimits(self, min_pan,max_pan,min_tilt,max_tilt):
         # TODO: Limits checking and driver unit conversion?
-        self.driver_setSoftLimits(min_yaw,max_yaw,min_pitch,max_pitch)
+        self.driver_setSoftLimits(min_pan,max_pan,min_tilt,max_tilt)
 
     def getSoftLimits(self):
         # TODO: Driver unit conversion?
-        [min_yaw,max_yaw,min_pitch,max_pitch] = self.driver_getSoftLimits()
-        soft_limits = [min_yaw,max_yaw,min_pitch,max_pitch]
+        [min_pan,max_pan,min_tilt,max_tilt] = self.driver_getSoftLimits()
+        soft_limits = [min_pan,max_pan,min_tilt,max_tilt]
         return soft_limits
 
 
@@ -423,6 +417,7 @@ class SidusSS109SerialPTXNode:
     def setSpeedRatio(self, ratio):
         # TODO: Limits checking and driver unit conversion?
         self.speed_ratio = ratio
+        self.driver_setSpeedRatios(ratio)
 
 
     def getSpeedRatio(self):
@@ -431,50 +426,33 @@ class SidusSS109SerialPTXNode:
         return ratio
           
 
-    def getCurrentPosition(self):
-        yaw_deg, pitch_deg = self.driver_getCurrentPosition(wait_on_busy = False, verbose = False)
-        #self.msg_if.pub_warn("Got pos degs : " + str([yaw_deg, pitch_deg]))
-        return yaw_deg, pitch_deg
+    def getPosition(self):
+        return self.current_position
         
 
-    def gotoPosition(self, yaw_deg, pitch_deg):
-        self.driver_moveToPosition(yaw_deg * self.DEG_DIR, pitch_deg * self.DEG_DIR)
+    def gotoPosition(self, pan_deg, tilt_deg):
+        self.driver_moveToPosition(pan_deg * self.PAN_DEG_DIR, tilt_deg * self.TILT_DEG_DIR)
 
-    def gotoPanPosition(self, yaw_deg, pitch_deg):
-        self.driver_moveToPanPosition(yaw_deg * self.DEG_DIR, pitch_deg)
+    def gotoPanPosition(self, pan_deg):
+        self.driver_moveToPanPosition(pan_deg * self.PAN_DEG_DIR)
 
-    def gotoTiltPosition(self, yaw_deg, pitch_deg):
-        self.driver_moveToTiltPosition(pitch_deg * self.DEG_DIR)
+    def gotoTiltPosition(self, tilt_deg):
+        self.driver_moveToTiltPosition(tilt_deg * self.TILT_DEG_DIR)
         
     def goHome(self):
-        self.driver_moveToPosition(self.home_yaw_deg, self.home_pitch_deg)
+        self.driver_moveToPosition(self.home_pan_deg, self.home_tilt_deg)
 
-    def setHomePosition(self, yaw_deg, pitch_deg):
-        self.home_yaw_deg = yaw_deg
-        self.home_pitch_deg = pitch_deg
+    def setHomePosition(self, pan_deg, tilt_deg):
+        self.home_pan_deg = pan_deg * self.PAN_DEG_DIR
+        self.home_tilt_deg = tilt_deg * self.TILT_DEG_DIR
 
     def setHomePositionHere(self):
         if self.driver_reportsPosition() is True:
-            yaw_deg, pitch_deg = self.driver_getCurrentPosition(wait_on_busy = True, verbose = True)
-            self.home_yaw_deg = yaw_deg * self.DEG_DIR
-            self.home_pitch_deg = pitch_deg * self.DEG_DIR 
+            pan_deg, tilt_deg = self.getPosition()
+            self.home_pan_deg = pan_deg * self.PAN_DEG_DIR
+            self.home_tilt_deg = tilt_deg * self.TILT_DEG_DIR 
 
-    def gotoWaypoint(self, waypoint_index):
-        if waypoint_index not in self.waypoints:
-            return
-        waypoint_yaw_deg = self.waypoints[waypoint_index]['yaw_deg']
-        waypoint_pitch_deg = self.waypoints[waypoint_index]['pitch_deg']
-        self.driver_moveToPosition(waypoint_yaw_deg, waypoint_pitch_deg)
-    
-    def setWaypoint(self, waypoint_index, yaw_deg, pitch_deg):
-        self.waypoints[waypoint_index] = {'yaw_deg': yaw_deg * self.DEG_DIR, 'pitch_deg': pitch_deg * self.DEG_DIR}
-        
-    def setWaypointHere(self, waypoint_index):
-        if self.driver_reportsPosition() and self.ptx_if is not None:
-            yaw_deg, pitch_deg = self.driver_getCurrentPosition(wait_on_busy = True, verbose = True)
-            self.waypoints[waypoint_index] = {'yaw_deg': yaw_deg, 'pitch_deg': pitch_deg}
 
-        self.msg_if.pub_info("Waypoint set to current position")
 
     def setCurrentSettingsAsDefault(self):
         # Don't need to worry about any of our params in this class, just child interfaces' params
@@ -542,14 +520,14 @@ class SidusSS109SerialPTXNode:
 
     def driver_getSoftLimits(self): 
         method_name = sys._getframe().f_code.co_name
-        min_yaw = self.driver_getSoftLimit(axis_str = self.pan_str, direction = -1)
+        min_pan = self.driver_getSoftLimit(axis_str = self.pan_str, direction = -1)
         nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-        max_yaw = self.driver_getSoftLimit(axis_str = self.pan_str, direction = 1)
+        max_pan = self.driver_getSoftLimit(axis_str = self.pan_str, direction = 1)
         nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-        min_pitch = self.driver_getSoftLimit(axis_str = self.tilt_str, direction = -1)
+        min_tilt = self.driver_getSoftLimit(axis_str = self.tilt_str, direction = -1)
         nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-        max_pitch = self.driver_getSoftLimit(axis_str = self.tilt_str, direction = 1)
-        return [min_yaw,max_yaw,min_pitch,max_pitch] 
+        max_tilt = self.driver_getSoftLimit(axis_str = self.tilt_str, direction = 1)
+        return [min_pan,max_pan,min_tilt,max_tilt] 
 
     def driver_setSoftLimit(self, limit_deg, axis_str = '#', direction = 1):
         method_name = sys._getframe().f_code.co_name
@@ -573,24 +551,24 @@ class SidusSS109SerialPTXNode:
         [success,response] = self.send_msg(ser_msg)  
         return success 
 
-    def driver_setSoftLimits(self, min_yaw,max_yaw,min_pitch,max_pitch): 
+    def driver_setSoftLimits(self, min_pan,max_pan,min_tilt,max_tilt): 
         method_name = sys._getframe().f_code.co_name
         success_list = []
         nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-        success_list.append(self.driver_setSoftLimit(min_yaw, axis_str = self.pan_str, direction = -1))
+        success_list.append(self.driver_setSoftLimit(min_pan, axis_str = self.pan_str, direction = -1))
         nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-        success_list.append(self.driver_setSoftLimit(max_yaw, axis_str = self.pan_str, direction = 1))
+        success_list.append(self.driver_setSoftLimit(max_pan, axis_str = self.pan_str, direction = 1))
         nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-        success_list.append(self.driver_setSoftLimit(min_pitch, axis_str = self.tilt_str, direction = -1))
+        success_list.append(self.driver_setSoftLimit(min_tilt, axis_str = self.tilt_str, direction = -1))
         nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-        success_list.append(self.driver_setSoftLimit(max_pitch, axis_str = self.tilt_str, direction = 1))
+        success_list.append(self.driver_setSoftLimit(max_tilt, axis_str = self.tilt_str, direction = 1))
         return False not in success_list
 
 
 
     def driver_getSpeedRatio(self, axis_str = '#'):
         method_name = sys._getframe().f_code.co_name
-        speedRatio = -999
+        speedRatio = 0.5
         success = False
         data_str = self.create_blank_str()
         ser_msg= (axis_str + self.addr_str + 'MRS' + data_str + 'R')
@@ -649,40 +627,45 @@ class SidusSS109SerialPTXNode:
         reportsPos = True
         return reportsPos
 
-    def driver_getCurrentPosition(self, wait_on_busy = False, verbose = False):
+    def driver_getPosition(self, wait_on_busy = False, verbose = False):
         caller_method = inspect.currentframe().f_back.f_code.co_name
         method_name = sys._getframe().f_code.co_name
-        yaw_deg = self.getCurrentPanPosition()
-        while yaw_deg < -360:
+        pan_deg = self.getCurrentPanPosition()
+        '''
+        while pan_deg < -360:
             if verbose == True:
-                self.msg_if.pub_warn(caller_method + ": " + method_name + ": Failed to get valid pan degs: " + str(yaw_deg))
+                self.msg_if.pub_warn(caller_method + ": " + method_name + ": Failed to get valid pan degs: " + str(pan_deg))
             nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-            yaw_deg_r = self.getCurrentPanPosition(wait_on_busy = wait_on_busy, verbose = verbose)
-            if yaw_deg_r > -360:
-                yaw_deg = yaw_deg_r
+            pan_deg_r = self.getCurrentPanPosition(wait_on_busy = wait_on_busy, verbose = verbose)
+            if pan_deg_r > -360:
+                pan_deg = pan_deg_r
+        '''
         if verbose == True:
-            self.msg_if.pub_warn(caller_method + ": " + method_name + ": Got pan degs: " + str(yaw_deg))
-                
+            self.msg_if.pub_warn(caller_method + ": " + method_name + ": Got pan degs: " + str(pan_deg))
+
+
         nepi_ros.sleep(self.SERIAL_SEND_DELAY)
 
-        pitch_deg = self.getCurrentTiltPosition()
-        while pitch_deg < -360:
+        tilt_deg = self.getCurrentTiltPosition()
+        '''
+        while tilt_deg < -360:
             if verbose == True:
-                self.msg_if.pub_warn(caller_method + ": " + method_name + ": Failed to get valid tilt degs: " + str(pitch_deg))
+                self.msg_if.pub_warn(caller_method + ": " + method_name + ": Failed to get valid tilt degs: " + str(tilt_deg))
             nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-            pitch_deg_r = self.getCurrentTiltPosition(wait_on_busy = wait_on_busy, verbose = verbose)
-            if pitch_deg_r > -360:
-                pitch_deg = pitch_deg_r
+            tilt_deg_r = self.getCurrentTiltPosition(wait_on_busy = wait_on_busy, verbose = verbose)
+            if tilt_deg_r > -360:
+                tilt_deg = tilt_deg_r
+        '''
         if verbose == True:
-            self.msg_if.pub_warn(caller_method + ": " + method_name + ": Got tilt degs: " + str(pitch_deg))
-        return yaw_deg, pitch_deg
+            self.msg_if.pub_warn(caller_method + ": " + method_name + ": Got tilt degs: " + str(tilt_deg))
+        return pan_deg, tilt_deg
 
         
 
 
     def getCurrentPanPosition(self, wait_on_busy = False, verbose = False):
         method_name = sys._getframe().f_code.co_name
-        yaw_deg = -999
+        pan_deg = self.current_position[0]
         success = False
         data_str = self.create_blank_str()
         ser_msg= (self.pan_str + self.addr_str + 'MRL' + data_str + 'R')
@@ -692,17 +675,17 @@ class SidusSS109SerialPTXNode:
             try:
                 data_str = response[5:(5 + self.data_len)]
                 #self.msg_if.pub_warn(method_name + ": Will convert pan position str: " + data_str)
-                yaw_count = int(data_str)
-                yaw_deg = self.pos_count2deg(yaw_count)
+                pan_count = int(data_str)
+                pan_deg = self.pos_count2deg(pan_count)
             except Exception as e:
                 self.msg_if.pub_warn(method_name + ": Failed to convert message to int: " + data_str + " " + str(e))
 
-        return yaw_deg
+        return pan_deg
 
 
     def getCurrentTiltPosition(self, wait_on_busy = False, verbose = False):
         method_name = sys._getframe().f_code.co_name
-        pitch_deg = -999
+        tilt_deg = self.current_position[1]
         success = False
         data_str = self.create_blank_str()
         ser_msg= (self.tilt_str + self.addr_str + 'MRL' + data_str + 'R')
@@ -712,49 +695,44 @@ class SidusSS109SerialPTXNode:
             try:
                 data_str = response[5:(5 + self.data_len)]
                 #self.msg_if.pub_warn(method_name + ": Will convert tilt position str: " + data_str)
-                pitch_count = int(data_str)
-                pitch_deg = self.pos_count2deg(pitch_count)
+                tilt_count = int(data_str)
+                tilt_deg = self.pos_count2deg(tilt_count)
             except Exception as e:
                 self.msg_if.pub_warn(method_name + ": Failed to convert message to int: " + data_str + " " + str(e))
 
-        return pitch_deg
+        return tilt_deg
 
 
-    def driver_moveToPosition(self,yaw_deg, pitch_deg):
-        success = self.driver_moveToPanPosition(yaw_deg)
-        success = self.driver_moveToTiltPosition(pitch_deg)
+    def driver_moveToPosition(self,pan_deg, tilt_deg):
+        success = self.driver_moveToPanPosition(pan_deg)
+        success = self.driver_moveToTiltPosition(tilt_deg)
         return success
 
 
-    def driver_moveToPanPosition(self,yaw_deg, pitch_deg):
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-
-        self.driver_setSpeedRatios(self.speed_ratio)
-
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-
+    def driver_moveToPanPosition(self,pan_deg):
         method_name = sys._getframe().f_code.co_name
         success = False
-        pos_count = self.deg2pos_count(yaw_deg)
+        pos_count = self.deg2pos_count(pan_deg)
         data_str = self.create_pos_str(pos_count)
         ser_msg= (self.pan_str + self.addr_str + 'MML' + data_str + 'W')
-        [success_1,response] = self.send_msg(ser_msg)
+        [success,response] = self.send_msg(ser_msg)
+
+        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.pan_str)
         
         return success
 
 
-    def driver_moveToTiltPosition(self,yaw_deg, pitch_deg):
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-
-        self.driver_setSpeedRatios(self.speed_ratio)
-
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
-
-        pos_count = self.deg2pos_count(pitch_deg)
+    def driver_moveToTiltPosition(self, tilt_deg):
+        method_name = sys._getframe().f_code.co_name
+        pos_count = self.deg2pos_count(tilt_deg)
         data_str = self.create_pos_str(pos_count)
         ser_msg= (self.tilt_str + self.addr_str + 'MML' + data_str + 'W')
-        [success_2,response] = self.send_msg(ser_msg)
-        success = (success_1 == True and success_2 == True) 
+        [success,response] = self.send_msg(ser_msg)
+
+        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.tilt_str)
+
         return success
 
 
@@ -794,9 +772,9 @@ class SidusSS109SerialPTXNode:
     def driver_jog(self,axis_str, direction):
 
 
-        self.driver_setSpeedRatios(self.speed_ratio)
+        #self.driver_setSpeedRatios(self.speed_ratio)
 
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        #nepi_ros.sleep(self.SERIAL_SEND_DELAY)
 
         method_name = sys._getframe().f_code.co_name
         success = False
