@@ -566,8 +566,12 @@ class IqrPanTiltNode:
     def driver_stopMotion(self):
         pan = self.current_position[0]
         tilt = self.current_position[1]
-        self.driver_setPosition(pan,tilt)
-        return success
+        try:
+            self.driver_moveToPosition(pan, tilt)
+            return True
+        except Exception as e:
+            self.msg_if.pub_warn("Failed to stop motion: " + e)
+            return False
 
 
     def driver_getPosition(self):
