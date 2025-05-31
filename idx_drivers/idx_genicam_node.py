@@ -157,8 +157,8 @@ class GenicamCamNode:
                                     factoryControls = self.factory_controls,
                                     setFramerateRatio =self.setFramerateRatio, 
                                     getFramerate = self.getFramerate,
-                                    getImage = self.getColorImg, 
-                                    stopImageAcquisition = self.stopColorImg)
+                                    getColorImage = self.getColorImg, 
+                                    stopColorImageAcquisition = self.stopColorImg)
         self.msg_if.pub_info("... IDX interface running")
         self.logDeviceInfo()
         self.idx_if.initConfig()
@@ -432,7 +432,7 @@ class GenicamCamNode:
     def stopColorImg(self):
         self.img_lock.acquire()
         # Don't stop acquisition if the b/w image is still being requested
-        ret,msg = self.driver.stopImageAcquisition()
+        ret,msg = self.driver.stopColorImageAcquisition()
         self.color_image_acquisition_running = False
         self.cached_2d_color_frame = None
         self.cached_2d_color_frame_timestamp = None

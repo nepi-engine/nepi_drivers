@@ -181,8 +181,8 @@ class OnvifCamNode:
                                     factoryControls = self.factory_controls,
                                     setFramerateRatio =self.setFramerateRatio, 
                                     getFramerate = self.getFramerate,
-                                    getImage = self.getColorImg, 
-                                    stopImageAcquisition = self.stopColorImg)
+                                    getColorImage = self.getColorImg, 
+                                    stopColorImageAcquisition = self.stopColorImg)
             self.msg_if.pub_info(" ... IDX interface running")
             # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
             self.idx_if.initConfig()

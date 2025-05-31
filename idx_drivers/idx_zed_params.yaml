@@ -26,7 +26,7 @@ driver:
       data_products:
         type: Discrete
         options:
-          - '2d_color_image'
+          - 'color_image'
           - 'image,depth_map'
           - 'image,depth_map,pointcloud'
         default: 'image,depth_map'

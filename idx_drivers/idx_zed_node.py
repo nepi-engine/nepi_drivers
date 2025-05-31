@@ -362,8 +362,8 @@ class ZedCamNode(object):
                                     setFramerateRatio =self.setFramerateRatio, 
                                     getFramerate = self.getFramerate,
                                     setRange = self.setRange,
-                                    getImage = self.getImage, 
-                                    stopImageAcquisition = self.stopImage,
+                                    getColorImage = self.getColorImage, 
+                                    stopColorImageAcquisition = self.stopColorImage,
                                     getDepthMap = self.getDepthMap, 
                                     stopDepthMapAcquisition = self.stopDepthMap,
                                     getPointcloud = self.getPointcloud, 
@@ -660,7 +660,7 @@ class ZedCamNode(object):
  
 
     # Good base class candidate - Shared with ONVIF
-    def getImage(self):
+    def getColorImage(self):
         if self.color_img_sub == None:
           self.color_img_sub = rospy.Subscriber(self.image_topic, Image, self.color_2d_image_callback, queue_size = 1)
           time.sleep(0.1)
@@ -699,7 +699,7 @@ class ZedCamNode(object):
 
     
     # Good base class candidate - Shared with ONVIF
-    def stopImage(self):
+    def stopColorImage(self):
         self.color_img_lock.acquire()
         self.color_img_sub.unregister()
         self.color_img_sub = None
