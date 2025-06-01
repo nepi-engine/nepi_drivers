@@ -168,7 +168,9 @@ class V4l2CamNode:
                                     setFramerateRatio =self.setFramerateRatio, 
                                     getFramerate = self.getFramerate,
                                     getColorImage = self.getColorImg, 
-                                    stopColorImageAcquisition = self.stopColorImg)
+                                    stopColorImageAcquisition = self.stopColorImg,
+                                    data_products = ['color_image'])
+                                    
         self.msg_if.pub_info(" " + " ... IDX interface running")
 
         # Update available IDX callbacks based on capabilities that the driver reports

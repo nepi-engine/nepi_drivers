@@ -94,10 +94,10 @@ class ZedCamDiscovery:
       nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
       return None
     if 'data_products' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
-      data_products = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['data_products']['value']
+      data_products = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['data_products']['value'].split(',')
     else:
-      data_products = 'image,depth'
-    self.data_products = data_products.split(',')
+      data_products = ['color_image','depth_map','pointcloud']
+    self.data_products = data_products
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
       self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
     else:

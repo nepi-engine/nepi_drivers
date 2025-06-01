@@ -96,7 +96,6 @@ class OnvifCamNode:
         self.driver_module = self.driver_file.split('.')[0]
         self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
 
-
         # Require the camera connection parameters to have been set
         if not nepi_ros.has_param('~credentials/username'):
             self.msg_if.pub_warn("Missing credentials/username parameter... cannot start")
@@ -182,7 +181,8 @@ class OnvifCamNode:
                                     setFramerateRatio =self.setFramerateRatio, 
                                     getFramerate = self.getFramerate,
                                     getColorImage = self.getColorImg, 
-                                    stopColorImageAcquisition = self.stopColorImg)
+                                    stopColorImageAcquisition = self.stopColorImg,
+                                    data_products = ['color_image'])
             self.msg_if.pub_info(" ... IDX interface running")
             # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
             self.idx_if.initConfig()

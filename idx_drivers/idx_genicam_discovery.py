@@ -89,7 +89,7 @@ class GenicamCamDiscovery:
       self.msg_if.pub_warn("Failed to load options " + str(e))#
       nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
       return
-      
+
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
       self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
     else:

@@ -89,7 +89,7 @@ class GenicamCamNode:
         self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
         self.driver_module = self.driver_file.split(".")[0]
         self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
-        
+        self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
         model = self.drv_dict['DEVICE_DICT']['model']
         serial_number = self.drv_dict['DEVICE_DICT']['serial_number']
         # import driver class fromn driver module
@@ -158,7 +158,8 @@ class GenicamCamNode:
                                     setFramerateRatio =self.setFramerateRatio, 
                                     getFramerate = self.getFramerate,
                                     getColorImage = self.getColorImg, 
-                                    stopColorImageAcquisition = self.stopColorImg)
+                                    stopColorImageAcquisition = self.stopColorImg,
+                                    data_products = self.data_products)
         self.msg_if.pub_info("... IDX interface running")
         self.logDeviceInfo()
         self.idx_if.initConfig()
