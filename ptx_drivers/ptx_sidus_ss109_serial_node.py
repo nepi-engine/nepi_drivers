@@ -25,7 +25,7 @@ import sys
 import inspect
 import math
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
 
@@ -123,11 +123,11 @@ class SidusSS109SerialPTXNode:
                                                 
     def __init__(self):
         ####  NODE Initialization ####
-        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+        nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
         self.class_name = type(self).__name__
-        self.base_namespace = nepi_ros.get_base_namespace()
-        self.node_name = nepi_ros.get_node_name()
-        self.node_namespace = nepi_ros.get_node_namespace()
+        self.base_namespace = nepi_sdk.get_base_namespace()
+        self.node_name = nepi_sdk.get_node_name()
+        self.node_namespace = nepi_sdk.get_node_namespace()
 
         ##############################  
         # Create Msg Class
@@ -138,7 +138,7 @@ class SidusSS109SerialPTXNode:
         # Initialize Class Variables
 
         # Get required drv driver dict info
-        self.drv_dict = nepi_ros.get_param('~drv_dict',dict()) 
+        self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
         #self.msg_if.pub_warn("Got Drivers_Dict from param server: " + str(self.drv_dict))
         try:
             self.port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
@@ -152,7 +152,7 @@ class SidusSS109SerialPTXNode:
             self.data_len = self.config_dict['data_len']
         except Exception as e:
             self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
-            nepi_ros.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
             return
 
         ################################################  
@@ -161,11 +161,11 @@ class SidusSS109SerialPTXNode:
         while self.connected == False and self.connect_attempts < 5:
             self.connected = self.connect() 
             if self.connected == False:
-                nepi_ros.sleep(1)
+                nepi_sdk.sleep(1)
         if self.connected == False:
             self.msg_if.pub_info("Shutting down node")
             self.msg_if.pub_info("Specified serial port not available")
-            nepi_ros.signal_shutdown("Serial port not available")   
+            nepi_sdk.signal_shutdown("Serial port not available")   
         else:
             ################################################
             self.msg_if.pub_info("... Connected!")
@@ -244,15 +244,15 @@ class SidusSS109SerialPTXNode:
 
             # Start an ptx activity check process that kills node after some number of failed comms attempts
             self.msg_if.pub_info("Starting an activity check process")
-            nepi_ros.start_timer_process(self.HEARTBEAT_CHECK_INTERVAL, self.check_timer_callback)
+            nepi_sdk.start_timer_process(self.HEARTBEAT_CHECK_INTERVAL, self.check_timer_callback)
             update_interval = float(1.0) / self.MAX_POSITION_UPDATE_RATE
-            nepi_ros.start_timer_process(update_interval, self.updatePositionHandler)
+            nepi_sdk.start_timer_process(update_interval, self.updatePositionHandler)
             # Initialization Complete
             self.msg_if.pub_info("Initialization Complete")
             #Set up node shutdown
-            nepi_ros.on_shutdown(self.cleanup_actions)
+            nepi_sdk.on_shutdown(self.cleanup_actions)
             # Spin forever (until object is detected)
-            nepi_ros.spin()
+            nepi_sdk.spin()
 
 
     def updatePositionHandler(self,timer):
@@ -376,10 +376,10 @@ class SidusSS109SerialPTXNode:
 
             if success:
                 if duration > 0:
-                    nepi_ros.sleep(time_s)
+                    nepi_sdk.sleep(time_s)
                     while success == False:
                         self.driver_stopAxisMotion(axis_str = axis_str, direction = direction)
-                        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+                        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
             '''
 
 
@@ -394,10 +394,10 @@ class SidusSS109SerialPTXNode:
 
             if success:
                 if duration > 0:
-                    nepi_ros.sleep(time_s)
+                    nepi_sdk.sleep(time_s)
                     while success == False:
                         self.driver_stopAxisMotion(axis_str = axis_str, direction = direction)
-                        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+                        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
             '''
 
 
@@ -521,11 +521,11 @@ class SidusSS109SerialPTXNode:
     def driver_getSoftLimits(self): 
         method_name = sys._getframe().f_code.co_name
         min_pan = self.driver_getSoftLimit(axis_str = self.pan_str, direction = -1)
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
         max_pan = self.driver_getSoftLimit(axis_str = self.pan_str, direction = 1)
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
         min_tilt = self.driver_getSoftLimit(axis_str = self.tilt_str, direction = -1)
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
         max_tilt = self.driver_getSoftLimit(axis_str = self.tilt_str, direction = 1)
         return [min_pan,max_pan,min_tilt,max_tilt] 
 
@@ -554,13 +554,13 @@ class SidusSS109SerialPTXNode:
     def driver_setSoftLimits(self, min_pan,max_pan,min_tilt,max_tilt): 
         method_name = sys._getframe().f_code.co_name
         success_list = []
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
         success_list.append(self.driver_setSoftLimit(min_pan, axis_str = self.pan_str, direction = -1))
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
         success_list.append(self.driver_setSoftLimit(max_pan, axis_str = self.pan_str, direction = 1))
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
         success_list.append(self.driver_setSoftLimit(min_tilt, axis_str = self.tilt_str, direction = -1))
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
         success_list.append(self.driver_setSoftLimit(max_tilt, axis_str = self.tilt_str, direction = 1))
         return False not in success_list
 
@@ -589,7 +589,7 @@ class SidusSS109SerialPTXNode:
         method_name = sys._getframe().f_code.co_name
         success_list = []
         success_list.append(self.driver_setSpeedRatio(speedRatio, axis_str = self.pan_str))
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
         success_list.append(self.driver_setSpeedRatio(speedRatio, axis_str = self.tilt_str))
         return False not in success_list
 
@@ -612,7 +612,7 @@ class SidusSS109SerialPTXNode:
         ser_msg= (self.tilt_str  + self.addr_str + 'MFR' + data_str + 'W')
         [success,response] = self.send_msg(ser_msg)
 
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
         data_str = self.create_blank_str()
         ser_msg= (self.pan_str  + self.addr_str + 'MFR' + data_str + 'W')
         [success,response] = self.send_msg(ser_msg)
@@ -635,7 +635,7 @@ class SidusSS109SerialPTXNode:
         while pan_deg < -360:
             if verbose == True:
                 self.msg_if.pub_warn(caller_method + ": " + method_name + ": Failed to get valid pan degs: " + str(pan_deg))
-            nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+            nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
             pan_deg_r = self.getCurrentPanPosition(wait_on_busy = wait_on_busy, verbose = verbose)
             if pan_deg_r > -360:
                 pan_deg = pan_deg_r
@@ -644,14 +644,14 @@ class SidusSS109SerialPTXNode:
             self.msg_if.pub_warn(caller_method + ": " + method_name + ": Got pan degs: " + str(pan_deg))
 
 
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
 
         tilt_deg = self.getCurrentTiltPosition()
         '''
         while tilt_deg < -360:
             if verbose == True:
                 self.msg_if.pub_warn(caller_method + ": " + method_name + ": Failed to get valid tilt degs: " + str(tilt_deg))
-            nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+            nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
             tilt_deg_r = self.getCurrentTiltPosition(wait_on_busy = wait_on_busy, verbose = verbose)
             if tilt_deg_r > -360:
                 tilt_deg = tilt_deg_r
@@ -717,7 +717,7 @@ class SidusSS109SerialPTXNode:
         ser_msg= (self.pan_str + self.addr_str + 'MML' + data_str + 'W')
         [success,response] = self.send_msg(ser_msg)
 
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
         self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.pan_str)
         
         return success
@@ -730,7 +730,7 @@ class SidusSS109SerialPTXNode:
         ser_msg= (self.tilt_str + self.addr_str + 'MML' + data_str + 'W')
         [success,response] = self.send_msg(ser_msg)
 
-        nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
         self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.tilt_str)
 
         return success
@@ -755,7 +755,7 @@ class SidusSS109SerialPTXNode:
             ser_msg= (self.pan_str + self.addr_str + 'MST' + data_str + 'W')
             self.msg_if.pub_warn(method_name + ": Sending Stop Pan serial msg: " + ser_msg)
 
-            nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+            nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
 
             ser_msg= (self.tilt_str + self.addr_str + 'MST' + data_str + 'W')
             self.msg_if.pub_warn(method_name + ": Sending Stop Tilt serial msg: " + ser_msg)
@@ -774,7 +774,7 @@ class SidusSS109SerialPTXNode:
 
         #self.driver_setSpeedRatios(self.speed_ratio)
 
-        #nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+        #nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
 
         method_name = sys._getframe().f_code.co_name
         success = False
@@ -808,7 +808,7 @@ class SidusSS109SerialPTXNode:
         if self.self_check_counter > self.self_check_count:  # Crashes node if set above limit??
             self.msg_if.pub_warn("Shutting down device: " +  self.addr_str + " on port " + self.port_str)
             self.msg_if.pub_warn("Too many comm failures")
-            nepi_ros.signal_shutdown("To many comm failures")   
+            nepi_sdk.signal_shutdown("To many comm failures")   
 
     
     ### Function to try and connect to device at given port and baudrate
@@ -845,7 +845,7 @@ class SidusSS109SerialPTXNode:
                     success = True
 
                     # Factory Reset Device
-                    nepi_ros.sleep(self.SERIAL_SEND_DELAY)
+                    nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
                     reset_success = self.driver_resetDevice()
 
             else:

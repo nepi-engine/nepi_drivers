@@ -23,7 +23,7 @@ import serial
 import serial.tools.list_ports
 import string
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_drvs
 
 PKG_NAME = 'PTX_SIDUS_SS109_SERIAL' # Use in display menus
@@ -60,7 +60,7 @@ class SidusSS109SerialDiscovery:
   def __init__(self):
     # Create Message Logger
     self.log_name = PKG_NAME.lower() + "_discovery"
-    self.logger = nepi_ros.logger(log_name = self.log_name)
+    self.logger = nepi_sdk.logger(log_name = self.log_name)
     time.sleep(1)
     self.logger.log_info("Starting Initialization")
     self.letters_list = list(string.ascii_uppercase)
@@ -195,7 +195,7 @@ class SidusSS109SerialDiscovery:
           try:
             serial_port.write(b)
             self.logger.log_debug("Waiting for response")
-            nepi_ros.sleep(.010)
+            nepi_sdk.sleep(.010)
             bs = serial_port.readline()
             response = bs.decode()
           except Exception as e:
@@ -243,7 +243,7 @@ class SidusSS109SerialDiscovery:
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
     self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str
     self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
-    nepi_ros.set_param(dict_param_name,self.drv_dict)
+    nepi_sdk.set_param(dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, node_name, device_path = path_str)
     if success:
       self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}

@@ -24,7 +24,7 @@ import os
 import subprocess
 import time
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
 
@@ -68,11 +68,11 @@ class GenicamCamDiscovery:
 
   def __init__(self):
     ####  NODE Initialization ####
-    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+    nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
     self.class_name = type(self).__name__
-    self.base_namespace = nepi_ros.get_base_namespace()
-    self.node_name = nepi_ros.get_node_name()
-    self.node_namespace = nepi_ros.get_node_namespace()
+    self.base_namespace = nepi_sdk.get_base_namespace()
+    self.node_name = nepi_sdk.get_node_name()
+    self.node_namespace = nepi_sdk.get_node_namespace()
 
     ##############################  
     # Create Msg Class
@@ -83,11 +83,11 @@ class GenicamCamDiscovery:
     ########################
     # Get discovery options
     try:
-      self.drv_dict = nepi_ros.get_param('~drv_dict',dict())
+      self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
       self.msg_if.pub_info("Initial Driver Dict: " + str(self.drv_dict))
     except Exception as e:
       self.msg_if.pub_warn("Failed to load options " + str(e))#
-      nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
+      nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
       return
 
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
@@ -102,10 +102,10 @@ class GenicamCamDiscovery:
     self.genicam_harvester.add_file(self.DEFAULT_GENTL_PRODUCER_GIGE)
 
 
-    nepi_ros.start_timer_process(nepi_ros.ros_duration(1), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
 
     self.msg_if.pub_info("Initialization Complete")
-    nepi_ros.spin()
+    nepi_sdk.spin()
 
   #**********************
   # Discovery functions
@@ -182,8 +182,8 @@ class GenicamCamDiscovery:
         if launch_id in self.dont_retry_list:
           self.dont_retry_list.remove(launch_id) 
 
-    nepi_ros.sleep(self.CHECK_INTERVAL_S,100)
-    nepi_ros.start_timer_process(nepi_ros.ros_duration(1), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.sleep(self.CHECK_INTERVAL_S,100)
+    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
 
 
   def startDeviceNode(self, vendor, model, serial_number):
@@ -203,7 +203,7 @@ class GenicamCamDiscovery:
         node_needs_serial_number = True
         break
     device_node_name = root_name if not node_needs_serial_number else unique_root_name
-    device_node_namespace = nepi_ros.get_base_namespace() + device_node_name
+    device_node_namespace = nepi_sdk.get_base_namespace() + device_node_name
 
 
 
@@ -214,7 +214,7 @@ class GenicamCamDiscovery:
     launch_check = True
     if launch_id in self.launch_time_dict.keys():
       launch_time = self.launch_time_dict[launch_id]
-      cur_time = nepi_ros.get_time()
+      cur_time = nepi_sdk.get_time()
       launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
     if launch_check == False:
       return False  ###
@@ -233,7 +233,7 @@ class GenicamCamDiscovery:
     self.drv_dict['DEVICE_DICT']={'model': model}
     self.drv_dict['DEVICE_DICT']['serial_number'] = serial_number
     dict_param_name = device_node_name + "/drv_dict"
-    nepi_ros.set_param(dict_param_name,self.drv_dict)
+    nepi_sdk.set_param(dict_param_name,self.drv_dict)
     # Try and load save node params
     nepi_drvs.checkLoadConfigFile(device_node_name)
 
@@ -254,7 +254,7 @@ class GenicamCamDiscovery:
                               "node_subprocess": sub_process})
 
     # Process luanch results
-    self.launch_time_dict[launch_id] = nepi_ros.get_time()
+    self.launch_time_dict[launch_id] = nepi_sdk.get_time()
     if success:
       self.msg_if.pub_info(" Launched node: " + device_node_name)
     else:

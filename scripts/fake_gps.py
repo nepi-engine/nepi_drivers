@@ -59,7 +59,7 @@ import numpy as np
 import math
 import random
 import copy
-from nepi_sdk import nepi_ros 
+from nepi_sdk import nepi_sdk 
 from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_nav
 from nepi_sdk import nepi_rbx
@@ -70,8 +70,8 @@ from geographic_msgs.msg import GeoPoint
 from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
-from nepi_ros_interfaces.msg import RBXGotoPose, RBXGotoPosition, RBXGotoLocation
-from nepi_ros_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
+from nepi_sdk_interfaces.msg import RBXGotoPose, RBXGotoPosition, RBXGotoLocation
+from nepi_sdk_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 
 from mavros_msgs.msg import HilGPS, State
 
@@ -86,7 +86,7 @@ class RBXFakeGPS:
   DEFAULT_NODE_NAME = "fake_gps" # connection port added once discovered
 
   # ROS namespace setup
-  NEPI_BASE_NAMESPACE = nepi_ros.get_base_namespace()
+  NEPI_BASE_NAMESPACE = nepi_sdk.get_base_namespace()
 
   #Homeup Location
   # [Lat, Long, Altitude_WGS84]
@@ -119,11 +119,11 @@ class RBXFakeGPS:
   # Init Fake GPS Node
   def __init__(self):
     ####  IF INIT SETUP ####
-    nepi_ros.init_node(name = self.DEFAULT_NODE_NAME)
+    nepi_sdk.init_node(name = self.DEFAULT_NODE_NAME)
     self.class_name = type(self).__name__
-    self.base_namespace = nepi_ros.get_base_namespace()
-    self.node_name = nepi_ros.get_node_name()
-    self.node_namespace = nepi_ros.get_node_namespace()
+    self.base_namespace = nepi_sdk.get_base_namespace()
+    self.node_name = nepi_sdk.get_node_name()
+    self.node_namespace = nepi_sdk.get_node_namespace()
 
     ##############################  
     # Create Msg Class
@@ -154,7 +154,7 @@ class RBXFakeGPS:
 
 
     # Start navpose callbacks
-    self.nepi_nav_service_name = nepi_ros.get_base_namespace() + "nav_pose_query"
+    self.nepi_nav_service_name = nepi_sdk.get_base_namespace() + "nav_pose_query"
     self.msg_if.pub_info("will call NEPI navpose service for current heading at: " + self.nepi_nav_service_name)
     rospy.Timer(rospy.Duration(self.navpose_update_interval), self.update_current_heading_callback)
     
@@ -162,7 +162,7 @@ class RBXFakeGPS:
     # Check if need to send Mavlink message
     mav_node_name = self.node_name.replace("fake_gps","mavlink")
     self.msg_if.pub_info("checking for mavlink node that includes: " + mav_node_name)
-    mav_node_name = nepi_ros.find_node(mav_node_name)
+    mav_node_name = nepi_sdk.find_node(mav_node_name)
     if mav_node_name != "":
       MAVLINK_NAMESPACE = (mav_node_name + '/')
       self.msg_if.pub_info("Found mavlink namespace: " + MAVLINK_NAMESPACE)
@@ -188,7 +188,7 @@ class RBXFakeGPS:
     self.msg_if.pub_info("Got fake gps node name: " + self.node_name)
     robot_namespace = self.node_name.replace("fake_gps","ardupilot")
     self.msg_if.pub_info("Waiting for RBX node that includes string: " + robot_namespace)
-    robot_namespace = nepi_ros.wait_for_node(robot_namespace)
+    robot_namespace = nepi_sdk.wait_for_node(robot_namespace)
     robot_namespace = robot_namespace.split("/rbx")[0] + "/"
     rbx_namespace = (robot_namespace + 'rbx/')
     self.msg_if.pub_info("Found rbx namespace: " + rbx_namespace)
@@ -387,10 +387,10 @@ class RBXFakeGPS:
   def reset_gps_loc(self, geo_msg):
     self.fake_gps_ready = False
     self.stop_triggered = True
-    nepi_ros.sleep(5,50)
+    nepi_sdk.sleep(5,50)
     self.current_location_wgs84_geo = geo_msg
     #self.msg_if.pub_info("Waiting for GPS to reset") 
-    nepi_ros.sleep(5,50)
+    nepi_sdk.sleep(5,50)
     self.stop_triggered = False
     self.fake_gps_ready = True
     return True

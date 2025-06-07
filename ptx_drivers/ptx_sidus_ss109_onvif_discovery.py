@@ -24,7 +24,7 @@ import serial.tools.list_ports
 import string
 import ipaddress
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_msg
 
@@ -133,7 +133,7 @@ class SidusSs109Onvif0Discovery:
         except Exception as e:
             nepi_msg.publishMsgWarn(self, ":" + self.log_name + ": Not a valid IP port " + ip_port + " " + str(e))#
             return self.active_paths_list
-        success = nepi_ros.ping_ip(ip_addr)
+        success = nepi_sdk.ping_ip(ip_addr)
         if success == True:
           self.path_list = [ip_addr + ':' + ip_port]
         else:
@@ -202,7 +202,7 @@ class SidusSs109Onvif0Discovery:
           try:
             serial_port.write(b)
             #print("Waiting for response")
-            nepi_ros.sleep(.005)
+            nepi_sdk.sleep(.005)
             bs = serial_port.readline()
             response = bs.decode()
           except Exception as e:
@@ -250,7 +250,7 @@ class SidusSs109Onvif0Discovery:
     launch_check = True
     if launch_id in self.launch_time_dict.keys():
       launch_time = self.launch_time_dict[launch_id]
-      cur_time = nepi_ros.get_time()
+      cur_time = nepi_sdk.get_time()
       launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
     if launch_check == False:
       return False  ###
@@ -269,13 +269,13 @@ class SidusSs109Onvif0Discovery:
     self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
     #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + str(self.drv_dict))
     nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Launching node  with path: " + path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str)
-    nepi_ros.set_param(self,dict_param_name,self.drv_dict)
+    nepi_sdk.set_param(self,dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name, device_path = path_str)
     if success == True:
       self.active_devices_dict[path_str] = {'node_name': device_node_name, 'sub_process': sub_process}
 
     # Process luanch results
-    self.launch_time_dict[launch_id] = nepi_ros.get_time()
+    self.launch_time_dict[launch_id] = nepi_sdk.get_time()
     if success:
       nepi_msg.publishMsgInfo(self," Launched node: " + device_node_name)
     else:

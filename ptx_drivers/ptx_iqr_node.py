@@ -32,7 +32,7 @@ from ctypes import c_int16
 
 from nepi_sdk.nepi_modbus import ModbusRTUMaster
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
 
@@ -181,11 +181,11 @@ class IqrPanTiltNode:
                                                 
     def __init__(self):
         ####  NODE Initialization ####
-        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+        nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
         self.class_name = type(self).__name__
-        self.base_namespace = nepi_ros.get_base_namespace()
-        self.node_name = nepi_ros.get_node_name()
-        self.node_namespace = nepi_ros.get_node_namespace()
+        self.base_namespace = nepi_sdk.get_base_namespace()
+        self.node_name = nepi_sdk.get_node_name()
+        self.node_namespace = nepi_sdk.get_node_namespace()
 
         ##############################  
         # Create Msg Class
@@ -196,7 +196,7 @@ class IqrPanTiltNode:
         # Initialize Class Variables
 
         # Get required drv driver dict info
-        self.drv_dict = nepi_ros.get_param('~drv_dict',dict()) 
+        self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
         #self.msg_if.pub_warn("Got Drivers_Dict from param server: " + str(self.drv_dict))
         try:
             self.port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
@@ -207,7 +207,7 @@ class IqrPanTiltNode:
 
         except Exception as e:
             self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
-            nepi_ros.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
             return
 
         ################################################  
@@ -216,10 +216,10 @@ class IqrPanTiltNode:
         while self.connected == False and self.connect_attempts < 5:
             self.connected = self.connect() 
             if self.connected == False:
-                nepi_ros.sleep(1)
+                nepi_sdk.sleep(1)
         if self.connected == False:
             self.msg_if.pub_info("Shutting down node")
-            nepi_ros.signal_shutdown("Unable to connect to Pan Tilt device")   
+            nepi_sdk.signal_shutdown("Unable to connect to Pan Tilt device")   
         else:
             ################################################
             self.msg_if.pub_info("... Connected!")
@@ -300,16 +300,16 @@ class IqrPanTiltNode:
 
             # Start an ptx activity check process that kills node after some number of failed comms attempts
             self.msg_if.pub_info("Starting an activity check process")
-            nepi_ros.start_timer_process(self.HEARTBEAT_CHECK_INTERVAL, self.check_timer_callback)
+            nepi_sdk.start_timer_process(self.HEARTBEAT_CHECK_INTERVAL, self.check_timer_callback)
             self.msg_if.pub_info("Starting an update position process")
             update_interval = float(1.0) / self.MAX_POSITION_UPDATE_RATE
-            nepi_ros.start_timer_process(update_interval, self.updateStatusHandler)
+            nepi_sdk.start_timer_process(update_interval, self.updateStatusHandler)
             # Initialization Complete
             self.msg_if.pub_info("Initialization Complete")
             #Set up node shutdown
-            nepi_ros.on_shutdown(self.cleanup_actions)
+            nepi_sdk.on_shutdown(self.cleanup_actions)
             # Spin forever (until object is detected)
-            nepi_ros.spin()
+            nepi_sdk.spin()
 
 
     def updateStatusHandler(self,timer):
@@ -589,7 +589,7 @@ class IqrPanTiltNode:
             if self.modbus_master is not None:
                 sendBuf = [speed_count, round(pan*100.0), round(tilt*100)]
                 self.modbus_master.set_multiple_registers(self.addr_int, 0x0006, sendBuf)
-                nepi_ros.sleep(0.01)
+                nepi_sdk.sleep(0.01)
 
     def driver_getSpeedRatio(self, axis_str = '#'):
         method_name = sys._getframe().f_code.co_name
@@ -619,7 +619,7 @@ class IqrPanTiltNode:
                 while stop == False:
                     time_check = (nepi_utils.get_time() - start_time) > duration
                     stop = time_check == True or self.checkResetPanStopTrigger() == True
-                    nepi_ros.sleep(0.1)
+                    nepi_sdk.sleep(0.1)
                 success = self.driver_stopMotion()
 
 
@@ -642,7 +642,7 @@ class IqrPanTiltNode:
                 while stop == False:
                     time_check = (nepi_utils.get_time() - start_time) > duration
                     stop = time_check == True or self.checkResetTiltStopTrigger() == True
-                    nepi_ros.sleep(0.1)
+                    nepi_sdk.sleep(0.1)
                 success = self.driver_stopMotion()
 
 
@@ -670,7 +670,7 @@ class IqrPanTiltNode:
         if self.self_check_counter > self.self_check_count:  # Crashes node if set above limit??
             self.msg_if.pub_warn("Shutting down device: " +  self.addr_str + " on port " + self.port_str)
             self.msg_if.pub_warn("Too many comm failures")
-            nepi_ros.signal_shutdown("To many comm failures")   
+            nepi_sdk.signal_shutdown("To many comm failures")   
 
     
     ### Function to try and connect to device at given port and baudrate
@@ -689,7 +689,7 @@ class IqrPanTiltNode:
             except Exception as e:
                 self.msg_if.pub_warn("Something went wrong with connecting to serial port at: " + self.port_str + "(" + str(e) + ")" )
             if success == True:
-                nepi_ros.sleep(0.1)
+                nepi_sdk.sleep(0.1)
                 success = False
                 # Send Message
                 self.msg_if.pub_info("Connect process requesting info for device on port: " + self.port_str)

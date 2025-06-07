@@ -28,11 +28,11 @@ import socket
 from mavros_msgs.srv import VehicleInfoGet
 from mavros_msgs.msg import VehicleInfo
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
 
-from nepi_sdk.nepi_ros import logger as Logger
+from nepi_sdk.nepi_sdk import logger as Logger
 log_name = "iqr_pan_tilt"
 logger = Logger(log_name = log_name)
 
@@ -66,7 +66,7 @@ class ArdupilotDiscovery:
     ############
     # Create Message Logger
     self.log_name = PKG_NAME.lower() + "_discovery"
-    self.logger = nepi_ros.logger(log_name = self.log_name)
+    self.logger = nepi_sdk.logger(log_name = self.log_name)
     time.sleep(1)
     self.logger.log_info("Starting Initialization")
     self.logger.log_info("Initialization Complete")
@@ -152,7 +152,7 @@ class ArdupilotDiscovery:
       # And make sure it actually starts up fully by waiting for a guaranteed service
       nepi_ipaddr_service_name = self.base_namespace + '/ip_addr_query'
       try:
-        get_ipaddr_service = nepi_ros.create_service(nepi_ipaddr_service_name, IPAddrQuery)
+        get_ipaddr_service = nepi_sdk.create_service(nepi_ipaddr_service_name, IPAddrQuery)
         response = get_ipaddr_service(IPAddrQueryRequest())
         ip_addr_list = response.ip_addrs
         for i, addr in enumerate(ip_addr_list):
@@ -206,26 +206,26 @@ class ArdupilotDiscovery:
       device_entry = self.active_devices_dict[path_str]
       sysid = device_entry["sysid"] 
       compid = device_entry["compid"]   
-      ros_node_name = device_entry["mav_node_name"]
+      node_name = device_entry["mav_node_name"]
       mavlink_subproc = device_entry["mavlink_subproc"] 
       ardu_subproc = device_entry["ardu_subproc"] 
       fgps_subproc = device_entry["fgps_subproc"] 
 
-      full_node_name = self.base_namespace + '/' + ros_node_name
+      full_node_name = self.base_namespace + '/' + node_name
       
-      # Check that the ros_node_name process is still running
+      # Check that the node_name process is still running
       if mavlink_subproc.poll() is not None:
-        self.logger.log_warn("Node process for is no longer running... purging from managed list " + ros_node_name)
+        self.logger.log_warn("Node process for is no longer running... purging from managed list " + node_name)
         purge_node = True
       # Check that the node's port still exists
       elif path_str not in self.active_paths_list:
-        self.logger.log_warn("Port  associated with node no longer detected " + ros_node_name)
+        self.logger.log_warn("Port  associated with node no longer detected " + node_name)
         purge_node = True
       else:
         # Now check that the node is actually responsive
         # Use a service call so that we can provide are assured of synchronous response
         vehicle_info_service_name = full_node_name + '/vehicle_info_get'
-        vehicle_info_query = nepi_ros.create_service(vehicle_info_service_name, VehicleInfoGet)
+        vehicle_info_query = nepi_sdk.create_service(vehicle_info_service_name, VehicleInfoGet)
         try:
           # We don't actually care about the contents of the response at this point, but we might in the future for
           # additional aliveness check logic:
@@ -233,18 +233,18 @@ class ArdupilotDiscovery:
           vehicle_info_query(sysid=sysid, compid=compid, get_all=False)
 
         except Exception as e: # Any exception indicates that the service call failed
-          self.logger.log_warn("Node is no longer responding to vehicle info queries  " + ros_node_name + " "  + str(e))
+          self.logger.log_warn("Node is no longer responding to vehicle info queries  " + node_name + " "  + str(e))
           purge_node = True
 
       if purge_node:
-        self.logger.log_warn("" + "Purging node  " + ros_node_name)
+        self.logger.log_warn("" + "Purging node  " + node_name)
 
         if path_str in self.active_paths_list:
           self.logger.log_warn("Removing port from active list as part of node purging  " + path_str)
           self.active_paths_list.remove(path_str)
 
         if mavlink_subproc.poll() is None:
-          self.logger.log_warn("Issuing sigterm to process for as part of node purging " + ros_node_name)
+          self.logger.log_warn("Issuing sigterm to process for as part of node purging " + node_name)
           mavlink_subproc.kill()
           # Turns out that is not always enough to get the node out of the ros system, so we use rosnode cleanup, too
           # rosnode cleanup won't find the disconnected node until the process is fully terminated
@@ -299,7 +299,7 @@ class ArdupilotDiscovery:
     launch_check = True
     if launch_id in self.launch_time_dict.keys():
       launch_time = self.launch_time_dict[launch_id]
-      cur_time = nepi_ros.get_time()
+      cur_time = nepi_sdk.get_time()
       launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
     if launch_check == False:
       return False  ###
@@ -314,12 +314,12 @@ class ArdupilotDiscovery:
     rosparam_load_cmd = ['rosparam', 'load', '/opt/nepi/ros/share/mavros/launch/apm_config.yaml', mav_node_namespace]
     subprocess.run(rosparam_load_cmd)
     # Adjust the timesync_rate to cut down on log noise
-    nepi_ros.set_param(mav_node_namespace + '/conn/timesync_rate', 1.0)
+    nepi_sdk.set_param(mav_node_namespace + '/conn/timesync_rate', 1.0)
     # Allow the HIL plugin. Disabled in apm configs for some reason
-    plugin_blacklist = nepi_ros.get_param(mav_node_namespace + '/plugin_blacklist')
+    plugin_blacklist = nepi_sdk.get_param(mav_node_namespace + '/plugin_blacklist')
     if 'hil' in plugin_blacklist:
       plugin_blacklist.remove('hil')
-      nepi_ros.set_param(mav_node_namespace + '/plugin_blacklist', plugin_blacklist)
+      nepi_sdk.set_param(mav_node_namespace + '/plugin_blacklist', plugin_blacklist)
     
     # Launch Mavlink Node
     self.logger.log_info("Launching mavlink node: " + mav_node_name)
@@ -333,7 +333,7 @@ class ArdupilotDiscovery:
 
     ardu_node_name = "ardupilot_" + device_id_str
     has_fake_gps_param_namespace = self.base_namespace + ardu_node_name + "/has_fake_gps"
-    nepi_ros.set_param(has_fake_gps_param_namespace,self.enable_fake_gps)
+    nepi_sdk.set_param(has_fake_gps_param_namespace,self.enable_fake_gps)
     self.logger.log_info("" + "Starting ardupilot rbx node: " + ardu_node_name)
     processor_run_cmd = ["rosrun", "nepi_drivers", "rbx_ardupilot_node.py",
                           "__name:=" + ardu_node_name, f"__ns:={self.base_namespace}"]
@@ -357,7 +357,7 @@ class ArdupilotDiscovery:
     success = True
     '''
     try:
-      nepi_ros.wait_for_service(vehicle_info_service_name, timeout=10)
+      nepi_sdk.wait_for_service(vehicle_info_service_name, timeout=10)
       # No exception, all good
     except Exception as e:
       success = False
@@ -454,7 +454,7 @@ class ArdupilotDiscovery:
     launch_check = True
     if launch_id in self.launch_time_dict.keys():
       launch_time = self.launch_time_dict[launch_id]
-      cur_time = nepi_ros.get_time()
+      cur_time = nepi_sdk.get_time()
       launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
     if launch_check == False:
       return False  ###
@@ -527,7 +527,7 @@ class ArdupilotDiscovery:
     launch_check = True
     if launch_id in self.launch_time_dict.keys():
       launch_time = self.launch_time_dict[launch_id]
-      cur_time = nepi_ros.get_time()
+      cur_time = nepi_sdk.get_time()
       launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
     if launch_check == False:
       return False  ###
@@ -558,7 +558,7 @@ class ArdupilotDiscovery:
 # Main
 #########################################
 if __name__ == '__main__':
-  from nepi_sdk import nepi_ros
-  bn = nepi_ros.get_base_namespace()
+  from nepi_sdk import nepi_sdk
+  bn = nepi_sdk.get_base_namespace()
   ardu = ArdupilotDiscovery()
   print(ardu.discoveryFunction([],[],bn))

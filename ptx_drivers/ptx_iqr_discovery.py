@@ -21,7 +21,7 @@ import os
 import subprocess
 import time
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
 
@@ -51,7 +51,7 @@ class IqrPanTiltDiscovery:
     ############
     # Create Message Logger
     self.log_name = PKG_NAME.lower() + "_discovery"
-    self.logger = nepi_ros.logger(log_name = self.log_name)
+    self.logger = nepi_sdk.logger(log_name = self.log_name)
     time.sleep(1)
     self.logger.log_info("Starting Initialization")
     self.logger.log_info("Initialization Complete")
@@ -150,12 +150,12 @@ class IqrPanTiltDiscovery:
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
     self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str
     self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
-    nepi_ros.set_param(dict_param_name,self.drv_dict)
+    nepi_sdk.set_param(dict_param_name,self.drv_dict)
 
     [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name)
 
     # Process luanch results
-    self.launch_time_dict[launch_id] = nepi_ros.get_time()
+    self.launch_time_dict[launch_id] = nepi_sdk.get_time()
     if success:
       self.logger.log_info("Launched node: " + device_node_name)
       self.active_devices_dict[path_str] = {'node_name': device_node_name, 'sub_process': sub_process}

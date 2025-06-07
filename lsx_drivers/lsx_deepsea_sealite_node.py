@@ -17,7 +17,7 @@
 #
 
 
-### Set the namespace before importing nepi_ros
+### Set the namespace before importing nepi_sdk
 import os
 import serial
 import serial.tools.list_ports
@@ -25,9 +25,9 @@ import time
 import re
 import sys
 
-from nepi_ros_interfaces.msg import LSXStatus
+from nepi_sdk_interfaces.msg import LSXStatus
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
 
@@ -123,11 +123,11 @@ class SealiteNode(object):
   drv_dict = dict()                                                    
   def __init__(self):
       ####  NODE Initialization ####
-      nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+      nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
       self.class_name = type(self).__name__
-      self.base_namespace = nepi_ros.get_base_namespace()
-      self.node_name = nepi_ros.get_node_name()
-      self.node_namespace = nepi_ros.get_node_namespace()
+      self.base_namespace = nepi_sdk.get_base_namespace()
+      self.node_name = nepi_sdk.get_node_name()
+      self.node_namespace = nepi_sdk.get_node_namespace()
 
       ##############################  
       # Create Msg Class
@@ -138,7 +138,7 @@ class SealiteNode(object):
       # Initialize Class Variables
 
       # Get required drv driver dict info
-      self.drv_dict = nepi_ros.get_param('~drv_dict',dict()) 
+      self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
       #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
       try:
         self.port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
@@ -147,7 +147,7 @@ class SealiteNode(object):
         self.addr_str = self.drv_dict['DEVICE_DICT']['addr_str'] 
       except Exception as e:
         self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
-        nepi_ros.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
+        nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
         return
       # Address string must be three char long
       zero_prefix_len = 3-len(self.addr_str)
@@ -196,17 +196,17 @@ class SealiteNode(object):
       
         # Start an sealite activity check process that kills node after some number of failed comms attempts
         self.msg_if.pub_info("Starting an activity check process")
-        nepi_ros.start_timer_process(nepi_ros.ros_duration(0.2), self.check_timer_callback)
+        nepi_sdk.start_timer_process((0.2), self.check_timer_callback)
         # Initialization Complete
         self.msg_if.pub_info("Initialization Complete")
         #Set up node shutdown
-        nepi_ros.on_shutdown(self.cleanup_actions)
+        nepi_sdk.on_shutdown(self.cleanup_actions)
         # Spin forever (until object is detected)
-        nepi_ros.spin()
+        nepi_sdk.spin()
       else:
         self.msg_if.pub_info("Shutting down node")
         self.msg_if.pub_info("Specified serial port not available")
-        nepi_ros.signal_shutdown("Serial port not available")   
+        nepi_sdk.signal_shutdown("Serial port not available")   
 
 
 
@@ -510,7 +510,7 @@ class SealiteNode(object):
     b=bytearray()
     b.extend(map(ord, ser_str))
     try:
-      while self.serial_busy == True and not nepi_ros.is_shutdown():
+      while self.serial_busy == True and not nepi_sdk.is_shutdown():
         time.sleep(0.01) # Wait for serial port to be available
       self.serial_busy = True
       self.serial_port.write(b)
@@ -539,7 +539,7 @@ class SealiteNode(object):
     if self.self_check_counter > self.self_check_count:  # Crashes node if set above limit??
       self.msg_if.pub_warn("Shutting down device: " +  self.addr_str + " on port " + self.port_str)
       self.msg_if.pub_warn("Too many comm failures")
-      nepi_ros.signal_shutdown("To many comm failures")   
+      nepi_sdk.signal_shutdown("To many comm failures")   
    
   ### Function to try and connect to device at given port and baudrate
   def connect(self):
@@ -588,7 +588,7 @@ class SealiteNode(object):
 
   def send_msg(self,ser_msg):
     response = None
-    if self.serial_port is not None and not nepi_ros.is_shutdown():
+    if self.serial_port is not None and not nepi_sdk.is_shutdown():
       ser_str = (ser_msg + '\r\n')
       b=bytearray()
       b.extend(map(ord, ser_str))
@@ -596,7 +596,7 @@ class SealiteNode(object):
       sleep_time = .1
       timeout = 2
       timer = 0
-      while self.serial_busy == True and timer < timeout and not nepi_ros.is_shutdown():
+      while self.serial_busy == True and timer < timeout and not nepi_sdk.is_shutdown():
           time.sleep(sleep_time ) # Wait for serial port to be available
           timer += sleep_time 
       if timer < timeout:

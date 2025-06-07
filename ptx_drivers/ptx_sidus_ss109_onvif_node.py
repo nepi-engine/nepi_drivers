@@ -18,7 +18,7 @@
 
 import time 
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
@@ -26,7 +26,7 @@ from nepi_sdk import nepi_settings
 from nepi_api.device_if_ptx import PTXActuatorIF
 from nepi_api.messages_if import MsgIF
 
-from nepi_ros_interfaces.msg import IDXStatus
+from nepi_sdk_interfaces.msg import IDXStatus
 
 PKG_NAME = 'PTX_SIDUS_SS109_ONVIF' # Use in display menus
 FILE_TYPE = 'NODE'
@@ -65,11 +65,11 @@ class SidusSs109OnvifNode:
     drv_dict = dict()                                                    
     def __init__(self):
         ####  NODE Initialization ####
-        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+        nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
         self.class_name = type(self).__name__
-        self.base_namespace = nepi_ros.get_base_namespace()
-        self.node_name = nepi_ros.get_node_name()
-        self.node_namespace = nepi_ros.get_node_namespace()
+        self.base_namespace = nepi_sdk.get_base_namespace()
+        self.node_name = nepi_sdk.get_node_name()
+        self.node_namespace = nepi_sdk.get_node_namespace()
 
         ##############################  
         # Create Msg Class
@@ -80,11 +80,11 @@ class SidusSs109OnvifNode:
         ##############################
         # Wait for camera status ready
         self.cam_namespace = self.node_namespace.replace('_pan_tilt_','_camera_')
-        cam_status_ns = nepi_ros.create_namespace(self.cam_namespace,'idx/status')
+        cam_status_ns = nepi_sdk.create_namespace(self.cam_namespace,'idx/status')
         self.msg_if.pub_warn("Waiting for camera status to publish on namespace: " + cam_status_ns)
 
-        cam_status_sub = nepi_ros.create_subscriber(cam_status_ns, IDXStatus, self.camStatusCb)
-        while self.cam_status == None and not nepi_ros.is_shutdown():
+        cam_status_sub = nepi_sdk.create_subscriber(cam_status_ns, IDXStatus, self.camStatusCb)
+        while self.cam_status == None and not nepi_sdk.is_shutdown():
             time.sleep(1)
         cam_status_sub.unregister()
         self.msg_if.pub_warn("Got camera status, starting ptz initialization")
@@ -96,9 +96,9 @@ class SidusSs109OnvifNode:
         
         # Get required drv driver dict info
         try:
-            self.drv_dict = nepi_ros.get_param('~drv_dict') # Crash if not provide
+            self.drv_dict = nepi_sdk.get_param('~drv_dict') # Crash if not provide
         except Exception as e:
-            nepi_ros.signal_shutdown("Failed to read drv_dict from param server for node " + self.node_name + " with exception: " + str(e))
+            nepi_sdk.signal_shutdown("Failed to read drv_dict from param server for node " + self.node_name + " with exception: " + str(e))
         self.driver_path = self.drv_dict['path']
         self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
         self.driver_module = self.driver_file.split('.')[0]
@@ -106,23 +106,23 @@ class SidusSs109OnvifNode:
 
 
         # Require the camera connection parameters to have been set
-        if not nepi_ros.has_param('~credentials/username'):
+        if not nepi_sdk.has_param('~credentials/username'):
             self.msg_if.pub_warn("Missing credentials/username parameter... cannot start")
             return
-        if not nepi_ros.has_param('~credentials/password'):
+        if not nepi_sdk.has_param('~credentials/password'):
             self.msg_if.pub_warn("Missing credentials/password parameter... cannot start")
             return
-        if not nepi_ros.has_param('~network/host'):
+        if not nepi_sdk.has_param('~network/host'):
             self.msg_if.pub_warn("Missing network/host parameter... cannot start")
             return
                 
-        username = str(nepi_ros.get_param('~credentials/username'))
-        password = str(nepi_ros.get_param('~credentials/password'))
-        host = str(nepi_ros.get_param('~network/host'))
+        username = str(nepi_sdk.get_param('~credentials/username'))
+        password = str(nepi_sdk.get_param('~credentials/password'))
+        host = str(nepi_sdk.get_param('~network/host'))
         
         # Allow a default for the port, since it is part of onvif spec.
-        onvif_port = nepi_ros.get_param('~network/port', 80)
-        nepi_ros.set_param('~/network/port', onvif_port)
+        onvif_port = nepi_sdk.get_param('~network/port', 80)
+        nepi_sdk.set_param('~/network/port', onvif_port)
 
 
         self.msg_if.pub_info("Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
@@ -131,17 +131,17 @@ class SidusSs109OnvifNode:
         driver_constructed = False
         if success:
             attempts = 0
-            while not nepi_ros.is_shutdown() and driver_constructed == False and attempts < 5:
+            while not nepi_sdk.is_shutdown() and driver_constructed == False and attempts < 5:
                 try:
                     self.driver = self.driver_class(username, password, host, onvif_port)
                     driver_constructed = True
                     self.msg_if.pub_info("Driver constructed")
                 except Exception as e:
                     self.msg_if.pub_info("Failed to construct driver: " + self.driver_module + "with exception: " + str(e))
-                    nepi_ros.sleep(1)
+                    nepi_sdk.sleep(1)
                 attempts += 1 
         if driver_constructed == False:
-            nepi_ros.signal_shutdown("Shutting down Onvif node " + self.node_name + ", unable to connect to driver")
+            nepi_sdk.signal_shutdown("Shutting down Onvif node " + self.node_name + ", unable to connect to driver")
         else:
             ################################################
             self.msg_if.pub_info("... Connected!")
@@ -204,7 +204,7 @@ class SidusSs109OnvifNode:
             # many ONVIF devices report capabilities that they don't actually have, so need a user-override mechanism. In
             # that case, assign these to null in the config file
             # TODO: Not sure we actually need remappings for PTX: Makes sense for IDX because there are lots of controllable params.
-            ptx_remappings = nepi_ros.get_param('~ptx_remappings', {})
+            ptx_remappings = nepi_sdk.get_param('~ptx_remappings', {})
             self.msg_if.pub_info('Establishing PTX remappings')
             for from_name in ptx_remappings:
                 to_name = ptx_remappings[from_name]
@@ -303,7 +303,7 @@ class SidusSs109OnvifNode:
                                         navpose_update_rate = self.POSITION_UPDATE_RATE)
                                         
             self.msg_if.pub_info(" ... PTX interface running")
-            nepi_ros.spin()
+            nepi_sdk.spin()
 
 
 
@@ -345,7 +345,7 @@ class SidusSs109OnvifNode:
     def settingUpdateFunction(self,setting):
         success = False
         setting_str = str(setting)
-        [setting_name, s_type, data] = nepi_ros.get_data_from_setting(setting)
+        [setting_name, s_type, data] = nepi_sdk.get_data_from_setting(setting)
         print("Onvif PT updating setting: " + str(setting_str))
         if data is not None and data != "None":
             setting_data = data
@@ -390,8 +390,8 @@ class SidusSs109OnvifNode:
      
     def tiltDegToOvRatio(self, deg):
         ratio = 0.5
-        max_ph = nepi_ros.get_param('~ptx/limits/max_tilt_hardstop_deg', self.default_settings['max_tilt_hardstop_deg'])
-        min_ph = nepi_ros.get_param('~ptx/limits/min_tilt_hardstop_deg', self.default_settings['min_tilt_hardstop_deg'])
+        max_ph = nepi_sdk.get_param('~ptx/limits/max_tilt_hardstop_deg', self.default_settings['max_tilt_hardstop_deg'])
+        min_ph = nepi_sdk.get_param('~ptx/limits/min_tilt_hardstop_deg', self.default_settings['min_tilt_hardstop_deg'])
         reverse_tilt = False
         if self.ptx_if is not None:
             reverse_tilt = self.ptx_if.reverse_tilt_control
@@ -404,8 +404,8 @@ class SidusSs109OnvifNode:
 
     def panDegToOvRatio(self, deg):
         ratio = 0.5
-        max_yh = nepi_ros.get_param('~ptx/limits/max_pan_hardstop_deg', self.default_settings['max_pan_hardstop_deg'])
-        min_yh = nepi_ros.get_param('~ptx/limits/min_pan_hardstop_deg', self.default_settings['min_pan_hardstop_deg'])
+        max_yh = nepi_sdk.get_param('~ptx/limits/max_pan_hardstop_deg', self.default_settings['max_pan_hardstop_deg'])
+        min_yh = nepi_sdk.get_param('~ptx/limits/min_pan_hardstop_deg', self.default_settings['min_pan_hardstop_deg'])
         reverse_pan = False
         if self.ptx_if is not None:
             reverse_pan = self.ptx_if.reverse_pan_control 
@@ -418,8 +418,8 @@ class SidusSs109OnvifNode:
 
     def panOvRatioToDeg(self, ovRatio):
         pan_deg = 0
-        max_yh = nepi_ros.get_param('~ptx/limits/max_pan_hardstop_deg', self.default_settings['max_pan_hardstop_deg'])
-        min_yh = nepi_ros.get_param('~ptx/limits/min_pan_hardstop_deg', self.default_settings['min_pan_hardstop_deg'])
+        max_yh = nepi_sdk.get_param('~ptx/limits/max_pan_hardstop_deg', self.default_settings['max_pan_hardstop_deg'])
+        min_yh = nepi_sdk.get_param('~ptx/limits/min_pan_hardstop_deg', self.default_settings['min_pan_hardstop_deg'])
         reverse_pan = False
         if self.ptx_if is not None:
             reverse_pan = self.ptx_if.reverse_pan_control 
@@ -431,8 +431,8 @@ class SidusSs109OnvifNode:
     
     def tiltOvRatioToDeg(self, ovRatio):
         tilt_deg = 0
-        max_ph = nepi_ros.get_param('~ptx/limits/max_tilt_hardstop_deg', self.default_settings['max_tilt_hardstop_deg'])
-        min_ph = nepi_ros.get_param('~ptx/limits/min_tilt_hardstop_deg', self.default_settings['min_tilt_hardstop_deg'])
+        max_ph = nepi_sdk.get_param('~ptx/limits/max_tilt_hardstop_deg', self.default_settings['max_tilt_hardstop_deg'])
+        min_ph = nepi_sdk.get_param('~ptx/limits/min_tilt_hardstop_deg', self.default_settings['min_tilt_hardstop_deg'])
         reverse_tilt = False
         if self.ptx_if is not None:
             reverse_tilt = self.ptx_if.reverse_tilt_control

@@ -21,7 +21,7 @@ import os
 import subprocess
 import time
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
 
@@ -53,11 +53,11 @@ class V4L2CamDiscovery:
   
   def __init__(self):
     ####  NODE Initialization ####
-    nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+    nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
     self.class_name = type(self).__name__
-    self.base_namespace = nepi_ros.get_base_namespace()
-    self.node_name = nepi_ros.get_node_name()
-    self.node_namespace = nepi_ros.get_node_namespace()
+    self.base_namespace = nepi_sdk.get_base_namespace()
+    self.node_name = nepi_sdk.get_node_name()
+    self.node_namespace = nepi_sdk.get_node_namespace()
 
     ##############################  
     # Create Msg Class
@@ -67,11 +67,11 @@ class V4L2CamDiscovery:
     ########################
     # Get discovery options
     try:
-      self.drv_dict = nepi_ros.get_param('~drv_dict',dict())
+      self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
       self.msg_if.pub_warn("Initial Driver Dict: " + str(self.drv_dict))
     except Exception as e:
       self.msg_if.pub_warn("Failed to load options " + str(e))#
-      nepi_ros.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
+      nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
       return
 
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
@@ -80,10 +80,10 @@ class V4L2CamDiscovery:
       self.retry = True
     ########################
 
-    nepi_ros.start_timer_process(nepi_ros.ros_duration(1), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
     # Now start the node
     self.msg_if.pub_info("Initialization Complete")
-    nepi_ros.spin()
+    nepi_sdk.spin()
 
   #**********************
   # Discovery functions
@@ -193,8 +193,8 @@ class V4L2CamDiscovery:
         if launch_id in self.dont_retry_list:
           self.dont_retry_list.remove(launch_id)
 
-    nepi_ros.sleep(self.CHECK_INTERVAL_S,100)
-    nepi_ros.start_timer_process(nepi_ros.ros_duration(1), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.sleep(self.CHECK_INTERVAL_S,100)
+    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
 
   def startDeviceNode(self, dtype, path_str, bus):
     success = False 
@@ -222,7 +222,7 @@ class V4L2CamDiscovery:
             same_type_count += 1
 
         device_node_name = self.short_name(root_name)
-        device_node_namespace = nepi_ros.get_base_namespace() + device_node_name
+        device_node_namespace = nepi_sdk.get_base_namespace() + device_node_name
         if bus is not None:
           id = bus
         else:
@@ -243,7 +243,7 @@ class V4L2CamDiscovery:
             #Setup required param server drv_dict for discovery node
             self.drv_dict['DEVICE_DICT'] = {'device_path': path_str}
             dict_param_name = os.path.join(self.base_namespace,device_node_name + "/drv_dict")
-            nepi_ros.set_param(dict_param_name,self.drv_dict)
+            nepi_sdk.set_param(dict_param_name,self.drv_dict)
             # Try and load save node params
             nepi_drvs.checkLoadConfigFile(device_node_name)
             

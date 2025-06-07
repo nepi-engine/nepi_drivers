@@ -24,9 +24,9 @@ import time
 import re
 import sys
 
-from nepi_ros_interfaces.msg import LSXStatus
+from nepi_sdk_interfaces.msg import LSXStatus
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
 
@@ -107,11 +107,11 @@ class AfTowerLightNode(object):
   ### LXS Driver NODE Initialization
   def __init__(self):
       ####  NODE Initialization ####
-      nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+      nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
       self.class_name = type(self).__name__
-      self.base_namespace = nepi_ros.get_base_namespace()
-      self.node_name = nepi_ros.get_node_name()
-      self.node_namespace = nepi_ros.get_node_namespace()
+      self.base_namespace = nepi_sdk.get_base_namespace()
+      self.node_name = nepi_sdk.get_node_name()
+      self.node_namespace = nepi_sdk.get_node_namespace()
 
       ##############################  
       # Create Msg Class
@@ -122,7 +122,7 @@ class AfTowerLightNode(object):
       # Initialize Class Variables
 
       # Get required drv driver dict info
-      self.drv_dict = nepi_ros.get_param('~drv_dict',{}) 
+      self.drv_dict = nepi_sdk.get_param('~drv_dict',{}) 
       #self.msg_if.pub_warn("AFTOWER_NODE: " + str(self.drv_dict))
       self.ser_port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
       ser_baud_str = self.drv_dict['DEVICE_DICT']['baud_rate_str'] 
@@ -137,7 +137,7 @@ class AfTowerLightNode(object):
       else:
         self.msg_if.pub_info("Shutting down node")
         self.msg_if.pub_info("Specified serial port not available")
-        nepi_ros.signal_shutdown("Serial port not available")  
+        nepi_sdk.signal_shutdown("Serial port not available")  
 
 
       # Initialize settings
@@ -185,9 +185,9 @@ class AfTowerLightNode(object):
       # Initialization Complete
       self.msg_if.pub_info("Initialization Complete")
       #Set up node shutdown
-      nepi_ros.on_shutdown(self.cleanup_actions)
+      nepi_sdk.on_shutdown(self.cleanup_actions)
       # Spin forever (until object is detected)
-      nepi_ros.spin() 
+      nepi_sdk.spin() 
 
 
   #**********************
@@ -210,7 +210,7 @@ class AfTowerLightNode(object):
   def settingUpdateFunction(self,setting):
       success = False
       setting_str = str(setting)
-      [setting_name, s_type, data] = nepi_ros.get_data_from_setting(setting)
+      [setting_name, s_type, data] = nepi_sdk.get_data_from_setting(setting)
       if data is not None:
           setting_data = data
           found_setting = False
@@ -309,11 +309,11 @@ class AfTowerLightNode(object):
 
   def send_msg(self,ser_msg):
     response = None
-    if self.serial_port is not None and not nepi_ros.is_shutdown():
+    if self.serial_port is not None and not nepi_sdk.is_shutdown():
       sleep_time = .1
       timeout = 2
       timer = 0
-      while self.serial_busy == True and timer < timeout and not nepi_ros.is_shutdown():
+      while self.serial_busy == True and timer < timeout and not nepi_sdk.is_shutdown():
           time.sleep(sleep_time ) # Wait for serial port to be available
           timer += sleep_time 
       self.serial_busy = True

@@ -34,7 +34,7 @@ import dynamic_reconfigure.client
 import numpy as np
 import tf
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_nav
 from nepi_sdk import nepi_img
@@ -45,8 +45,8 @@ from nepi_sdk import nepi_settings
 from datetime import datetime
 from std_msgs.msg import UInt8, Empty, String, Bool, Float32
 from sensor_msgs.msg import Image, PointCloud2
-from nepi_ros_interfaces.msg import IDXStatus, RangeWindow, SaveDataStatus, SaveDataRate
-from nepi_ros_interfaces.srv import IDXCapabilitiesQuery, IDXCapabilitiesQueryResponse
+from nepi_sdk_interfaces.msg import IDXStatus, RangeWindow, SaveDataStatus, SaveDataRate
+from nepi_sdk_interfaces.srv import IDXCapabilitiesQuery, IDXCapabilitiesQueryResponse
 from nav_msgs.msg import Odometry
 
 from dynamic_reconfigure.msg import Config
@@ -196,11 +196,11 @@ class ZedCamNode(object):
     drv_dict = dict()                          
     def __init__(self):
         ####  NODE Initialization ####
-        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+        nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
         self.class_name = type(self).__name__
-        self.base_namespace = nepi_ros.get_base_namespace()
-        self.node_name = nepi_ros.get_node_name()
-        self.node_namespace = nepi_ros.get_node_namespace()
+        self.base_namespace = nepi_sdk.get_base_namespace()
+        self.node_name = nepi_sdk.get_node_name()
+        self.node_namespace = nepi_sdk.get_node_namespace()
 
         ##############################  
         # Create Msg Class
@@ -211,7 +211,7 @@ class ZedCamNode(object):
         # Initialize Class Variables
 
         # Get required drv driver dict info
-        self.drv_dict = nepi_ros.get_param('~drv_dict',TEST_DRV_DICT) 
+        self.drv_dict = nepi_sdk.get_param('~drv_dict',TEST_DRV_DICT) 
 
         ################################################
         # Try to restore camera calibration files from
@@ -229,7 +229,7 @@ class ZedCamNode(object):
         self.framerate = self.drv_dict['DEVICE_DICT']['framerate']
         self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
         self.msg_if.pub_warn("Got discovery data products: " + str(self.data_products))
-        ZED_BASE_NAMESPACE = nepi_ros.get_base_namespace() + self.zed_type + "/zed_node/"
+        ZED_BASE_NAMESPACE = nepi_sdk.get_base_namespace() + self.zed_type + "/zed_node/"
 
 
         '''
@@ -238,7 +238,7 @@ class ZedCamNode(object):
         try:
           self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=3)
           zed_wrapper_not_running = nepi_drvs.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
-          nepi_ros.sleep(2,20)
+          nepi_sdk.sleep(2,20)
         except Exception as e:
           pass #self.msg_if.pub_info(str(e))
 
@@ -272,19 +272,19 @@ class ZedCamNode(object):
         # TODO: Some process management for the Zed  wrapper
         self.zed_ros_wrapper_proc = subprocess.Popen(zed_ros_wrapper_run_cmd)
         # Now that Zed SDK is started, we can set up the reconfig client
-        nepi_ros.sleep(5,10)
+        nepi_sdk.sleep(5,10)
         success = False
         timeout = 10
         waittime = 1
         timer = 0
         self.zed_dynamic_reconfig_client = None
-        while success == False and timer < timeout and not nepi_ros.is_shutdown():
+        while success == False and timer < timeout and not nepi_sdk.is_shutdown():
           try:
             self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=3)
             success = True
           except Exception as e:
             self.msg_if.pub_info(str(e))
-            nepi_ros.sleep(waittime,10)
+            nepi_sdk.sleep(waittime,10)
             timer += waittime
         if timer >= timeout or self.zed_dynamic_reconfig_client is None:
           self.msg_if.pub_warn("Failed to connect to zed_node using launch process" + str(zed_ros_wrapper_run_cmd))
@@ -292,7 +292,7 @@ class ZedCamNode(object):
           success = nepi_drvs.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
           if success:
             time.sleep(2)
-          nepi_ros.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
+          nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
           return
         self.msg_if.pub_warn("Zed DRC: " + str(self.zed_dynamic_reconfig_client))
         time.sleep(2)
@@ -313,7 +313,7 @@ class ZedCamNode(object):
 
         # Wait for zed camera topic to publish, then subscribeCAPS SETTINGS
         self.msg_if.pub_info("Waiting for topic: " + self.image_topic)
-        nepi_ros.wait_for_topic(self.image_topic)
+        nepi_sdk.wait_for_topic(self.image_topic)
 
         self.msg_if.pub_info("Starting Zed IDX subscribers and publishers")
         self.color_img_sub = None
@@ -396,9 +396,9 @@ class ZedCamNode(object):
         self.msg_if.pub_info("Initialization Complete")
         # Now start zed node check process
         self.attempts = 0
-        nepi_ros.start_timer_process(nepi_ros.ros_duration(1), self.checkZedNodeCb)
+        nepi_sdk.start_timer_process((1), self.checkZedNodeCb)
         rospy.on_shutdown(self.cleanup_actions)
-        nepi_ros.spin()
+        nepi_sdk.spin()
 
     def checkZedNodeCb(self,timer):
       poll = self.zed_ros_wrapper_proc.poll()
@@ -408,7 +408,7 @@ class ZedCamNode(object):
       else:
         self.attempts += 1
       if self.attempts > 2:
-        nepi_ros.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
+        nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
 
       
 
@@ -511,7 +511,7 @@ class ZedCamNode(object):
         if need_data == True:
           self.dm_img_last_time = current_time
 
-          image_msg.header.stamp = nepi_ros.ros_time_now()
+          image_msg.header.stamp = nepi_sdk.get_msg_stamp()
           self.depth_map_lock.acquire()
           self.depth_map_msg = image_msg
           self.depth_map_lock.release()
@@ -538,7 +538,7 @@ class ZedCamNode(object):
         if need_data == True:
           self.di_img_last_time = current_time
 
-          image_msg.header.stamp = nepi_ros.ros_time_now()
+          image_msg.header.stamp = nepi_sdk.get_msg_stamp()
           self.depth_img_lock.acquire()
           self.depth_img_msg = image_msg
           self.depth_img_lock.release()
@@ -598,7 +598,7 @@ class ZedCamNode(object):
         xyz_body_o = list([body.x, body.y, body.z])
         xyz = nepi_nav.convert_point_body2enu(xyz_body_o,rpy[2])
 
-        timestamp = nepi_ros.sec_from_ros_stamp(odom_msg.header.stamp)
+        timestamp = nepi_sdk.sec_from_msg_stamp(odom_msg.header.stamp)
 
 
         self.orientation_dict['time_oreantation'] = timestamp
@@ -685,10 +685,10 @@ class ZedCamNode(object):
         timestamp = None
         if img_msg is not None:
           if img_msg.header.stamp != self.color_img_last_stamp:
-            timestamp = nepi_ros.sec_from_ros_stamp(img_msg.header.stamp)
+            timestamp = nepi_sdk.sec_from_msg_stamp(img_msg.header.stamp)
             status = True
             msg = ""
-            timestamp = nepi_ros.sec_from_ros_stamp(img_msg.header.stamp)
+            timestamp = nepi_sdk.sec_from_msg_stamp(img_msg.header.stamp)
             cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
             self.color_img_last_stamp = timestamp
           else:
@@ -731,7 +731,7 @@ class ZedCamNode(object):
         timestamp = None
         if img_msg is not None:
           if img_msg.header.stamp != self.depth_map_last_stamp:
-            timestamp = nepi_ros.sec_from_ros_stamp(img_msg.header.stamp)
+            timestamp = nepi_sdk.sec_from_msg_stamp(img_msg.header.stamp)
             self.depth_map_last_stamp = timestamp
             status = True
             msg = ""
@@ -799,7 +799,7 @@ class ZedCamNode(object):
         frame_id = None
         if pc_msg is not None:
           if pc_msg.header.stamp != self.pc_last_stamp:
-            timestamp = nepi_ros.sec_from_ros_stamp(pc_msg.header.stamp)
+            timestamp = nepi_sdk.sec_from_msg_stamp(pc_msg.header.stamp)
             frame_id = pc_msg.header.frame_id
             status = True
             msg = ""
@@ -842,13 +842,13 @@ class ZedCamNode(object):
       try:
         zed_type = self.zed_type
         zed_node_namespace = os.path.join(self.base_namespace,zed_type,'zed_node')
-        nepi_ros.kill_node_namespace(zed_node_namespace)
+        nepi_sdk.kill_node_namespace(zed_node_namespace)
       except Exception as e:
         self.msg_if.pub_warn("Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
       try:
         zed_type = self.zed_type
         zed_node_namespace = os.path.join(self.base_namespace,zed_type,zed_type + '_state_publisher')
-        nepi_ros.kill_node_namespace(zed_node_namespace)
+        nepi_sdk.kill_node_namespace(zed_node_namespace)
       except Exception as e:
         self.msg_if.pub_warn("Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
         

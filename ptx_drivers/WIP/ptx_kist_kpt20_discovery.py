@@ -24,7 +24,7 @@ import serial.tools.list_ports
 import string
 import ipaddress
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
 
@@ -68,7 +68,7 @@ class KistKPT20Discovery:
     ############
     # Create Message Logger
     self.log_name = PKG_NAME.lower() + "_discovery"
-    self.logger = nepi_ros.logger(log_name = self.log_name)
+    self.logger = nepi_sdk.logger(log_name = self.log_name)
     time.sleep(1)
     self.logger.log_info("Starting Initialization")
     self.letters_list = list(string.ascii_uppercase)
@@ -226,7 +226,7 @@ class KistKPT20Discovery:
           try:
             serial_port.write(b)
             #print("Waiting for response")
-            nepi_ros.sleep(.005)
+            nepi_sdk.sleep(.005)
             bs = serial_port.readline()
             response = bs.decode()
           except Exception as e:
@@ -274,7 +274,7 @@ class KistKPT20Discovery:
     launch_check = True
     if launch_id in self.launch_time_dict.keys():
       launch_time = self.launch_time_dict[launch_id]
-      cur_time = nepi_ros.get_time()
+      cur_time = nepi_sdk.get_time()
       launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
     if launch_check == False:
       return False  ###
@@ -293,13 +293,13 @@ class KistKPT20Discovery:
     self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
     #self.logger.log_info(" launching node: " + str(self.drv_dict))
     self.logger.log_info("Launching node  with path: " + path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str)
-    nepi_ros.set_param(dict_param_name,self.drv_dict)
+    nepi_sdk.set_param(dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name, device_path = path_str)
     if success == True:
       self.active_devices_dict[path_str] = {'node_name': device_node_name, 'sub_process': sub_process}
 
     # Process luanch results
-    self.launch_time_dict[launch_id] = nepi_ros.get_time()
+    self.launch_time_dict[launch_id] = nepi_sdk.get_time()
     if success:
       self.logger.log_info("Launched node: " + device_node_name)
     else:

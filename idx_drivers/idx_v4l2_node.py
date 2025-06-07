@@ -23,7 +23,7 @@ import math
 import threading
 import cv2
 
-from nepi_sdk import nepi_ros
+from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_img
@@ -95,11 +95,11 @@ class V4l2CamNode:
     drv_dict = dict()                             
     def __init__(self):
         ####  NODE Initialization ####
-        nepi_ros.init_node(name= self.DEFAULT_NODE_NAME)
+        nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
         self.class_name = type(self).__name__
-        self.base_namespace = nepi_ros.get_base_namespace()
-        self.node_name = nepi_ros.get_node_name()
-        self.node_namespace = nepi_ros.get_node_namespace()
+        self.base_namespace = nepi_sdk.get_base_namespace()
+        self.node_name = nepi_sdk.get_node_name()
+        self.node_namespace = nepi_sdk.get_node_namespace()
 
         ##############################  
         # Create Msg Class
@@ -110,7 +110,7 @@ class V4l2CamNode:
         # Initialize Class Variables
                
         # Get required drv driver dict info
-        self.drv_dict = nepi_ros.get_param('~drv_dict',TEST_DRV_DICT) 
+        self.drv_dict = nepi_sdk.get_param('~drv_dict',TEST_DRV_DICT) 
         #self.msg_if.pub_warn("Drv_Dict: " + str(self.drv_dict))
         self.driver_path = self.drv_dict['path']
         self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
@@ -185,7 +185,7 @@ class V4l2CamNode:
         ## Initiation Complete
         self.msg_if.pub_info("Initialization Complete")
         # Now start the node
-        nepi_ros.spin()
+        nepi_sdk.spin()
 
     #**********************
     # Sensor setting functions
