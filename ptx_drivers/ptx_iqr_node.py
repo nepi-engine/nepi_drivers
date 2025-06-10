@@ -17,6 +17,7 @@
 #
 
 import os
+import copy
 import serial
 import serial.tools.list_ports
 import time
@@ -345,13 +346,10 @@ class IqrPanTiltNode:
 
     def getFactorySettings(self):
         settings = self.getSettings()
-        #Apply factory setting overides
         for setting_name in settings.keys():
             if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
-                    settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
+                settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
         return settings
-
-
 
     def getSettings(self):
         settings = dict()
@@ -363,7 +361,6 @@ class IqrPanTiltNode:
             val = None
             if setting_name in self.settingFunctions.keys():
                 function_str_name = self.settingFunctions[setting_name]['get']
-                #self.msg_if.pub_info("Calling get setting function " + function_str_name)
                 get_function = globals()[function_str_name]
                 val = get_function(self)
                 if val is not None:
@@ -502,10 +499,9 @@ class IqrPanTiltNode:
         self.home_tilt_deg = tilt_deg
 
     def setHomePositionHere(self):
-        if self.driver_reportsPosition() is True:
-            pan_deg, tilt_deg = self.getPosition()
-            self.home_pan_deg = pan_deg * self.PAN_DEG_DIR
-            self.home_tilt_deg = tilt_deg * self.TILT_DEG_DIR 
+        pan_deg, tilt_deg = self.getPosition()
+        self.home_pan_deg = pan_deg * self.PAN_DEG_DIR
+        self.home_tilt_deg = tilt_deg * self.TILT_DEG_DIR
 
 
     def setCurrentSettingsAsDefault(self):
@@ -520,7 +516,8 @@ class IqrPanTiltNode:
         self.limits_dict['min_tilt_softstop_deg'] = self.FACTORY_LIMITS_DICT['min_tilt_softstop_deg']
         self.limits_dict['max_tilt_softstop_deg'] = self.FACTORY_LIMITS_DICT['max_tilt_softstop_deg']
 
-
+    def driver_reportsPosition(self):
+        return True
 
    #######################
     ### Driver Interface Functions
