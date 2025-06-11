@@ -336,7 +336,6 @@ class IqrPanTiltNode:
         orientation_dict['pitch_deg'] = tilt_deg * self.TILT_DEG_DIR
         return orientation_dict
 
-
     #**********************
     # Device setting functions
 
@@ -397,6 +396,7 @@ class IqrPanTiltNode:
         else:
             msg = (self.node_name  + " Setting data" + setting_str + " is None")
         return success, msg
+
 
     ##############
     ### Settings Functions
