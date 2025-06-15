@@ -89,12 +89,6 @@ class IqrPanTiltNode:
     FACTORY_LIMITS_DICT['max_tilt_softstop_deg'] = 60
     
 
-    FACTORY_OFFSETS_DICT = dict()
-    FACTORY_OFFSETS_DICT['h'] = 0.0889
-    FACTORY_OFFSETS_DICT['x'] = 0.0 # 0.0254
-    FACTORY_OFFSETS_DICT['y'] = 0.0 # 0.0635
-    FACTORY_OFFSETS_DICT['z'] = 0.0254 # 0.0635
-
     limits_dict = FACTORY_LIMITS_DICT
 
     PAN_DEG_DIR = 1
@@ -279,7 +273,6 @@ class IqrPanTiltNode:
                                         getSettingsFunction=self.getSettings,
                                         factoryControls = self.FACTORY_CONTROLS,
                                         factoryLimits = self.FACTORY_LIMITS_DICT,
-                                        factoryOffsets = self.FACTORY_OFFSETS_DICT,
                                         stopMovingCb = self.stopMoving,
                                         movePanCb = self.movePan,
                                         moveTiltCb = self.moveTilt,
