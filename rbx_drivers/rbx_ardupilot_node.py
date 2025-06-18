@@ -42,7 +42,7 @@ from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeReq
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Image, NavSatFix, BatteryState
 
-from nepi_sdk_interfaces.msg import AxisControls
+from nepi_interfaces.msg import AxisControls
 
 from nepi_api.device_if_rbx import RBXRobotIF
 from nepi_api.messages_if import MsgIF

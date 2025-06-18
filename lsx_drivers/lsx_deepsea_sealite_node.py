@@ -25,7 +25,7 @@ import time
 import re
 import sys
 
-from nepi_sdk_interfaces.msg import LSXStatus
+from nepi_interfaces.msg import LSXStatus
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils

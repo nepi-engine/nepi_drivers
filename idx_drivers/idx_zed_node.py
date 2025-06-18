@@ -45,8 +45,8 @@ from nepi_sdk import nepi_settings
 from datetime import datetime
 from std_msgs.msg import UInt8, Empty, String, Bool, Float32
 from sensor_msgs.msg import Image, PointCloud2
-from nepi_sdk_interfaces.msg import IDXStatus, RangeWindow, SaveDataStatus, SaveDataRate
-from nepi_sdk_interfaces.srv import IDXCapabilitiesQuery, IDXCapabilitiesQueryResponse
+from nepi_interfaces.msg import IDXStatus, RangeWindow, SaveDataStatus, SaveDataRate
+from nepi_interfaces.srv import IDXCapabilitiesQuery, IDXCapabilitiesQueryResponse
 from nav_msgs.msg import Odometry
 
 from dynamic_reconfigure.msg import Config
@@ -120,7 +120,7 @@ class ZedCamNode(object):
     # Create shared class variables and thread locks 
     
     device_info_dict = dict(node_name = "",
-                            sensor_name = "",
+                            device_name = "",
                             identifier = "",
                             serial_number = "",
                             hw_version = "",
@@ -349,11 +349,13 @@ class ZedCamNode(object):
         self.device_info_dict["node_name"] = self.node_name
         if self.node_name.find("_") != -1:
             split_name = self.node_name.rsplit('_', 1)
-            self.device_info_dict["sensor_name"] = split_name[0]
+            self.device_info_dict["device_name"] = split_name[0]
             self.device_info_dict["identifier"] = split_name[1]
         else:
-            self.device_info_dict["sensor_name"] = self.node_name
+            self.device_info_dict["device_name"] = self.node_name
         self.idx_if = IDXDeviceIF(device_info = self.device_info_dict,
+                                    data_source_description = 'stereo_camera',
+                                    data_ref_description = 'left_camera_lense',
                                     capSettings = self.cap_settings,
                                     factorySettings = self.factory_settings,
                                     settingUpdateFunction=self.settingUpdateFunction,

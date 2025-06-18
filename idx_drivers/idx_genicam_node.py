@@ -51,7 +51,7 @@ class GenicamCamNode:
     DEFAULT_CURRENT_FPS = 20 # Will be update later with actual
     
     device_info_dict = dict(node_name = "",
-       sensor_name = "",
+       device_name = "",
        identifier = "",
        serial_number = "",
        hw_version = "",
@@ -145,11 +145,13 @@ class GenicamCamNode:
         self.device_info_dict["node_name"] = self.node_name
         if self.node_name.find("_") != -1:
             split_name = self.node_name.rsplit('_', 1)
-            self.device_info_dict["sensor_name"] = split_name[0]
+            self.device_info_dict["device_name"] = split_name[0]
             self.device_info_dict["identifier"] = split_name[1]
         else:
-            self.device_info_dict["sensor_name"] = self.node_name
+            self.device_info_dict["device_name"] = self.node_name
         self.idx_if = IDXDeviceIF(device_info = self.device_info_dict,
+                                    data_source_description = 'camera',
+                                    data_ref_description = 'camera_lense',
                                     capSettings = self.cap_settings,
                                     factorySettings = self.factory_settings,
                                     settingUpdateFunction= self.settingUpdateFunction,

@@ -70,8 +70,8 @@ from geographic_msgs.msg import GeoPoint
 from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
-from nepi_sdk_interfaces.msg import RBXGotoPose, RBXGotoPosition, RBXGotoLocation
-from nepi_sdk_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
+from nepi_interfaces.msg import RBXGotoPose, RBXGotoPosition, RBXGotoLocation
+from nepi_interfaces.srv import NavPoseQuery, NavPoseQueryRequest
 
 from mavros_msgs.msg import HilGPS, State
 

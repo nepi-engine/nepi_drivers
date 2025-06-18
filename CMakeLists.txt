@@ -20,7 +20,7 @@ set(CMAKE_VERBOSE_MAKEFILE TRUE)
 set(OpenCV_DIR /usr/share/OpenCV)
 
 find_package(catkin REQUIRED
-    COMPONENTS std_msgs sensor_msgs nepi_sdk nepi_api nepi_sdk_interfaces cv_bridge OpenCV  serial pcl_ros pcl_conversions tf2_ros )
+    COMPONENTS std_msgs sensor_msgs nepi_sdk nepi_api nepi_interfaces cv_bridge OpenCV  serial pcl_ros pcl_conversions tf2_ros )
 
 find_package(PkgConfig)
 
@@ -110,7 +110,7 @@ catkin_python_setup()
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-	CATKIN_DEPENDS sensor_msgs nepi_sdk_interfaces nepi_sdk
+	CATKIN_DEPENDS sensor_msgs nepi_interfaces nepi_sdk
 )
 
 ###########

@@ -26,7 +26,7 @@ from nepi_sdk import nepi_settings
 from nepi_api.device_if_ptx import PTXActuatorIF
 from nepi_api.messages_if import MsgIF
 
-from nepi_sdk_interfaces.msg import IDXStatus
+from nepi_interfaces.msg import IDXStatus
 
 PKG_NAME = 'PTX_SIDUS_SS109_ONVIF' # Use in display menus
 FILE_TYPE = 'NODE'
