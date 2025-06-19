@@ -24,8 +24,6 @@ import time
 import re
 import sys
 
-from nepi_interfaces.msg import LSXStatus
-
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
@@ -236,7 +234,7 @@ class AfTowerLightNode(object):
     # update status values from device
     success=self.update_status_values()
     # Create LSX status message
-    status_msg=LSXStatus()
+    status_msg=self.self.lsx_if.get_blank_status_msg()
     status_msg.device_name = self.device_info_dict["device_name"]
     status_msg.user_name = self.device_info_dict["device_name"]
     status_msg.identifier = self.device_info_dict["identifier"]
