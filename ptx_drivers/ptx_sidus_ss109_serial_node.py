@@ -28,6 +28,7 @@ import math
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
+from nepi_sdk import nepi_nav
 
 from nepi_api.device_if_ptx import PTXActuatorIF
 from nepi_api.messages_if import MsgIF
@@ -235,8 +236,7 @@ class SidusSS109SerialPTXNode:
                                         goHomeCb = self.goHome,
                                         setHomePositionCb = self.setHomePosition,
                                         setHomePositionHereCb = self.setHomePositionHere,
-                                        getNpHeadingCb = None, getNpPositionCb = None, getNpOrientationCb = self.getOrientationCb,
-                                        getNpLocationCb = None, getNpAltitudeCb = None, getNpDepthCb = None,
+                                        getNavPoseCb = self.getNavPoseDict,
                                         max_navpose_update_rate = self.MAX_POSITION_UPDATE_RATE,
                                         deviceResetCb = self.resetDevice
                                         )
@@ -266,14 +266,16 @@ class SidusSS109SerialPTXNode:
         dev_info_string += "Serial Number: " + self.dev_info["SerialNum"] + "\n"
         self.msg_if.pub_info(dev_info_string)
 
-    def getOrientationCb(self):
+       
+    def getNavPoseDict(self):
         pan_deg, tilt_deg = self.current_position
-        orientation_dict = dict()
-        orientation_dict['time_oreantation'] = nepi_utils.get_time()
-        orientation_dict['roll_deg'] = 0.0
-        orientation_dict['yaw_deg'] = pan_deg * self.PAN_DEG_DIR
-        orientation_dict['pitch_deg'] = tilt_deg * self.TILT_DEG_DIR
-        return orientation_dict
+        navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
+        navpose_dict['has_orientation'] = True
+        navpose_dict['time_oreantation'] = nepi_utils.get_time()
+        navpose_dict['roll_deg'] = 0.0
+        navpose_dict['yaw_deg'] = pan_deg * self.PAN_DEG_DIR
+        navpose_dict['pitch_deg'] = tilt_deg * self.TILT_DEG_DIR
+        return navpose_dict
 
 
     #**********************

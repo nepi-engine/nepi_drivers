@@ -22,6 +22,7 @@ from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
+from nepi_sdk import nepi_nav
 
 from nepi_api.device_if_ptx import PTXActuatorIF
 from nepi_api.messages_if import MsgIF
@@ -296,10 +297,7 @@ class SidusSs109OnvifNode:
                                         goHomeCb = ptx_callback_names["GoHome"],
                                         setHomePositionCb = ptx_callback_names["SetHomePosition"],
                                         setHomePositionHereCb = ptx_callback_names["SetHomePositionHere"],
-                                        capSettingsNavPose=None, factorySettingsNavPose=None,
-                                        settingUpdateFunctionNavPose=None, getSettingsFunctionNavPose=None,
-                                        getNpHeadingCb = None, getNpPositionCb = None, getNpOrientationCb = self.getOrientationCb,
-                                        getNpLocationCb = None, getNpAltitudeCb = None, getNpDepthCb = None,
+                                        getNavPoseCb = self.getNavPoseDict,
                                         navpose_update_rate = self.POSITION_UPDATE_RATE)
                                         
             self.msg_if.pub_info(" ... PTX interface running")
@@ -311,15 +309,15 @@ class SidusSs109OnvifNode:
         return self.current_position
 
 
-    def getOrientationCb(self):
+    def getNavPoseDict(self):
         pan_deg, tilt_deg = self.getCurrentPosition()
-        orientation_dict = dict()
-        orientation_dict['time_oreantation'] = nepi_utils.get_time()
-        orientation_dict['roll_deg'] = 0.0
-        orientation_dict['yaw_deg'] = pan_deg
-        orientation_dict['pitch_deg'] = tilt_deg
-        self.current_position = [pan_deg,tilt_deg]
-        return orientation_dict
+        navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
+        navpose_dict['has_orientation'] = True
+        navpose_dict['time_oreantation'] = nepi_utils.get_time()
+        navpose_dict['roll_deg'] = 0.0
+        navpose_dict['yaw_deg'] = pan_deg * self.PAN_DEG_DIR
+        navpose_dict['pitch_deg'] = tilt_deg * self.TILT_DEG_DIR
+        return navpose_dict
 
 
     def camStatusCb(self,msg):

@@ -174,23 +174,8 @@ class ZedCamNode(object):
 
     framerate_ratio = 1.0
 
-    position_dict = {
-        'time_position': nepi_utils.get_time(),
-        # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
-        'x_m': 0.0,
-        'y_m': 0.0,
-        'z_m': 0.0,
-    }
-
-
-    orientation_dict = {
-        'time_oreientation': nepi_utils.get_time(),
-        # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
-        'roll_deg': 0.0,
-        'pitch_deg': 0.0,
-        'yaw_deg': 0.0,
-    }
-
+    navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
+ 
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"         
     drv_dict = dict()                          
@@ -354,6 +339,7 @@ class ZedCamNode(object):
         else:
             self.device_info_dict["device_name"] = self.node_name
         self.idx_if = IDXDeviceIF(device_info = self.device_info_dict,
+                                    data_products =  self.data_products,
                                     data_source_description = 'stereo_camera',
                                     data_ref_description = 'left_camera_lense',
                                     capSettings = self.cap_settings,
@@ -370,9 +356,7 @@ class ZedCamNode(object):
                                     stopDepthMapAcquisition = self.stopDepthMap,
                                     getPointcloud = self.getPointcloud, 
                                     stopPointcloudAcquisition = self.stopPointcloud,                                  
-                                    getPositionCb = self.getPositionDict, 
-                                    getOrientationCb = self.getOrientationDict,
-                                    data_products =  self.data_products,
+                                    getNavPoseCb = self.getNavPoseDict, 
                                     navpose_update_rate = 10 
                                     )
         self.msg_if.pub_info("... IDX interface running")
@@ -581,8 +565,8 @@ class ZedCamNode(object):
         # callback to get and process point_cloud image
 
 
-    def getPositionDict(self):
-      return self.position_dict
+    def getNavPoseDict(self):
+      return self.navpose_dict
 
     def getOrientationDict(self):
       return self.orientation_dict
@@ -602,18 +586,19 @@ class ZedCamNode(object):
 
         timestamp = nepi_sdk.sec_from_msg_stamp(odom_msg.header.stamp)
 
-
-        self.orientation_dict['time_oreantation'] = timestamp
+        self.navpose_dict['has_orientation']
+        self.navpose_dict['time_oreantation'] = timestamp
         # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
-        self.orientation_dict['roll_deg'] = rpy[0]
-        self.orientation_dict['pitch_deg'] = rpy[1]
-        self.orientation_dict['yaw_deg'] = rpy[2]
+        self.navpose_dict['roll_deg'] = rpy[0]
+        self.navpose_dict['pitch_deg'] = rpy[1]
+        self.navpose_dict['yaw_deg'] = rpy[2]
 
-        self.position_dict['time_position'] = timestamp
+        self.navpose_dict['has_position']
+        self.navpose_dict['time_position'] = timestamp
         # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
-        self.position_dict['x_m'] = xyz[0]
-        self.position_dict['y_m'] = xyz[1]
-        self.position_dict['z_m'] = xyz[2]
+        self.navpose_dict['x_m'] = xyz[0]
+        self.navpose_dict['y_m'] = xyz[1]
+        self.navpose_dict['z_m'] = xyz[2]
 
 
     #**********************
