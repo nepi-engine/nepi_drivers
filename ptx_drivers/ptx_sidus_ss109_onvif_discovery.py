@@ -26,7 +26,6 @@ import ipaddress
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_drvs
-from nepi_sdk import nepi_msg
 
 PKG_NAME = 'PTX_SIDUS_SS109_ONVIF' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
@@ -55,12 +54,18 @@ class SidusSs109Onvif0Discovery:
 
   ################################################          
   def __init__(self):
-    self.log_name = PKG_NAME.lower() + "_discovery" 
-    nepi_msg.createMsgPublishers(self)
-    time.sleep(1)
-    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Starting Initialization")
-    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Initialization Complete")
+    nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
+    self.class_name = type(self).__name__
+    self.base_namespace = nepi_sdk.get_base_namespace()
+    self.node_name = nepi_sdk.get_node_name()
+    self.node_namespace = nepi_sdk.get_node_namespace()
+
+    ##############################  
+    # Create Msg Class
+    self.msg_if = MsgIF(log_name = self.class_name)
+    self.msg_if.pub_info("Starting Node Initialization Processes")
     self.letters_list = list(string.ascii_uppercase)
+    self.msg_if.pub_info("Initialization Complete")
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
@@ -73,7 +78,7 @@ class SidusSs109Onvif0Discovery:
     ########################
     # Get discovery options
     try:
-      #Snepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Starting discovery with drv_dict " + str(drv_dict))#
+      self.msg_if.pub_debug("Starting discovery with drv_dict " + str(drv_dict), throttle_s = 5.0)
       baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
       baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
       baudrate_list = []
@@ -109,7 +114,7 @@ class SidusSs109Onvif0Discovery:
       ip_port = drv_dict['DISCOVERY_DICT']['OPTIONS']['ip_port']['value']
 
     except Exception as e:
-      nepi_msg.publishMsgWarn(self, ":" + self.log_name + ": Failed to load options " + str(e))#
+      self.msg_if.pub_warn("Failed to load options " + str(e), throttle_s = 5.0)
       return None
 
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
@@ -126,12 +131,12 @@ class SidusSs109Onvif0Discovery:
         try:
             test = ipaddress.ip_address(ip_addr)
         except Exception as e:
-            nepi_msg.publishMsgWarn(self, ":" + self.log_name + ": Not a valid IP address " + ip_addr + " " + str(e))#
+            self.msg_if.pub_warn("Not a valid IP address " + ip_addr + " " + str(e), throttle_s = 5.0)
             return self.active_paths_list
         try:
             test = int(ip_port)
         except Exception as e:
-            nepi_msg.publishMsgWarn(self, ":" + self.log_name + ": Not a valid IP port " + ip_port + " " + str(e))#
+            self.msg_if.pub_warn("Not a valid IP port " + ip_port + " " + str(e), throttle_s = 5.0)
             return self.active_paths_list
         success = nepi_sdk.ping_ip(ip_addr)
         if success == True:
@@ -159,8 +164,8 @@ class SidusSs109Onvif0Discovery:
         if path_str.find(id) != -1 or path_str in self.active_paths_list:
           valid_path = False
       if valid_path:
-        #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Looking for path: " + path_str)
-        #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": In path_list: " + str(self.active_paths_list))
+        self.msg_if.pub_debug("Looking for path: " + path_str, throttle_s = 5.0)
+        self.msg_if.pub_debug("In path_list: " + str(self.active_paths_list), throttle_s = 5.0)
         found = self.checkForDevice(path_str)
         if found:
           success = self.launchDeviceNode(path_str)
@@ -171,9 +176,9 @@ class SidusSs109Onvif0Discovery:
 
   ##########  Device specific calls
   def checkForDevice(self,path_str):
-    #nepi_msg.publishMsgWarn(self, "Sealight checkForDevice start")###
+    self.msg_if.pub_debug("Check for device start", throttle_s = 5.0)
     found_device = False
-    #nepi_msg.publishMsgWarn(self, ": " + self.log_name + ": Running device search with path: " + path_str + " and buadlist " + str(self.baudrate_list))
+    self.msg_if.pub_debug("Running device search with path: " + path_str + " and buadlist " + str(self.baudrate_list), throttle_s = 5.0)
     if path_str not in self.active_paths_list:
       for baud_str in self.baudrate_list:
         self.baud_str = baud_str
@@ -186,7 +191,7 @@ class SidusSs109Onvif0Discovery:
           elif self.connection == 'TCP-Server':
             serial_port = serial.serial_for_url('socket://' + path_str, timeout=1)
         except Exception as e:
-          nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
+          self.msg_if.pub_warn("Unable to open serial port " + path_str + " with baudrate: " + baud_str + " " + str(e), throttle_s = 5.0)
           continue
         #################################################
         for addr_str in self.addr_search_list:
@@ -206,14 +211,14 @@ class SidusSs109Onvif0Discovery:
             bs = serial_port.readline()
             response = bs.decode()
           except Exception as e:
-            #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ": Got a serial read/write error: " + str(e))
+            self.msg_if.pub_debug("Got a serial read/write error: " + str(e), throttle_s = 5.0)
             continue
           #############################################
           if len(response) > 5:
             if response[0:5] == ser_msg[0:5]:
-              nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at path: " + path_str)
-              nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at baudrate: " + baud_str)
-              nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Found device at address: " + self.addr_str)
+              self.msg_if.pub_debug("Found device at path: " + path_str, throttle_s = 5.0)
+              self.msg_if.pub_debug("Found device at baudrate: " + baud_str, throttle_s = 5.0)
+              self.msg_if.pub_debug("Found device at address: " + self.addr_str, throttle_s = 5.0)
               found_device = True
               return found_device
           ##############################################
@@ -227,7 +232,7 @@ class SidusSs109Onvif0Discovery:
     if path_str not in self.available_paths_list:
       active = False
     if active == False:
-      nepi_msg.publishMsgInfo(self, ":  " +self.log_name + "No longer detecting device on : " + path_str)
+      self.msg_if.pub_warn("No longer detecting device on : " + path_str)
       if path_str in self.active_devices_dict.keys():
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
@@ -257,7 +262,7 @@ class SidusSs109Onvif0Discovery:
 
     ### Start Node Luanch Process
     device_node_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
-    nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + device_node_name)
+    self.msg_if.pub_warn("launching node: " + device_node_name, throttle_s = 5.0)
     #Setup required param server drv_dict for discovery node
     dict_param_name = self.base_namespace + device_node_name + "/drv_dict"
     # Try to load node saved device config
@@ -267,8 +272,9 @@ class SidusSs109Onvif0Discovery:
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
     self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str
     self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
-    #nepi_msg.publishMsgInfo(self, ":" + self.log_name + ":  launching node: " + str(self.drv_dict))
-    nepi_msg.publishMsgInfo(self,  ":" + self.log_name + ": Launching node  with path: " + path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str)
+    self.msg_if.pub_debug("Launching node: " + str(self.drv_dict), throttle_s = 5.0)
+    self.msg_if.pub_debug("Launching node with path: " + \
+                       path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str, throttle_s = 5.0)
     nepi_sdk.set_param(self,dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name, device_path = path_str)
     if success == True:
@@ -277,14 +283,14 @@ class SidusSs109Onvif0Discovery:
     # Process luanch results
     self.launch_time_dict[launch_id] = nepi_sdk.get_time()
     if success:
-      nepi_msg.publishMsgInfo(self," Launched node: " + device_node_name)
+      self.msg_if.pub_warn("Launched node: " + device_node_name, throttle_s = 5.0)
     else:
-      nepi_msg.publishMsgInfo(self," Failed to lauch node: " + device_node_name + " with msg: " + msg)
+      self.msg_if.pub_warn("Failed to lauch node: " + device_node_name + " with msg: " + msg, throttle_s = 5.0)
       if self.retry == False:
-        nepi_msg.publishMsgInfo(self," Will not try relaunch for node: " + device_node_name)
+        self.msg_if.pub_warn("Will not try relaunch for node: " + device_node_name)
         self.dont_retry_list.append(launch_id)
       else:
-        nepi_msg.publishMsgInfo(self," Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+        self.msg_if.pub_warn("Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs", throttle_s = 5.0)
     return success
 
   def ping_ip(self,ip_address):

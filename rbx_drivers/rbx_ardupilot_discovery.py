@@ -61,6 +61,7 @@ class ArdupilotDiscovery:
   includeDevices = []
   excludedDevices = ['ttyACM']
 
+  fake_gps_filename = "fake_gps_node.py"
   ################################################          
   def __init__(self):
     ############
@@ -347,7 +348,7 @@ class ArdupilotDiscovery:
       #Start the an RBX fake gps for this ardupilot node
       fgps_node_name = "fake_gps_" + device_id_str
       self.logger.log_info("" + "Starting fake gps rbx node: " + fgps_node_name)
-      processor_run_cmd = ["rosrun", "nepi_drivers", "fake_gps.py",
+      processor_run_cmd = ["rosrun", "nepi_drivers", self.fake_gps_filename,
                             "__name:=" + fgps_node_name, f"__ns:={self.base_namespace}"]
       fgps_subproc = subprocess.Popen(processor_run_cmd)
 

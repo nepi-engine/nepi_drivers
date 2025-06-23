@@ -60,7 +60,6 @@ import math
 import random
 import copy
 from nepi_sdk import nepi_sdk 
-from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_nav
 from nepi_sdk import nepi_rbx
 
@@ -128,7 +127,7 @@ class RBXFakeGPS:
     ##############################  
     # Create Msg Class
     self.msg_if = MsgIF(log_name = self.class_name)
-    self.msg_if.pub_info("Starting IF Initialization Processes")
+    self.msg_if.pub_info("Starting Initialization Processes")
     ##############################
 
 

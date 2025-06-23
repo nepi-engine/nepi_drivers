@@ -23,7 +23,6 @@ import os
 import copy
 from onvif import ONVIFCamera # python-onvif
 
-from nepi_sdk import nepi_msg
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 

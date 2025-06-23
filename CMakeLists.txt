@@ -125,7 +125,7 @@ catkin_package(
 #############
 
 catkin_install_python(PROGRAMS
-  scripts/fake_gps.py
+  scripts/fake_gps_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
