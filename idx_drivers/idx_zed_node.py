@@ -365,7 +365,6 @@ class ZedCamNode(object):
         self.logDeviceInfo()
 
         # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
-        self.idx_if.initConfig()
 
         # Try to backup camera calibration files
         [success,files_copied,files_not_copied] = nepi_utils.copy_files_from_folder(self.CAL_SRC_PATH,self.CAL_BACKUP_PATH)

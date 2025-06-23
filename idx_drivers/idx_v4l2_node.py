@@ -181,8 +181,6 @@ class V4l2CamNode:
         self.getColorImg()
         # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
         time.sleep(1)
-        self.idx_if.initConfig()
-        self.idx_if.publishStatus()
 
         ## Initiation Complete
         self.msg_if.pub_info("Initialization Complete")

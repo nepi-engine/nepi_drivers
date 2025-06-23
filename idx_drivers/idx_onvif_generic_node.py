@@ -187,7 +187,6 @@ class OnvifCamNode:
                                     data_products = ['color_image'])
             self.msg_if.pub_info(" ... IDX interface running")
             # Now that all camera start-up stuff is processed, we can update the camera from the parameters that have been established
-            self.idx_if.initConfig()
 
             # Now start the node
             nepi_sdk.spin()

@@ -470,10 +470,6 @@ class OnvifPanTiltNode:
         if self.driver.homePositionAdjustable is True:
             self.driver.setHomeHere()
 
-    def setCurrentSettingsAsDefault(self):
-        # Don't need to worry about any of our params in this class, just child interfaces' params
-        if self.ptx_if is not None:
-            self.ptx_if.initConfig()
 
     def updateFromParamServer(self):
         if self.ptx_if is not None:

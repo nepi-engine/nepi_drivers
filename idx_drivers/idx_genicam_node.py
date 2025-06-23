@@ -164,7 +164,6 @@ class GenicamCamNode:
                                     data_products = self.data_products)
         self.msg_if.pub_info("... IDX interface running")
         self.logDeviceInfo()
-        self.idx_if.initConfig()
 
 
         ## Initiation Complete

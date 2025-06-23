@@ -498,11 +498,6 @@ class IqrPanTiltNode:
         self.home_tilt_deg = tilt_deg * self.TILT_DEG_DIR
 
 
-    def setCurrentSettingsAsDefault(self):
-        # Don't need to worry about any of our params in this class, just child interfaces' params
-        if self.ptx_if is not None:
-            self.ptx_if.initConfig()
-
     def resetDevice(self):
         self.speed_ratio = 0.5
         self.limits_dict['min_pan_softstop_deg'] = self.FACTORY_LIMITS_DICT['min_pan_softstop_deg']
