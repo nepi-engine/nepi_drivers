@@ -170,7 +170,7 @@ class SealiteNode(object):
         #Start with off. IF will set to saved value
         self.turnOnOff(False)
 
-        # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
+        # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
         self.msg_if.pub_info("Launching NEPI LSX () interface...")
         self.device_info_dict["node_name"] = self.node_name
         if self.node_name.find("_") != -1:
