@@ -28,10 +28,10 @@ from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
 
+from nepi_interfaces.msg import DeviceLSXStatus
+
 from nepi_api.device_if_lsx import LSXDeviceIF
 from nepi_api.messages_if import MsgIF
-
-
 
 PKG_NAME = 'LSX_AFTOWERLIGHT'
 FILE_TYPE = 'NODE'
@@ -142,6 +142,9 @@ class AfTowerLightNode(object):
       self.cap_settings = self.getCapSettings()
       self.factory_settings = self.getFactorySettings()
 
+      #Start with off. IF will set to saved value
+      self.turnOnOff(False)
+
       # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
       self.msg_if.pub_info("Launching NEPI LSX () interface...")
       self.device_info_dict["node_name"] = self.node_name
@@ -234,7 +237,7 @@ class AfTowerLightNode(object):
     # update status values from device
     success=self.update_status_values()
     # Create LSX status message
-    status_msg=self.self.lsx_if.get_blank_status_msg()
+    status_msg= DeviceLSXStatus()
     status_msg.device_name = self.device_info_dict["device_name"]
     status_msg.user_name = self.device_info_dict["device_name"]
     status_msg.identifier = self.device_info_dict["identifier"]

@@ -37,7 +37,7 @@ from nepi_api.messages_if import MsgIF
 
 
 
-PKG_NAME = 'LSX_DEEPSEA_SEALITE'
+PKG_NAME = 'LSX_SIDUS_SS182_SERIAL'
 FILE_TYPE = 'NODE'
 
 
@@ -49,7 +49,7 @@ DEFAULT_CURVE = [DEFAULT_MIN,DEFAULT_MAX,'1','5','70','95','4.5']
 # Sealite LSX Driver Node Class
 #########################################
 
-class SealiteNode(object):
+class SidusSS182SerialNode(object):
   ### LXS Driver Settings
   # Set driver capability parameters
 
@@ -153,9 +153,6 @@ class SealiteNode(object):
       zero_prefix_len = 3-len(self.addr_str)
       for z in range(zero_prefix_len):
         self.addr_str = ('0' + self.addr_str)  
-
-
-
       ################################################  
       self.msg_if.pub_info("Connecting to Device on port " + self.port_str + " with baud " + self.baud_str)
       ### Try and connect to device
@@ -170,7 +167,7 @@ class SealiteNode(object):
         #Start with off. IF will set to saved value
         self.turnOnOff(False)
 
-        # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
+        # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
         self.msg_if.pub_info("Launching NEPI LSX () interface...")
         self.device_info_dict["node_name"] = self.node_name
         if self.node_name.find("_") != -1:
@@ -199,6 +196,7 @@ class SealiteNode(object):
                     reports_temp = True, 
                     reports_power = False
                     )
+        self.turnOnOff(False)
         # Start an sealite activity check process that kills node after some number of failed comms attempts
         self.msg_if.pub_info("Starting an activity check process")
         nepi_sdk.start_timer_process((0.2), self.check_timer_callback)
@@ -642,7 +640,7 @@ class SealiteNode(object):
       self.serial_port.close()
       
 if __name__ == '__main__':
-  SealiteNode()
+  SidusSS182SerialNode()
 
 
 

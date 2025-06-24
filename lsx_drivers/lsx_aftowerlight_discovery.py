@@ -158,7 +158,7 @@ class AfTowerLightDiscovery:
     if launch_id in self.launch_time_dict.keys():
       launch_time = self.launch_time_dict[launch_id]
       cur_time = nepi_sdk.get_time()
-      launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
+      launch_check = (cur_time - launch_time) > self.NODE_LOAD_TIME_SEC
     if launch_check == False:
       return False   ###
 
@@ -188,7 +188,7 @@ class AfTowerLightDiscovery:
         self.logger.log_warn("Will not try relaunch for node: " + node_name)
         self.dont_retry_list.append(launch_id)
       else:
-        self.logger.log_warn("Will attemp relaunch for node: " + node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+        self.logger.log_warn("Will attemp relaunch for node: " + node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
     return success
 
 
