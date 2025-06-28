@@ -44,8 +44,6 @@ class ZedCamDiscovery:
   
   settings_if = None
 
-  NEPI_DEFAULT_CFG_PATH = '/opt/nepi/ros/etc/nepi_drivers'
-  NEPI_DEFAULT_USER_CFG_PATH = 'mnt/nepi_storage/user_cfg/ros'
   CHECK_INTERVAL_S = 3.0
   DEVICE_DICT = dict()
   ################################################

@@ -40,8 +40,6 @@ class V4L2CamDiscovery:
   includeDevices = []
   excludedDevices = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X']     
 
-  NEPI_DEFAULT_CFG_PATH = '/opt/nepi/ros/etc/nepi_drivers'
-  NEPI_DEFAULT_USER_CFG_PATH = 'mnt/nepi_storage/user_cfg/ros'
   CHECK_INTERVAL_S = 3.0
 
 

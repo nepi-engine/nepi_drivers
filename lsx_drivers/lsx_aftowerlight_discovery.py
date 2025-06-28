@@ -24,6 +24,7 @@ import serial.tools.list_ports
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
+from nepi_sdk import nepi_serial
 
 from nepi_sdk.nepi_sdk import logger as Logger
 log_name = "iqr_pan_tilt"
@@ -115,12 +116,12 @@ class AfTowerLightDiscovery:
     found_device = False
     #self.logger.log_warn("path_str " + path_str)
     if path_str.find('ttyUSB') != -1:
-      usb_dict = nepi_drvs.getSerialPortDict()
-      #self.logger.log_warn("serial_port_dict " + str(usb_dict))
-      if path_str in usb_dict.keys():
+      ports_dict = nepi_serial.get_serial_ports_dict_list()
+      #self.logger.log_warn("serial_port_dict " + str(ports_dict))
+      if path_str in ports_dict.keys():
         #self.logger.log_warn("search ids " + str(self.search_ids))
-        #self.logger.log_warn("serial_port product id " + str(usb_dict[path_str]['product_id']))
-        if str(usb_dict[path_str]['product_id']) in self.includeDevices:
+        #self.logger.log_warn("serial_port product id " + str(ports_dict[path_str]['product_id']))
+        if str(ports_dict[path_str]['product_id']) in self.includeDevices:
           #self.logger.log_warn("found device on path: " + path_str)
           found_device = True
     return found_device

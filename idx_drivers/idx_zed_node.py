@@ -45,7 +45,7 @@ from nepi_sdk import nepi_settings
 from datetime import datetime
 from std_msgs.msg import UInt8, Empty, String, Bool, Float32
 from sensor_msgs.msg import Image, PointCloud2
-from nepi_interfaces.msg import IDXStatus, RangeWindow, SaveDataStatus, SaveDataRate
+from nepi_interfaces.msg import RangeWindow, SaveDataStatus, SaveDataRate
 from nepi_interfaces.srv import IDXCapabilitiesQuery, IDXCapabilitiesQueryResponse
 from nav_msgs.msg import Odometry
 
@@ -62,7 +62,7 @@ FILE_TYPE = 'NODE'
 TEST_DRV_DICT = {
 'type': 'IDX',
 'group_id': 'None',
-'usr_cfg_path': '/mnt/nepi_storage/user_cfg/ros',
+'usr_cfg_path': '/mnt/nepi_storage/user_cfg',
 'NODE_DICT': {
     'file_name': 'idx_zed_node.py',
     'class_name': 'ZedCamNode',
