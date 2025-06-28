@@ -117,6 +117,11 @@ class SidusSS182SerialNode(object):
 
   cur_curve = DEFAULT_CURVE
 
+  CONFIGS_DICT = {
+        'Standard' : {'data_len': 4},
+  }
+  config_dict = CONFIGS_DICT['Standard']
+  data_len = 4
   ### LXS Driver NODE Initialization
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
@@ -134,39 +139,47 @@ class SidusSS182SerialNode(object):
       self.msg_if = MsgIF(log_name = self.class_name)
       self.msg_if.pub_info("Starting Node Initialization Processes")
 
-      ##############################  
-      # Initialize Class Variables
+    ##############################  
+    # Initialize Class Variables
 
-      # Get required drv driver dict info
-      self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
-      #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
-      try:
+    # Get required drv driver dict info
+    self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
+    #self.msg_if.pub_warn("Got Drivers_Dict from param server: " + str(self.drv_dict))
+    try:
         self.port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
         self.baud_str = self.drv_dict['DEVICE_DICT']['baud_str'] 
         self.baud_int = int(self.baud_str)
         self.addr_str = self.drv_dict['DEVICE_DICT']['addr_str'] 
-      except Exception as e:
+
+        system_config = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['system_config']['value']
+        if system_config in self.CONFIGS_DICT.keys():
+            self.config_dict = self.CONFIGS_DICT[system_config]
+        self.data_len = self.config_dict['data_len']
+    except Exception as e:
         self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
         nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
         return
-      # Address string must be three char long
-      zero_prefix_len = 3-len(self.addr_str)
-      for z in range(zero_prefix_len):
-        self.addr_str = ('0' + self.addr_str)  
-      ################################################  
-      self.msg_if.pub_info("Connecting to Device on port " + self.port_str + " with baud " + self.baud_str)
-      ### Try and connect to device
-      self.connected = self.connect() 
-      if self.connected:
-        # Create LSX  node
-        self.msg_if.pub_info("Connected")
+
+    ################################################  
+    self.msg_if.pub_info("Connecting to Device on port " + self.port_str + " with baud " + self.baud_str)
+    ### Try and connect to device
+    while self.connected == False and self.connect_attempts < 5:
+        self.connected = self.connect() 
+        if self.connected == False:
+            nepi_sdk.sleep(1)
+    if self.connected == False:
+        self.msg_if.pub_info("Shutting down node")
+        self.msg_if.pub_info("Specified serial port not available")
+        nepi_sdk.signal_shutdown("Serial port not available")   
+    else:
+        ################################################
+        self.msg_if.pub_info("... Connected!")
+        self.dev_info = self.driver_getDeviceInfo()
+        self.logDeviceInfo()
         # Initialize settings
         self.cap_settings = self.getCapSettings()
         self.factory_settings = self.getFactorySettings()
-
-        #Start with off. IF will set to saved value
-        self.turnOnOff(False)
-
+          
         # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
         self.msg_if.pub_info("Launching NEPI LSX () interface...")
         self.device_info_dict["node_name"] = self.node_name
@@ -221,43 +234,42 @@ class SidusSS182SerialNode(object):
       return self.CAP_SETTINGS
 
   def getFactorySettings(self):
-    settings = self.getSettings()
-    #Apply factory setting overides
-    for setting_name in settings.keys():
-      if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
-            settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
-    return settings
-
+      settings = self.getSettings()
+      #Apply factory setting overides
+      for setting_name in settings.keys():
+          if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
+                  settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
+      return settings
 
 
   def getSettings(self):
       settings = dict()
       for setting_name in self.cap_settings.keys():
-        cap_setting = self.cap_settings[setting_name]
-        setting = dict()
-        setting["name"] = setting_name
-        setting["type"] = cap_setting['type']
-        val = None
-        if setting_name in self.settingFunctions.keys():
-          function_str_name = self.settingFunctions[setting_name]['get']
-          #self.msg_if.pub_info("Calling get setting function " + function_str_name)
-          get_function = globals()[function_str_name]
-          val = get_function(self)
-        if val is not None:
-            setting["value"] = str(val)
-            settings[setting_name] = setting
-      return settings
+          cap_setting = self.cap_settings[setting_name]
+          setting = dict()
+          setting["name"] = setting_name
+          setting["type"] = cap_setting['type']
+          val = None
+          if setting_name in self.settingFunctions.keys():
+              function_str_name = self.settingFunctions[setting_name]['get']
+              #self.msg_if.pub_info("Calling get setting function " + function_str_name)
+              get_function = globals()[function_str_name]
+              val = get_function(self)
+              if val is not None:
+                  setting["value"] = str(val)
+                  settings[setting_name] = setting
+          return settings
 
 
 
   def setSetting(self,setting_name,val):
-    success = False
-    if setting_name in self.settingFunctions.keys():
+      success = False
+      if setting_name in self.settingFunctions.keys():
           function_str_name = self.settingFunctions[setting_name]['set']
           #self.msg_if.pub_info("Calling set setting function " + function_str_name)
           set_function = globals()[function_str_name]
           success = set_function(self,val)
-    return success
+      return success
 
 
   def settingUpdateFunction(self,setting):
@@ -278,68 +290,32 @@ class SidusSS182SerialNode(object):
           msg = (self.node_name  + " Setting data" + setting_str + " is None")
       return success, msg
 
-  ##############
-  ### Settings Functions
-
-  global getMinIntensityPercent
-  def getMinIntensityPercent(self):
-    success = False
-    val = '-999'
-    ser_msg= ('!' + self.addr_str + ':curv=?')
-    response = self.send_msg(ser_msg)
-    response_curv_parts = response.split(',')
-    if len(response_curv_parts) == 7:
-      self.cur_curv = response_curv_parts
-      val = response_curv_parts[0]
-      success = True
-    return val
-
-  global setMinIntensityPercent
-  def setMinIntensityPercent(self,val):
-    cur_curv = self.cur_curve
-    cur_max = cur_curv[1]
-    #success = False
-    if int(val) < int(cur_max):
-      cur_curv[0] = val
-      curv_str = ", ".join(cur_curv)
-      ser_msg_start= ('!' + self.addr_str + ':CURV=')
-      ser_msg = ser_msg_start + curv_str
-      response = self.send_msg(ser_msg)
-      if response == 'ACK':
-        self.cur_curv = cur_curv
-        success = True
-      return success
+    ##############
+    ### Settings Functions
 
   global getMaxIntensityPercent
   def getMaxIntensityPercent(self):
+    data_str = '000'
     success = False
-    val = '-999'
-    ser_msg= ('!' + self.addr_str + ':CURV=?')
-    response = self.send_msg(ser_msg)
-    response_curv_parts = response.split(',')
-    if len(response_curv_parts) == 7:
-      self.cur_curv = response_curv_parts
-      val = response_curv_parts[0]
-      success = True
-    return val
+    ser_msg= ('&' + self.addr_str + "LPMX" + data_str + "W")
+    [success,response] = self.send_msg(ser_msg)
+
+    if success:
+      if response is not None and len(response) >= 9:
+          try:
+              data_str = response[6:9]
+              max_intensity = int(data_str) * 0.1
+              return max_intensity
+          except ValueError:
+              self.msg_if.pub_warn("Invalid response format")
 
   global setMaxIntensityPercent
-  def setMaxIntensityPercent(self,val):
-    cur_curv = self.cur_curve
-    cur_min = cur_curv[0]
-    success = False
-    if int(val) > int(cur_min):
-      cur_curv[1] = val
-      curv_str = ", ".join(cur_curv)
-      ser_msg_start= ('!' + self.addr_str + ':CURV=')
-      ser_msg = ser_msg_start + curv_str
-      response = self.send_msg(ser_msg)
-      if response == 'ACK':
-        self.cur_curv = cur_curv
-        success = True        
-    return success
-
-
+  def setMaxIntensityPercent(self, val):
+      success = False
+      data_str = create_zero_prefix_str(val)
+      ser_msg= ("&" + self.addr_str + 'LMX' + data_str + 'W')
+      [success,response] = self.send_msg(ser_msg)
+      return success
 
 
 
@@ -371,6 +347,7 @@ class SidusSS182SerialNode(object):
 
   def update_status_values(self):
     success = True
+    '''
     # Update standby status
     #self.msg_if.pub_info("Updating standby status")
     ser_msg= ('!' + self.addr_str + ':STBY?')
@@ -385,13 +362,14 @@ class SidusSS182SerialNode(object):
       #self.msg_if.pub_info("Standby: " + str(self.standby_state))
     else:
       success = False
+    '''
     # Update intensity_ratio status
     #self.msg_if.pub_info("Updating intensity_ratio status")
-    ser_msg= ('!' + self.addr_str + ':LOUT?')
+    ser_msg= ('&' + self.addr_str + 'LIN0000R')
     response = self.send_msg(ser_msg)
-    if response != None and response != "?":
+    if response is not None and response[0:5] == ser_msg[0:5]:
       try:
-        self.intensity_ratio = float(response)/100
+        self.intensity_ratio = float(response[6:9])/100
         #self.msg_if.pub_info("Intensity Ratio: " + str(self.intensity_ratio))
       except Exception as i:
         self.intensity_ratio = -999
@@ -402,6 +380,7 @@ class SidusSS182SerialNode(object):
       self.intensity_ratio = -999
       success = False
     # Update strobe enable status
+    '''
     #self.msg_if.pub_info("Updating strobe enable status")
     ser_msg= ('!' + self.addr_str + ':PMOD?')
     response = self.send_msg(ser_msg)
@@ -415,13 +394,14 @@ class SidusSS182SerialNode(object):
       #self.msg_if.pub_info("Strobe Enable: " + str(self.strobe_state))
     else:
       success = False
+    '''
     # Update temp status
     #self.msg_if.pub_info("Updating temp status")
-    ser_msg= ('!' + self.addr_str + ':TEMP?')
+    ser_msg= ('&' + self.addr_str + '0003R')
     response = self.send_msg(ser_msg)
-    if response != None and response != "?":
+    if response == ser_msg[0:5]:
       try:
-        temp_c = int(float(response))
+        temp_c = int(float(response[6:9]))
         success = True
         #self.msg_if.pub_info("Temp Deg C: " + str(temp_c))
       except Exception as t:
@@ -439,17 +419,6 @@ class SidusSS182SerialNode(object):
 
   #######################
   ### LSX IF Interface Functions
-  def setStandby(self,standby_val):
-    success = False
-    if standby_val == True:
-      ser_msg= ('!' + self.addr_str + ':STBY=1')
-    else:
-      ser_msg= ('!' + self.addr_str + ':STBY=0')
-    response = self.send_msg(ser_msg)
-    if response != None and response != "?":
-      success = True
-    return success 
-
   def turnOnOff(self,turn_on_off):
     self.on_off_state = turn_on_off
     if turn_on_off == False:
@@ -463,7 +432,6 @@ class SidusSS182SerialNode(object):
       self.setIntensityFunction(0)
     else:
       self.setIntensityFunction(self.intensity_ratio)
-    return success 
 
 
   def setIntensityRatio(self,intensity_ratio):
@@ -483,86 +451,127 @@ class SidusSS182SerialNode(object):
     zero_prefix_len = 3-len(level_str)
     for z in range(zero_prefix_len):
       level_str = ('0' + level_str)
-    ser_msg= ('!' + self.addr_str + ':LOUT=' +  level_str)
+    ser_msg = ('&' + self.addr_str + 'LIN' +  level_str + "W")
     response = self.send_msg(ser_msg)
-    if response != None and response != "?":
+    if response != None and response == ser_msg:
       success = True
     return success 
 
-  def setStrobeEnable(self,strobe_enable_val):
-    success = False
-    if strobe_enable_val == True:
-      ser_msg= ('!' + self.addr_str + ':PMOD=1')
-    else:
-      ser_msg= ('!' + self.addr_str + ':PMOD=0')
-    response = self.send_msg(ser_msg)
-    if response != None and response != "?":
-      success = True
-    return success  
-
-
-
-
   #######################
   ### Class Functions
+  def check_timer_callback(self, timer):
+      success = False
+      # Use DSN command for heartbeat
+      ser_msg = ('&' + self.addr_str + 'DSN0000R')
+      expected_prefix = ('&' + self.addr_str + 'DSN')
+      
+      ser_str = (ser_msg + '\r\n')
+      b = bytearray()
+      b.extend(map(ord, ser_str))
+      
+      try:
+          while self.serial_busy == True and not nepi_sdk.is_shutdown():
+              time.sleep(0.01)
+          self.serial_busy = True
+          self.serial_port.write(b)
+      except Exception as e:
+          self.msg_if.pub_warn("Failed to send heartbeat message")
+      
+      time.sleep(.01)
+      
+      try:
+          bs = self.serial_port.readline()
+      except Exception as e:
+          self.msg_if.pub_warn("Failed to receive heartbeat message")
+      
+      self.serial_busy = False
+      response = bs.decode().strip()
+      
+      # Check for valid response 
+      if response is not None and len(response) >= 9:
+          if response[0:len(expected_prefix)] == expected_prefix:
+              success = True
+      if success:
+          self.serial_busy = False
+          self.self_check_counter = 0
+      else:
+          self.serial_busy = True
+          self.self_check_counter = self.self_check_counter + 1
+          
+      if self.self_check_counter > self.self_check_count:
+          self.msg_if.pub_warn("Shutting down device: " + self.addr_str + " on port " + self.port_str)
+          self.msg_if.pub_warn("Too many comm failures")
+          nepi_sdk.signal_shutdown("Too many comm failures")
 
-  def check_timer_callback(self,timer):
-    success = False
-    ser_msg= ('!' + self.addr_str + ':INFO?')
-    ser_str = (ser_msg + '\r\n')
-    b=bytearray()
-    b.extend(map(ord, ser_str))
-    try:
-      while self.serial_busy == True and not nepi_sdk.is_shutdown():
-        time.sleep(0.01) # Wait for serial port to be available
-      self.serial_busy = True
-      self.serial_port.write(b)
-    except Exception as e:
-      self.msg_if.pub_warn("Failed to send message")
-    time.sleep(.01)
-    try:
-      bs = self.serial_port.readline()
-    except Exception as e:
-      self.msg_if.pub_warn("Failed to receive message")
-    self.serial_busy = False
-    response = bs.decode()
-    # Check for valid response 
-    if response != None and response != "?" and len(response)>4:
-      ret_addr = response[0:3]
-      if ret_addr == self.addr_str:
-        success = True
-    # Update results and take actions
-    if success:
-      self.serial_busy = False # Clear the busy indicator
-      self.self_check_counter = 0 # reset comms failure count
-    else:
-      self.serial_busy = True # Lock port until valid response
-      self.self_check_counter = self.self_check_counter + 1 # increment counter
-    #print("Current failed comms count: " + str(self.self_check_counter))
-    if self.self_check_counter > self.self_check_count:  # Crashes node if set above limit??
-      self.msg_if.pub_warn("Shutting down device: " +  self.addr_str + " on port " + self.port_str)
-      self.msg_if.pub_warn("Too many comm failures")
-      nepi_sdk.signal_shutdown("To many comm failures")   
-   
+
   ### Function to try and connect to device at given port and baudrate
   def connect(self):
-    success = False
-    port_check = self.check_port(self.port_str)
-    if port_check is True:
-      try:
-        # Try and open serial port
-        self.msg_if.pub_info("Opening serial port " + self.port_str + " with baudrate: " + self.baud_str)
-        self.serial_port = serial.Serial(self.port_str,self.baud_int,timeout = 0.1)
-        self.msg_if.pub_info("Serial port opened")
-        # Send Message
-        self.msg_if.pub_info("Requesting info for device: " + self.addr_str)
-        ser_msg = ('!' + self.addr_str + ':INFO?')
-        #self.msg_if.pub_info("Sending serial string: " + ser_msg)
-        response = self.send_msg(ser_msg)
-        #self.msg_if.pub_info("Got response message: " + response)
-        if len(response) > 0:
-          if response != None and response != "?" and response[3] == ",":
-            if len(response) > 4:
+      success = False
+      port_check = self.check_port(self.port_str)
+      if port_check is True:
+        try:
+          # Try and open serial port
+          self.msg_if.pub_info("Opening serial port " + self.port_str + " with baudrate: " + self.baud_str)
+          self.serial_port = serial.Serial(self.port_str,self.baud_int,timeout = 0.1)
+          self.msg_if.pub_info("Serial port opened")
+          # Send Message
+          self.msg_if.pub_info("Requesting info for device: " + self.addr_str)
+          ser_msg = ('&' + self.addr_str + 'DSN0000R')
+          #self.msg_if.pub_info("Sending serial string: " + ser_msg)
+          response = self.send_msg(ser_msg)
+          #self.msg_if.pub_info("Got response message: " + response)
+          if response is not None and len(response) == 9:
+                expected_prefix = ('&' + self.addr_str + 'DSN')
+                if response[0:len(expected_prefix)] == expected_prefix:
+                  self.serial_num = response[5:9]
+                  self.msg_if.pub_info("Got serial number: " + self.serial_num)
+                  self.msg_if.pub_info("Requesting firmware P/N for device: " + self.addr_str)
+
+                  ser_msg = ('&' + self.addr_str + 'DFW0000R')
+                  fw_response = self.send_msg(ser_msg)
+                  
+                  if fw_response is not None and len(fw_response) >= 9:
+                      expected_fw_prefix = ('&' + self.addr_str + 'DFW')
+                      if fw_response[0:len(expected_fw_prefix)] == expected_fw_prefix:
+                          self.sw_version = fw_response[5:9] 
+                          self.msg_if.pub_info("Got Software Version: " + self.sw_version)
+
+                      else:
+                          self.msg_if.pub_warn("Device returned unexpected Software response format")
+                          self.sw_version = "Unknown"
+                  else:
+                      self.msg_if.pub_warn("Device returned invalid DFW response")
+                      self.sw_version = "Unknown"
+                  
+                  # Set hardware version as unknown since we don't have a specific command for it
+                  self.hw_version = "Unknown"
+                  
+                  self.msg_if.pub_info("Connected to device at address: " + self.addr_str)
+                  self.msg_if.pub_info("Serial Number: " + self.serial_num)
+                  self.msg_if.pub_info("Firmware P/N: " + self.sw_version)
+                  success = True
+                    
+                else:
+                    self.msg_if.pub_warn("Device returned unexpected Serial Number response format")
+          else:
+              self.msg_if.pub_warn("Device returned invalid Serial Number response")
+                
+        except Exception as e:
+            self.msg_if.pub_warn("Something went wrong with connect function at serial port: " + self.port_str + " (" + str(e) + ")")
+      else:
+          self.msg_if.pub_warn("serial port not active")
+      return success
+
+
+
+
+
+
+
+
+
+
+
               ret_addr = response[0:3]
               #self.msg_if.pub_info("Returned address value: " + ret_addr)
               if ret_addr == self.addr_str:
@@ -587,6 +596,9 @@ class SidusSS182SerialNode(object):
     else:
       self.msg_if.pub_warn("serial port not active")
     return success
+
+
+
 
 
   def send_msg(self,ser_msg):
@@ -631,6 +643,20 @@ class SidusSS182SerialNode(object):
       if loc == port_str:
         success = True
     return success
+
+  def create_blank_str(self):
+      data_str = ""
+      zero_prefix_len = self.data_len-len(data_str)
+      for z in range(self.data_len):
+          data_str += '0'
+      return data_str
+
+  def create_zero_prefix_str(self,count_val):
+    data_str = str(count_val)
+    zero_prefix_len = self.data_len-len(data_str)
+    for z in range(zero_prefix_len):
+        data_str = ('0' + data_str)
+    return data_str
 
   #######################
   ### Cleanup processes on node shutdown

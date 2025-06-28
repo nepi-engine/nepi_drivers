@@ -19,7 +19,11 @@ driver:
         type: Discrete
         options:
           - All
+          - '4800'
           - '9600'
+          - '19200'
+          - '38400'
+          - '115200'
         default: All
         value: All
 
