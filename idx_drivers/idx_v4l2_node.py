@@ -429,6 +429,7 @@ class V4l2CamNode:
         if ratio > .99:
             ratio = 1.0
         self.framerate_ratio = ratio
+        #self.msg_if.pub_warn("Updated framerate: " + str(self.framerate_ratio))
         status = True
         err_str = ""
         return status, err_str
@@ -449,6 +450,8 @@ class V4l2CamNode:
         need_data = False
         if last_time != None and self.idx_if is not None:
           adj_fr =   nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
+          #self.msg_if.pub_warn("Current HW Framerate: " + str(self.current_fps))
+          #self.msg_if.pub_warn("Using Max Framerate: " + str(adj_fr))
           fr_delay = float(1) / adj_fr
           timer = current_time - last_time
           if timer > fr_delay or self.framerate_ratio > 0.95:
