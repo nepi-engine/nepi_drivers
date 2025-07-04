@@ -271,7 +271,7 @@ class OnvifPanTiltNode:
                                         setHomePositionCb = ptx_callback_names["SetHomePosition"],
                                         setHomePositionHereCb = ptx_callback_names["SetHomePositionHere"],
                                         getNavPoseCb = self.getNavPoseDict,
-                                        max_navpose_update_rate = self.MAX_POSITION_UPDATE_RATE)
+                                        navpose_update_rate = self.MAX_POSITION_UPDATE_RATE)
                                         
             self.msg_if.pub_info(" ... PTX interface running")
 

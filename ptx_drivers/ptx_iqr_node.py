@@ -287,7 +287,7 @@ class IqrPanTiltNode:
                                         setHomePositionCb = self.setHomePosition,
                                         setHomePositionHereCb = self.setHomePositionHere,
                                         getNavPoseCb = self.getNavPoseDict,
-                                        max_navpose_update_rate = self.MAX_POSITION_UPDATE_RATE,
+                                        navpose_update_rate = self.MAX_POSITION_UPDATE_RATE,
                                         deviceResetCb = self.resetDevice
                                         )
             self.msg_if.pub_info(" ... PTX interface running")
