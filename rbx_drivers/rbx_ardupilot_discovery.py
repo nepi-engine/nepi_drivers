@@ -151,7 +151,7 @@ class ArdupilotDiscovery:
       '''
       # Try and get list of NEPI enabled IP Ports
       # And make sure it actually starts up fully by waiting for a guaranteed service
-      nepi_ipaddr_service_name = self.base_namespace + '/ip_addr_query'
+      nepi_ipaddr_service_name = nepi_sdk.create_namespace(self.base_namespace,'ip_addr_query')
       try:
         get_ipaddr_service = nepi_sdk.create_service(nepi_ipaddr_service_name, IPAddrQuery)
         response = get_ipaddr_service(IPAddrQueryRequest())
@@ -212,7 +212,7 @@ class ArdupilotDiscovery:
       ardu_subproc = device_entry["ardu_subproc"] 
       fgps_subproc = device_entry["fgps_subproc"] 
 
-      full_node_name = self.base_namespace + '/' + node_name
+      full_node_name = nepi_sdk.create_namespace(self.base_namespace,node_name)
       
       # Check that the node_name process is still running
       if mavlink_subproc.poll() is not None:
@@ -307,7 +307,7 @@ class ArdupilotDiscovery:
 
     ### Start Node Luanch Process
     mav_node_name = "mavlink_" + device_id_str
-    mav_node_namespace = self.base_namespace + mav_node_name
+    mav_node_namespace = nepi_sdk.create_namespace(self.base_namespace,mav_node_name)
     self.logger.log_info("Starting mavlink node setup: " + mav_node_name)
     # Load the proper configs for APM
     rosparam_load_cmd = ['rosparam', 'load', '/opt/nepi/ros/share/mavros/launch/apm_pluginlists.yaml', mav_node_namespace]
@@ -333,7 +333,7 @@ class ArdupilotDiscovery:
     ardu_subproc = None
 
     ardu_node_name = "ardupilot_" + device_id_str
-    has_fake_gps_param_namespace = self.base_namespace + ardu_node_name + "/has_fake_gps"
+    has_fake_gps_param_namespace = nepi_sdk.create_namespace(self.base_namespace,has_fake_gps)
     nepi_sdk.set_param(has_fake_gps_param_namespace,self.enable_fake_gps)
     self.logger.log_info("" + "Starting ardupilot rbx node: " + ardu_node_name)
     processor_run_cmd = ["rosrun", "nepi_drivers", "rbx_ardupilot_node.py",

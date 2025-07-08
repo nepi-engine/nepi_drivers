@@ -235,7 +235,7 @@ class SealiteDiscovery:
     node_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
     self.logger.log_warn(" launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
-    dict_param_name = self.base_namespace + node_name + "/drv_dict"
+    dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
     # Try to load node saved device config
     nepi_drvs.checkLoadConfigFile(node_name)
     # Store drv info for node to use
