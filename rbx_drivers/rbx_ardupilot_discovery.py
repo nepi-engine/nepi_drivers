@@ -333,8 +333,11 @@ class ArdupilotDiscovery:
     ardu_subproc = None
 
     ardu_node_name = "ardupilot_" + device_id_str
-    has_fake_gps_param_namespace = nepi_sdk.create_namespace(self.base_namespace,has_fake_gps)
-    nepi_sdk.set_param(has_fake_gps_param_namespace,self.enable_fake_gps)
+
+    
+    #has_fake_gps_param_namespace = nepi_sdk.create_namespace(self.base_namespace,has_fake_gps)
+    #nepi_sdk.set_param(has_fake_gps_param_namespace,self.enable_fake_gps)
+    
     self.logger.log_info("" + "Starting ardupilot rbx node: " + ardu_node_name)
     processor_run_cmd = ["rosrun", "nepi_drivers", "rbx_ardupilot_node.py",
                           "__name:=" + ardu_node_name, f"__ns:={self.base_namespace}"]
@@ -344,6 +347,8 @@ class ArdupilotDiscovery:
     fgps_node_name = None
     fgps_subproc = None
 
+
+    '''
     if self.enable_fake_gps:
       #Start the an RBX fake gps for this ardupilot node
       fgps_node_name = "fake_gps_" + device_id_str
@@ -352,7 +357,7 @@ class ArdupilotDiscovery:
                             "__name:=" + fgps_node_name, f"__ns:={self.base_namespace}"]
       fgps_subproc = subprocess.Popen(processor_run_cmd)
 
-
+    '''
     # And make sure it actually starts up fully by waiting for a guaranteed service
     vehicle_info_service_name = mav_node_namespace + '/vehicle_info_get'
     success = True
