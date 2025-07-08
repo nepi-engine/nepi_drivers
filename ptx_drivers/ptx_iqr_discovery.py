@@ -142,7 +142,7 @@ class IqrPanTiltDiscovery:
     device_node_name = self.node_launch_name + "_" + path_str.split('/')[-1]
     self.logger.log_info(" launching node: " + device_node_name)
     #Setup required param server drv_dict for discovery node
-    dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
+    dict_param_name = nepi_sdk.create_namespace(self.base_namespace,device_node_name + "/drv_dict")
     # Try and load save node params
     nepi_drvs.checkLoadConfigFile(device_node_name)
     self.logger.log_warn(" launching node: " + str(self.drv_dict))
