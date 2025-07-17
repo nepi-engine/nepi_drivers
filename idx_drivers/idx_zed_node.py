@@ -214,7 +214,7 @@ class ZedCamNode(object):
         self.framerate = self.drv_dict['DEVICE_DICT']['framerate']
         self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
         self.msg_if.pub_warn("Got discovery data products: " + str(self.data_products))
-        ZED_BASE_NAMESPACE = nepi_sdk.get_base_namespace() + self.zed_type + "/zed_node/"
+        ZED_BASE_NAMESPACE = os.path.join(self.base_namespace, self.zed_type + "/zed_node/")
 
 
         '''
@@ -349,7 +349,7 @@ class ZedCamNode(object):
                                     factoryControls = self.factory_controls,
                                     setFramerateRatio =self.setFramerateRatio, 
                                     getFramerate = self.getFramerate,
-                                    setRange = self.setRange,
+                                    setRangeRatio = self.setRangeRatio,
                                     getColorImage = self.getColorImage, 
                                     stopColorImageAcquisition = self.stopColorImage,
                                     getDepthMap = self.getDepthMap, 
@@ -623,7 +623,7 @@ class ZedCamNode(object):
         adj_fps =   nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
         return adj_fps
 
-    def setRange(self, min_ratio, max_ratio):
+    def setRangeRatio(self, min_ratio, max_ratio):
         if min_ratio > 1:
             min_ratio = 1
         elif min_ratio < 0:

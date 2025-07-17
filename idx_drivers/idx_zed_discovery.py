@@ -259,7 +259,7 @@ class ZedCamDiscovery:
             device_exists = True
 
         if device_exists is False:
-          device_node_namespace = nepi_sdk.get_base_namespace() + device_node_name
+          device_node_namespace = os.path.join(self.base_namespace, device_node_name)
           self.msg_if.pub_info("Initiating new Zed node " + device_node_namespace)
 
           # Now start the node via rosrun

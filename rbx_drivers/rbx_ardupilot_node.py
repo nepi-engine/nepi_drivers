@@ -313,14 +313,14 @@ class ArdupilotNode:
       setFakeGPSFunction = self.setFakeGPSFunction
       # Define fake gps namespace
       fake_gps_node = self.node_name.replace("ardupilot","fake_gps")
-      FAKE_GPS_NAMESPACE = nepi_sdk.get_base_namespace() + fake_gps_node + "/"
+      FAKE_GPS_NAMESPACE = os.path.join(self.base_namespace, fake_gps_node)
       self.msg_if.pub_info("Setting up fake_gps pubs at namespace: " + FAKE_GPS_NAMESPACE)
       # Start fake gps local publishers
-      self.fake_gps_enable_pub = rospy.Publisher(FAKE_GPS_NAMESPACE + "enable", Bool, queue_size=1)
-      self.fake_gps_reset_pub = rospy.Publisher(FAKE_GPS_NAMESPACE + "reset", GeoPoint, queue_size=1)
-      self.fake_gps_go_stop_pub = rospy.Publisher(FAKE_GPS_NAMESPACE + "go_stop", Empty, queue_size=1)
-      self.fake_gps_goto_position_pub = rospy.Publisher(FAKE_GPS_NAMESPACE + "goto_position", Point, queue_size=1)
-      self.fake_gps_goto_location_pub = rospy.Publisher(FAKE_GPS_NAMESPACE + "goto_location", GeoPoint, queue_size=1)
+      self.fake_gps_enable_pub = rospy.Publisher(FAKE_GPS_NAMESPACE + "/enable", Bool, queue_size=1)
+      self.fake_gps_reset_pub = rospy.Publisher(FAKE_GPS_NAMESPACE + "/reset", GeoPoint, queue_size=1)
+      self.fake_gps_go_stop_pub = rospy.Publisher(FAKE_GPS_NAMESPACE + "/go_stop", Empty, queue_size=1)
+      self.fake_gps_goto_position_pub = rospy.Publisher(FAKE_GPS_NAMESPACE + "/goto_position", Point, queue_size=1)
+      self.fake_gps_goto_location_pub = rospy.Publisher(FAKE_GPS_NAMESPACE + "/goto_location", GeoPoint, queue_size=1)
 
           
 

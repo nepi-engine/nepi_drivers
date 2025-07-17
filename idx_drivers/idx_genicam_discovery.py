@@ -200,7 +200,7 @@ class GenicamCamDiscovery:
         node_needs_serial_number = True
         break
     device_node_name = root_name if not node_needs_serial_number else unique_root_name
-    device_node_namespace = nepi_sdk.get_base_namespace() + device_node_name
+    device_node_namespace = os.path.join(self.base_namespace, device_node_name)
 
 
 

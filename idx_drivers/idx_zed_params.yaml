@@ -27,9 +27,9 @@ driver:
         type: Discrete
         options:
           - 'color_image'
-          - 'image,depth_map'
-          - 'image,depth_map,pointcloud'
-        default: 'image,depth_map'
+          - 'color_image,depth_map'
+          - 'color_image,depth_map,pointcloud'
+        default: 'color_image,depth_map'
       auto_restart:
         type: Bool
         default: 'True'

@@ -153,7 +153,7 @@ class RBXFakeGPS:
 
 
     # Start navpose callbacks
-    self.nepi_nav_service_name = nepi_sdk.get_base_namespace() + "nav_pose_query"
+    self.nepi_nav_service_name = os.path.join(self.base_namespace, "nav_pose_query")
     self.msg_if.pub_info("will call NEPI navpose service for current heading at: " + self.nepi_nav_service_name)
     rospy.Timer(rospy.Duration(self.navpose_update_interval), self.update_current_heading_callback)
     

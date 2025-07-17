@@ -220,7 +220,7 @@ class V4L2CamDiscovery:
             same_type_count += 1
 
         device_node_name = self.short_name(root_name)
-        device_node_namespace = nepi_sdk.get_base_namespace() + device_node_name
+        device_node_namespace = os.path.join(self.base_namespace, device_node_name)
         if bus is not None:
           id = bus
         else:
