@@ -44,7 +44,8 @@ class GenicamCamDiscovery:
   launch_time_dict = dict()
   retry = True
   dont_retry_list = []
- 
+  test_val = 2
+   
   includeDevices = []
   excludedDevices = []     
 
