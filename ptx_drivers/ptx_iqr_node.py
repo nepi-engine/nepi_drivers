@@ -281,6 +281,7 @@ class IqrPanTiltNode:
                                         getSoftLimitsCb=self.getSoftLimits,                                        
                                         getSpeedRatioCb = self.getSpeedRatio,
                                         setSpeedRatioCb = self.setSpeedRatio,
+                                        supportsSinScan = True,
                                         getPositionCb = self.getPosition,
                                         gotoPositionCb = self.gotoPosition,
                                         goHomeCb = self.goHome,
