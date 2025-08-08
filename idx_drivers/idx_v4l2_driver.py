@@ -97,7 +97,8 @@ class V4l2CamDriver(object):
 
     self.camera_controls = dict()
 
-    nLines = len(out)
+
+    print(nLines)
     for i in range(0, nLines):
       #Skip menu legend lines which are denoted by 4 tabs
       if out[i].startswith('\t\t\t\t'):
@@ -516,7 +517,7 @@ class V4l2CamDriver(object):
 
     # Create the OpenCV cap object using V4L2 as the backend API -- TODO: Maybe other APIs would be better? (Seems FFMPEG doesn't work for USB cams, however)
     self.v4l2_cap = cv2.VideoCapture(self.device_path, cv2.CAP_V4L2)
-
+    self.v4l2_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
     if not self.v4l2_cap.isOpened():
       self.img_acq_lock.release()
       return False, "Failed to open capture object for v4l2 device " + self.device_path 
