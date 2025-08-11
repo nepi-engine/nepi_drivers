@@ -27,7 +27,7 @@ FILE_TYPE = 'DRIVER'
 
 
 class GenericONVIF_PTZ(object):
-    WSDL_FOLDER = "/opt/nepi/ros/etc/onvif/wsdl/"
+    WSDL_FOLDER = "/opt/nepi/engine/etc/onvif/wsdl/"
     PT_DIRECTION_POSITIVE = 1
     PT_DIRECTION_NEGATIVE = -1
     PT_DIRECTION_NONE = 0
@@ -162,7 +162,7 @@ class GenericONVIF_PTZ(object):
         #request = self.ptz_service.create_type('Stop')
         #request.ProfileToken = self.profile_token
         #self.ptz_service.Stop(request)
-        self.jog(1,1,0.0)
+        self.jog(1,3.5)
 
     def jog(self, pan_direction, tilt_direction, speed_ratio, time_s = 1):
         self.continuous_move_request.Velocity.PanTilt.x = speed_ratio * pan_direction

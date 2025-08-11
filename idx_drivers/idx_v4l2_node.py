@@ -38,7 +38,7 @@ FILE_TYPE = 'NODE'
 TEST_DRV_DICT = {
 'type': 'IDX',
 'group_id': 'None',
-'path': '/opt/nepi/ros/lib/nepi_drivers',
+'path': '/opt/nepi/engine/lib/nepi_drivers',
 'NODE_DICT': {
     'file_name': 'idx_v4l2_node.py',
     'class_name': 'V4l2CamNode',

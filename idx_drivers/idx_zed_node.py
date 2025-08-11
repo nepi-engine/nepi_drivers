@@ -81,10 +81,10 @@ class ZedCamNode(object):
     CAL_SRC_PATH = "/usr/local/zed/settings"
     USER_CFG_PATH = "/mnt/nepi_storage/user_cfg"
     CAL_BACKUP_PATH = USER_CFG_PATH + "/zed_cals"
-    ZED_PARAMS_PATH = '/opt/nepi/ros/share/zed_wrapper/params/'
+    ZED_PARAMS_PATH = '/opt/nepi/engine/share/zed_wrapper/params/'
 
     CAP_SETTINGS = dict(
-      pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","100.0"]},
+      pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","3.5"]},
       depth_confidence = {"type":"Int","name":"depth_confidence","options":["0","100"]},
       depth_texture_conf = {"type":"Int","name":"depth_texture_conf","options":["0","100"]},
       point_cloud_freq = {"type":"Int","name":"point_cloud_freq","options":["0.1","100"]},

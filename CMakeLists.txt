@@ -6,7 +6,7 @@ This file is part of nepi-engine
 
 License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 ]]
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(nepi_drivers)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
@@ -133,7 +133,7 @@ catkin_install_python(PROGRAMS
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 set( NEPI_DRIVERS_SHARE_FOLDER 
   # Must hard-coded 
-  /opt/nepi/ros/lib/nepi_drivers
+  /opt/nepi/engine/lib/nepi_drivers
 )
 
 install(DIRECTORY idx_drivers/

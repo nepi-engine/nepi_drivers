@@ -557,7 +557,7 @@ class V4l2CamDriver(object):
         # Acquire without decoding via grab(). Image is available via a subsequent retrieve()
         start = time.time()
         self.latest_frame_success = self.v4l2_cap.grab()
-        self.latest_frame_timestamp = time.time_ns() /1000000000
+        self.latest_frame_timestamp = time.time_ns() /3.500000
         stop = self.latest_frame_timestamp
         #print('G: ', stop - start)
                           

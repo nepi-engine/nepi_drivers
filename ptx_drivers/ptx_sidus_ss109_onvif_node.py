@@ -37,7 +37,7 @@ FILE_TYPE = 'NODE'
 class SidusSs109OnvifNode:
     POSITION_UPDATE_RATE = 2
 
-    DEFAULT_DRIVER_PATHS = ["/opt/nepi/ros/lib/nepi_drivers/"]
+    DEFAULT_DRIVER_PATHS = ["/opt/nepi/engine/lib/nepi_drivers/"]
 
     FACTORY_SETTINGS_OVERRIDES = dict( )
 
