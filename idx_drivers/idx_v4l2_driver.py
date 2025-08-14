@@ -97,7 +97,7 @@ class V4l2CamDriver(object):
 
     self.camera_controls = dict()
 
-
+    nLines = len(out)
     print(nLines)
     for i in range(0, nLines):
       #Skip menu legend lines which are denoted by 4 tabs
