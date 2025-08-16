@@ -310,9 +310,9 @@ class ArdupilotDiscovery:
     mav_node_namespace = nepi_sdk.create_namespace(self.base_namespace,mav_node_name)
     self.logger.log_info("Starting mavlink node setup: " + mav_node_name)
     # Load the proper configs for APM
-    rosparam_load_cmd = ['rosparam', 'load', '/opt/nepi/engine/share/mavros/launch/apm_pluginlists.yaml', mav_node_namespace]
+    rosparam_load_cmd = ['rosparam', 'load', '/opt/nepi/nepi_engine/share/mavros/launch/apm_pluginlists.yaml', mav_node_namespace]
     subprocess.run(rosparam_load_cmd)
-    rosparam_load_cmd = ['rosparam', 'load', '/opt/nepi/engine/share/mavros/launch/apm_config.yaml', mav_node_namespace]
+    rosparam_load_cmd = ['rosparam', 'load', '/opt/nepi/nepi_engine/share/mavros/launch/apm_config.yaml', mav_node_namespace]
     subprocess.run(rosparam_load_cmd)
     # Adjust the timesync_rate to cut down on log noise
     nepi_sdk.set_param(mav_node_namespace + '/conn/timesync_rate', 1.0)

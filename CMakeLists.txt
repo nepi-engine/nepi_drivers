@@ -124,6 +124,31 @@ catkin_package(
 ## Install ##
 #############
 
+
+if(NOT NEPI_BASE)
+  set( NEPI_BASE 
+    /opt/nepi
+  )
+endif()
+
+if(NOT NEPI_RUI)
+  set( NEPI_RUI 
+    ${NEPI_BASE}/nepi_rui
+  )
+endif()
+
+if(NOT NEPI_ENGINE)
+  set( NEPI_ENGINE 
+    ${NEPI_BASE}/nepi_engine
+  )
+endif()
+
+if(NOT NEPI_ETC)
+  set( NEPI_ETC 
+    ${NEPI_BASE}/etc
+  )
+endif()
+
 catkin_install_python(PROGRAMS
   scripts/fake_gps_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -133,7 +158,7 @@ catkin_install_python(PROGRAMS
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 set( NEPI_DRIVERS_SHARE_FOLDER 
   # Must hard-coded 
-  /opt/nepi/engine/lib/nepi_drivers
+  /opt/nepi/nepi_engine/lib/nepi_drivers
 )
 
 install(DIRECTORY idx_drivers/
