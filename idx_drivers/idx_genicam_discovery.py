@@ -19,7 +19,7 @@
 
 import os
 # ROS namespace setup
-#NEPI_BASE_NAMESPACE = '/nepi/s2x/'
+#NEPI_BASE_NAMESPACE = '/nepi/device1/'
 #os.environ["ROS_NAMESPACE"] = NEPI_BASE_NAMESPACE[0:-1]
 import subprocess
 import time
