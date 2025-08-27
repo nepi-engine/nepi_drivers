@@ -20,7 +20,7 @@ set(CMAKE_VERBOSE_MAKEFILE TRUE)
 set(OpenCV_DIR /usr/share/OpenCV)
 
 find_package(catkin REQUIRED
-    COMPONENTS std_msgs sensor_msgs nepi_sdk nepi_api nepi_interfaces cv_bridge OpenCV  serial pcl_ros pcl_conversions tf2_ros )
+    COMPONENTS std_msgs serial )
 
 find_package(PkgConfig)
 
@@ -110,7 +110,7 @@ catkin_python_setup()
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-	CATKIN_DEPENDS sensor_msgs nepi_interfaces nepi_sdk
+	CATKIN_DEPENDS std_msgs
 )
 
 ###########
@@ -125,29 +125,6 @@ catkin_package(
 #############
 
 
-if(NOT NEPI_BASE)
-  set( NEPI_BASE 
-    /opt/nepi
-  )
-endif()
-
-if(NOT NEPI_RUI)
-  set( NEPI_RUI 
-    ${NEPI_BASE}/nepi_rui
-  )
-endif()
-
-if(NOT NEPI_ENGINE)
-  set( NEPI_ENGINE 
-    ${NEPI_BASE}/nepi_engine
-  )
-endif()
-
-if(NOT NEPI_ETC)
-  set( NEPI_ETC 
-    ${NEPI_BASE}/etc
-  )
-endif()
 
 catkin_install_python(PROGRAMS
   scripts/fake_gps_node.py

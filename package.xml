@@ -50,13 +50,7 @@
   <!--   <doc_depend>doxygen</doc_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
 
-  <depend>nepi_interfaces</depend>
-  <depend>nepi_sdk</depend>
-  <depend>nepi_api</depend>
-  <depend>cv_bridge</depend>
   <depend>std_msgs</depend>
-  <depend>sensor_msgs</depend>
-  <depend>tf2_ros</depend>
   <depend>serial</depend>
   <build_depend>message_generation</build_depend>
   <buildtool_depend>catkin</buildtool_depend>
