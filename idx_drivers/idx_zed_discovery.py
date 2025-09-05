@@ -40,7 +40,7 @@ class ZedCamDiscovery:
   retry = True
   dont_retry_list = []
 
-  FRAMERATE = 15
+  MAX_FRAMERATE = 15
   
   settings_if = None
 
@@ -87,6 +87,15 @@ class ZedCamDiscovery:
         res_str = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['resolution']['value']
         if res_str in self.RES_DICT.keys():
           self.res_val = self.RES_DICT[res_str]
+      if 'framerate' in self.drv_dict['DISCOVERY_DICT']['OPTIONS']:
+        fs_str = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['framerate']['value']
+        fr_val=int(fr_str)
+        if fr_val < 1:
+          fr_val = 1
+        if fr_val > self.MAX_FRAMERATE:
+          fr_val = self.MAX_FRAMERATE
+        self.fr_val = fr_val
+
     except Exception as e:
       self.msg_if.pub_warn("Failed to load options " + str(e))#
       nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
@@ -267,7 +276,7 @@ class ZedCamDiscovery:
           self.msg_if.pub_info("Launching node " + device_node_name)
           if dtype in self.includeDevices:
             #Setup required param server drv_dict for discovery node
-            self.drv_dict['DEVICE_DICT']={'zed_type': root_name, 'res_val': self.res_val, 'framerate': self.FRAMERATE, 'data_products': self.data_products}
+            self.drv_dict['DEVICE_DICT']={'zed_type': root_name, 'res_val': self.res_val, 'framerate': self.fr_val, 'data_products': self.data_products}
             dict_param_name = device_node_name + "/drv_dict"
             nepi_sdk.set_param(dict_param_name,self.drv_dict)
             

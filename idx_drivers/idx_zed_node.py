@@ -691,6 +691,7 @@ class ZedCamNode(object):
         self.color_img_sub = None
         self.color_img_msg = None
         self.color_img_lock.release()
+        self.msg_if.pub_warn("Stoped Color Image Acquire")
         ret = True
         msg = "Success"
         return ret,msg
@@ -759,6 +760,7 @@ class ZedCamNode(object):
 
         self.depth_map_msg = None
         self.depth_map_lock.release()
+        self.msg_if.pub_warn("Stoped Depthmap Acquire")
         ret = True
         msg = "Success"
         return ret,msg

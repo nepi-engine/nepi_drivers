@@ -23,6 +23,9 @@ driver:
           - HD720
           - VGA
         default: HD720
+      framerate:
+        type: INT
+        default: 7
       data_products:
         type: Discrete
         options:
