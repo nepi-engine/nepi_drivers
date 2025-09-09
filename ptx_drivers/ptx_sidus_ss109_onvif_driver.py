@@ -94,14 +94,14 @@ class SidusSS109_PTZ(object):
     def getPositionLimitsInDegrees(self):
         # For this generic driver, can only set these to some arbitrary value. Users can override in the device's config file (after saving one as necessary)
         position_limits_deg = {
-            'max_yaw_hardstop_deg' : 3.5,
-            'min_yaw_hardstop_deg' : -3.5,
+            'max_yaw_hardstop_deg' : 100,
+            'min_yaw_hardstop_deg' : -100,
 
-            'max_yaw_softstop_deg' : 3.5,
-            'min_yaw_softstop_deg' : -3.5,
+            'max_yaw_softstop_deg' : 100,
+            'min_yaw_softstop_deg' : -100,
 
-            'max_pitch_hardstop_deg' : 3.5,
-            'min_pitch_hardstop_deg' : -3.5,
+            'max_pitch_hardstop_deg' : 100,
+            'min_pitch_hardstop_deg' : -100,
 
             'max_pitch_softstop_deg' : 90.0,
             'min_pitch_softstop_deg' : -90.0

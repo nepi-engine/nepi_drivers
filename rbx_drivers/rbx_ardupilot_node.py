@@ -61,7 +61,7 @@ class ArdupilotNode:
   DEFAULT_NODE_NAME = "ardupilot" # connection port added once discovered
 
   CAP_SETTINGS = dict(
-    takeoff_height_m = {"type":"Float","name":"takeoff_height_m","options":["0.0","3.5.0"]},
+    takeoff_height_m = {"type":"Float","name":"takeoff_height_m","options":["0.0","100.0"]},
     takeoff_min_pitch_deg =  {"type":"Float","name":"takeoff_min_pitch_deg","options":["-90.0","90.0"]}
   )
 
