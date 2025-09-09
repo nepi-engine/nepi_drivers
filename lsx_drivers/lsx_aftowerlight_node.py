@@ -60,7 +60,11 @@ class AfTowerLightNode(object):
     blink_enabled = False
   )
   color_options = ['GREEN','YELLOW','RED']
+<<<<<<< HEAD
   kelvin_limits = [1000,100]
+=======
+  kelvin_limits = [1000,5000]
+>>>>>>> 014b0f1
 
   device_info_dict = dict(node_name = "",
                         device_name = "",

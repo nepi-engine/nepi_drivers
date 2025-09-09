@@ -162,7 +162,11 @@ class GenericONVIF_PTZ(object):
         #request = self.ptz_service.create_type('Stop')
         #request.ProfileToken = self.profile_token
         #self.ptz_service.Stop(request)
+<<<<<<< HEAD
         self.jog(1,100)
+=======
+        self.jog(1,1,0.0)
+>>>>>>> 014b0f1
 
     def jog(self, pan_direction, tilt_direction, speed_ratio, time_s = 1):
         self.continuous_move_request.Velocity.PanTilt.x = speed_ratio * pan_direction
