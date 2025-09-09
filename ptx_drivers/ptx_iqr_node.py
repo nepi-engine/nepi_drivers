@@ -533,13 +533,13 @@ class IqrPanTiltNode:
                                             f"{int((rcvdBuf[4] & 0x0f00) >> 8)}.{int(rcvdBuf[4] & 0x00ff)}")
                         pt_status.set_zero = rcvdBuf[5]
                         pt_status.speed = rcvdBuf[6]
-                        pt_status.pan_goal = c_int16(rcvdBuf[7]).value / 3.5
-                        pt_status.tilt_goal = c_int16(rcvdBuf[8]).value / 3.5
+                        pt_status.pan_goal = c_int16(rcvdBuf[7]).value / 100
+                        pt_status.tilt_goal = c_int16(rcvdBuf[8]).value / 100
                         pt_status.reserved = rcvdBuf[9]
                         pt_status.driver_ec = rcvdBuf[10]
                         pt_status.encoder_ec = rcvdBuf[11]
-                        pt_status.pan_now = c_int16(rcvdBuf[12]).value / 3.5
-                        pt_status.tilt_now = c_int16(rcvdBuf[13]).value / 3.5
+                        pt_status.pan_now = c_int16(rcvdBuf[12]).value / 100
+                        pt_status.tilt_now = c_int16(rcvdBuf[13]).value / 100
                         pt_status.pan_temp = c_int16(rcvdBuf[14]).value / 10.0
                         pt_status.tilt_temp = c_int16(rcvdBuf[15]).value / 10.0
                         pt_status.pan_raw = c_int16(rcvdBuf[16]).value
@@ -574,7 +574,7 @@ class IqrPanTiltNode:
         speed_count = self.ratio2speed_count(self.speed_ratio)
         with self.pt_status_lock:
             if self.modbus_master is not None:
-                sendBuf = [speed_count, round(pan*3.5), round(tilt*100)]
+                sendBuf = [speed_count, round(pan*100), round(tilt*100)]
                 self.modbus_master.set_multiple_registers(self.addr_int, 0x0006, sendBuf)
                 nepi_sdk.sleep(0.01)
 

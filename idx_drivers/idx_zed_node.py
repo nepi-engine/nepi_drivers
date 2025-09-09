@@ -84,7 +84,7 @@ class ZedCamNode(object):
     ZED_PARAMS_PATH = '/opt/nepi/nepi_engine/share/zed_wrapper/params/'
 
     CAP_SETTINGS = dict(
-      pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","3.5"]},
+      pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","15"]},
       depth_confidence = {"type":"Int","name":"depth_confidence","options":["0","100"]},
       depth_texture_conf = {"type":"Int","name":"depth_texture_conf","options":["0","100"]},
       point_cloud_freq = {"type":"Int","name":"point_cloud_freq","options":["0.1","100"]},
