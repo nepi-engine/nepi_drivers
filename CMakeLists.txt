@@ -178,6 +178,15 @@ install(DIRECTORY rbx_drivers/
   FILES_MATCHING PATTERN "*.yaml"
 )
 
+install(DIRECTORY npx_drivers/
+  DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER}  
+  FILES_MATCHING PATTERN "*.py"
+)
+
+install(DIRECTORY npx_drivers/
+  DESTINATION ${NEPI_DRIVERS_SHARE_FOLDER}  
+  FILES_MATCHING PATTERN "*.yaml"
+)
 
 #############
 ## Testing ##
