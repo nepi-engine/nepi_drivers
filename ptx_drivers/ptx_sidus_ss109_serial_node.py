@@ -24,7 +24,6 @@ import re
 import sys
 import inspect
 import math
-import glob
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
@@ -39,13 +38,9 @@ FILE_TYPE = 'NODE'
 
 
 class SidusSS109SerialPTXNode:
-    set_speed = True
-
     MAX_POSITION_UPDATE_RATE = 5
     SERIAL_RECEIVE_DELAY = 0.03
-    SERIAL_SEND_CONNECT_DELAY = 0.5
     SERIAL_SEND_DELAY = 0.5
-
     HEARTBEAT_CHECK_INTERVAL = 1.0
 
     PAN_DEG_DIR = -1
@@ -218,12 +213,6 @@ class SidusSS109SerialPTXNode:
 
             self.home_pan_deg = 0.0
             self.home_tilt_deg = 0.0
-            
-            if self.set_speed == True:
-                self.speed_control = self.setSpeedRatio
-            else:
-                self.speed_control = None
-            
 
 
             self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict, 
@@ -239,7 +228,7 @@ class SidusSS109SerialPTXNode:
                                         getSoftLimitsCb = None, #self.getSoftLimits, # 109 does not return response
                                         setSoftLimitsCb = self.setSoftLimits,
                                         getSpeedRatioCb = self.getSpeedRatio,
-                                        setSpeedRatioCb = self.speed_control,
+                                        setSpeedRatioCb = self.setSpeedRatio,
                                         getPositionCb = self.getPosition,
                                         gotoPositionCb = self.gotoPosition,
                                         gotoPanPositionCb = self.gotoPanPosition,
@@ -447,7 +436,6 @@ class SidusSS109SerialPTXNode:
         self.driver_moveToPosition(pan_deg * self.PAN_DEG_DIR, tilt_deg * self.TILT_DEG_DIR)
 
     def gotoPanPosition(self, pan_deg):
-        #self.msg_if.pub_warn("gotoPanPosition: " + str(pan_deg) + " direction: " + str(self.PAN_DEG_DIR))
         self.driver_moveToPanPosition(pan_deg * self.PAN_DEG_DIR)
 
     def gotoTiltPosition(self, tilt_deg):
@@ -684,8 +672,8 @@ class SidusSS109SerialPTXNode:
             try:
                 data_str = response[5:(5 + self.data_len)]
                 #self.msg_if.pub_warn(method_name + ": Will convert pan position str: " + data_str)
-                pan_count = int(data_str) 
-                pan_deg = self.pos_count2deg(pan_count) * -1
+                pan_count = int(data_str)
+                pan_deg = self.pos_count2deg(pan_count)
             except Exception as e:
                 self.msg_if.pub_warn(method_name + ": Failed to convert message to int: " + data_str + " " + str(e))
 
@@ -705,7 +693,7 @@ class SidusSS109SerialPTXNode:
                 data_str = response[5:(5 + self.data_len)]
                 #self.msg_if.pub_warn(method_name + ": Will convert tilt position str: " + data_str)
                 tilt_count = int(data_str)
-                tilt_deg = self.pos_count2deg(tilt_count) *-1
+                tilt_deg = self.pos_count2deg(tilt_count)
             except Exception as e:
                 self.msg_if.pub_warn(method_name + ": Failed to convert message to int: " + data_str + " " + str(e))
 
@@ -715,28 +703,19 @@ class SidusSS109SerialPTXNode:
     def driver_moveToPosition(self,pan_deg, tilt_deg):
         success = self.driver_moveToPanPosition(pan_deg)
         success = self.driver_moveToTiltPosition(tilt_deg)
-        self.msg_if.pub_warn("driver_moveToPosition: " + str(success))
-
         return success
 
 
     def driver_moveToPanPosition(self,pan_deg):
-
         method_name = sys._getframe().f_code.co_name
         success = False
         pos_count = self.deg2pos_count(pan_deg)
         data_str = self.create_pos_str(pos_count)
         ser_msg= (self.pan_str + self.addr_str + 'MML' + data_str + 'W')
-        #self.msg_if.pub_warn("pos_count: " + str(pos_count) + "data_str: " + str(data_str))
-        #self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
         [success,response] = self.send_msg(ser_msg)
 
-        if self.set_speed == True:
-            self.msg_if.pub_warn("driver_setSpeedRatio called")
-            self.msg_if.pub_warn("driver_setSpeedRatio: " + str(self.speed_ratio))
-            nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
-            self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.pan_str)
-
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
+        self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.pan_str)
         
         return success
 
@@ -748,9 +727,8 @@ class SidusSS109SerialPTXNode:
         ser_msg= (self.tilt_str + self.addr_str + 'MML' + data_str + 'W')
         [success,response] = self.send_msg(ser_msg)
 
-        if self.set_speed == True:
-            nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
-            self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.tilt_str)
+        nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
+        self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.tilt_str)
 
         return success
 
@@ -835,7 +813,6 @@ class SidusSS109SerialPTXNode:
         success = False
         self.connect_attempts += 1
         port_check = self.check_port(self.port_str)
-        self.msg_if.pub_warn("connect_attempts: " +  str(self.connect_attempts))
         if port_check is True:
             try:
                 # Try and open serial port
@@ -887,9 +864,8 @@ class SidusSS109SerialPTXNode:
                 self.serial_busy = True
 
                 if verbose == True:
-                    #self.msg_if.pub_warn(caller_method + ": send_msg: <<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-                    #self.msg_if.pub_warn(caller_method + ": send_msg: Locked serial with send msg: " + ser_msg)
-                    pass
+                    self.msg_if.pub_warn(caller_method + ": send_msg: <<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+                    self.msg_if.pub_warn(caller_method + ": send_msg: Locked serial with send msg: " + ser_msg)
                 ser_str = (ser_msg + '\r\n')
                 b=bytearray()
                 b.extend(map(ord, ser_str))
@@ -906,9 +882,9 @@ class SidusSS109SerialPTXNode:
                 except Exception as e:
                     self.msg_if.pub_warn(caller_method + ": send_msg: Failed to recieve message " + str(e))
                 if verbose == True:
-                    #self.msg_if.pub_warn(caller_method + ": send_msg: Unlocking serial")
-                    #self.msg_if.pub_warn(caller_method + ": send_msg: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-                    pass
+                    self.msg_if.pub_warn(caller_method + ": send_msg: Unlocking serial")
+                    self.msg_if.pub_warn(caller_method + ": send_msg: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+
                 success = self.check_valid_response(ser_msg,response)
                 if success == False:
                     # Try again
@@ -920,9 +896,9 @@ class SidusSS109SerialPTXNode:
                     except Exception as e:
                         self.msg_if.pub_warn(caller_method + ": send_msg: Failed to recieve message " + str(e))
                     if verbose == True:
-                        #self.msg_if.pub_warn(caller_method + ": send_msg: Unlocking serial")
-                        #self.msg_if.pub_warn(caller_method + ": send_msg: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-                        pass
+                        self.msg_if.pub_warn(caller_method + ": send_msg: Unlocking serial")
+                        self.msg_if.pub_warn(caller_method + ": send_msg: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+
 
 
                 self.serial_busy = False
@@ -936,11 +912,10 @@ class SidusSS109SerialPTXNode:
         caller_method = inspect.currentframe().f_back.f_code.co_name
         valid = False
         if len(response) >= 5 + self.data_len + 1:
-            if response[0:4] == ser_msg[0:4]:
+            if response[0:5] == ser_msg[0:5]:
                 valid = True
         if valid == False:
-            pass
-            #self.msg_if.pub_warn(caller_method + ": Failed to get valid response message from: " + ser_msg + " : " + str(response))
+            self.msg_if.pub_warn(caller_method + ": Failed to get valid response message from: " + ser_msg + " : " + str(response))
         return valid
 
 
@@ -949,17 +924,8 @@ class SidusSS109SerialPTXNode:
     ### Function for checking if port is available
     def check_port(self,port_str):
         success = False
-            # Try pyserial first
-        ports = list(serial.tools.list_ports.comports())
-        add_ports = sorted(set(
-                glob.glob('/dev/ttyTHS0')
-            ))
-        for add_port in add_ports:
-            if add_port not in ports:
-                ports.append(add_port)
-        self.msg_if.pub_warn("Node Port Check: " + str(ports))
-        for p in ports:
-            loc = getattr(p, 'device', p)
+        ports = serial.tools.list_ports.comports()
+        for loc, desc, hwid in sorted(ports):
             if loc == port_str:
                 success = True
         return success
