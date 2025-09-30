@@ -39,7 +39,7 @@ FILE_TYPE = 'NODE'
 
 
 class SidusSS109SerialPTXNode:
-    set_speed = True
+    set_speed = False
 
     MAX_POSITION_UPDATE_RATE = 5
     SERIAL_RECEIVE_DELAY = 0.03
@@ -447,10 +447,11 @@ class SidusSS109SerialPTXNode:
         self.driver_moveToPosition(pan_deg * self.PAN_DEG_DIR, tilt_deg * self.TILT_DEG_DIR)
 
     def gotoPanPosition(self, pan_deg):
-        #self.msg_if.pub_warn("gotoPanPosition: " + str(pan_deg) + " direction: " + str(self.PAN_DEG_DIR))
+        self.msg_if.pub_warn("gotoPanPosition: " + str(pan_deg) + " direction: " + str(self.PAN_DEG_DIR))
         self.driver_moveToPanPosition(pan_deg * self.PAN_DEG_DIR)
 
     def gotoTiltPosition(self, tilt_deg):
+        self.msg_if.pub_warn("gotoPanPosition: " + str(tilt_deg) + " direction: " + str(self.TILT_DEG_DIR))
         self.driver_moveToTiltPosition(tilt_deg * self.TILT_DEG_DIR)
         
     def goHome(self):
@@ -732,8 +733,8 @@ class SidusSS109SerialPTXNode:
         [success,response] = self.send_msg(ser_msg)
 
         if self.set_speed == True:
-            self.msg_if.pub_warn("driver_setSpeedRatio called")
-            self.msg_if.pub_warn("driver_setSpeedRatio: " + str(self.speed_ratio))
+            #self.msg_if.pub_warn("driver_setSpeedRatio called")
+            #self.msg_if.pub_warn("driver_setSpeedRatio: " + str(self.speed_ratio))
             nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
             self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.pan_str)
 
@@ -742,15 +743,21 @@ class SidusSS109SerialPTXNode:
 
 
     def driver_moveToTiltPosition(self, tilt_deg):
-        method_name = sys._getframe().f_code.co_name
+         method_name = sys._getframe().f_code.co_name
+        success = False
         pos_count = self.deg2pos_count(tilt_deg)
         data_str = self.create_pos_str(pos_count)
         ser_msg= (self.tilt_str + self.addr_str + 'MML' + data_str + 'W')
+        #self.msg_if.pub_warn("pos_count: " + str(pos_count) + "data_str: " + str(data_str))
+        #self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
         [success,response] = self.send_msg(ser_msg)
 
         if self.set_speed == True:
+            #self.msg_if.pub_warn("driver_setSpeedRatio called")
+            #self.msg_if.pub_warn("driver_setSpeedRatio: " + str(self.speed_ratio))
             nepi_sdk.sleep(self.SERIAL_SEND_DELAY)
-            self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.tilt_str)
+            self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.pan_str)
+
 
         return success
 

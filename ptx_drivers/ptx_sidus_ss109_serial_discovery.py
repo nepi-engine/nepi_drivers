@@ -69,7 +69,9 @@ class SidusSS109SerialDiscovery:
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
   def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace,drv_dict):
-    self.logger.log_debug("Entering discovery function with drv_dict: " + str(drv_dict))###
+    #self.logger.log_warn("Entering discovery function with available_paths_list: " + str(available_paths_list))###
+    #self.logger.log_warn("Entering discovery function with active_paths_list: " + str(active_paths_list))###
+    #self.logger.log_warn("Entering discovery function with drv_dict: " + str(drv_dict))###
     self.drv_dict = drv_dict
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
@@ -137,12 +139,14 @@ class SidusSS109SerialDiscovery:
       self.path_list.append(loc)
 
     ### Purge Unresponsive Connections
+    #self.logger.log_warn("Entering Check On Devices loop with active device keys: " + str(self.active_devices_dict.keys()))###
     path_purge_list = []
     for path_str in self.active_devices_dict:
         success = self.checkOnDevice(path_str)
         if success == False:
           path_purge_list.append(path_str) 
     # Clean up the active_devices_dict
+    #self.logger.log_warn("Entering Purge Devices loop with purge device keys: " + str(path_purge_list))
     for path_str in path_purge_list:
       del  self.active_devices_dict[path_str]
       if path_str in self.active_paths_list:
@@ -215,7 +219,7 @@ class SidusSS109SerialDiscovery:
 
 
   def checkOnDevice(self,path_str):
-    self.logger.log_debug("Entering check for device function for path: " + str(path_str))###
+    #self.logger.log_warn("Entering Check On Device function for path: " + str(path_str))###
     active = True
     if path_str not in self.available_paths_list:
       active = False
@@ -226,6 +230,7 @@ class SidusSS109SerialDiscovery:
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
         success = nepi_drvs.killDriverNode(node_name,sub_process)
+        active = False
     return active
 
 
@@ -248,3 +253,20 @@ class SidusSS109SerialDiscovery:
     if success:
       self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
       self.active_paths_list.append(path_str)
+      self.logger.log_warn("Driver Node launched successfully, adding to active device dict keys: " + str(self.active_devices_dict.keys()))###
+
+
+  def killAllDevices(self,path_str,active_paths_list):
+    #self.logger.log_warn("Entering Kill All Devices function for path: " + str(path_str))###
+    path_purge_list = self.active_devices_dict.keys() 
+    #self.logger.log_warn("Killing Devices: " + str(path_purge_list))
+    for path_str in path_purge_list:
+        path_entry = self.active_devices_dict[path_str]
+        node_name = path_entry['node_name']
+        sub_process = path_entry['sub_process']
+        success = nepi_drvs.killDriverNode(node_name,sub_process)
+        del  self.active_devices_dict[path_str]
+        if path_str in active_paths_list:
+          active_paths_list.remove(path_str)
+    nepi_sdk.sleep(1)
+    return active_paths_list
