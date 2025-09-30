@@ -44,7 +44,7 @@ class SidusSS109SerialPTXNode:
     MAX_POSITION_UPDATE_RATE = 5
     SERIAL_RECEIVE_DELAY = 0.03
     SERIAL_SEND_CONNECT_DELAY = 0.5
-    SERIAL_SEND_DELAY = 0.5
+    SERIAL_SEND_DELAY = 0.15
 
     HEARTBEAT_CHECK_INTERVAL = 1.0
 
@@ -114,7 +114,7 @@ class SidusSS109SerialPTXNode:
     connected = False
 
 
-    self_check_count = 10
+    self_check_count = 100
     self_check_counter = 0
 
     current_position = [0.0,0.0]
