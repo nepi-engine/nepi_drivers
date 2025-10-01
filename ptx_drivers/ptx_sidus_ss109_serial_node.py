@@ -43,12 +43,16 @@ class SidusSS109SerialPTXNode:
     set_speed = False
 
     MAX_POSITION_UPDATE_RATE = 5
-    MAX_SERIAL_SEND_DELAY = 0.5
-    MAX_SERIAL_ATTEMPTS=100  # Com Loss Point
-    SERIAL_RECEIVE_DELAY = 0.03
+    SERIAL_RECEIVE_DELAY = 0.001
+
+    MIN_SERIAL_SEND_DELAY = 0.01
+    MAX_SERIAL_SEND_DELAY = 0.05
+    serial_send_delay = 0.0 # Adjusted Atuomatically based on serial_fail_attempts
+
+    MAX_SERIAL_ATTEMPTS=10  # Com Loss Point
     serial_fail_attempts = 0 # Current failed com attempts. Reset on success
     max_serial_fail_attempts = 0 # Tracked Max Attempts
-    serial_send_delay = 0.0 # Adjusted Atuomatically based on serial_fail_attempts
+    
 
     PAN_DEG_DIR = -1
     TILT_DEG_DIR = -1
@@ -257,7 +261,7 @@ class SidusSS109SerialPTXNode:
             # Start an ptx activity check process that kills node after some number of failed comms attempts
             self.msg_if.pub_info("Starting an activity check process")
             update_interval = float(1.0) / self.MAX_POSITION_UPDATE_RATE
-            nepi_sdk.start_timer_process(update_interval, self.updatePositionHandler)
+            nepi_sdk.start_timer_process(update_interval, self.updatePositionHandler, oneshot = True)
             # Initialization Complete
             self.msg_if.pub_info("Initialization Complete")
             #Set up node shutdown
@@ -267,7 +271,14 @@ class SidusSS109SerialPTXNode:
 
 
     def updatePositionHandler(self,timer):
-        self.current_position = self.driver_getPosition()
+        stime=nepi_utils.get_time()
+        self.current_position = self.driver_getPosition(self.current_position)
+        #self.msg_if.pub_info("Got current position :" + str(self.current_position))
+        gtime = nepi_utils.get_time() - stime
+        wait_time = float(1.0) / self.MAX_POSITION_UPDATE_RATE - gtime
+        if wait_time > 0.1:
+            nepi_sdk.sleep(wait_time)
+        nepi_sdk.start_timer_process(0.1, self.updatePositionHandler, oneshot = True)
 
     def logDeviceInfo(self):
         dev_info_string = self.node_name + " Device Info:\n"
@@ -447,11 +458,11 @@ class SidusSS109SerialPTXNode:
         self.driver_moveToPosition(pan_deg * self.PAN_DEG_DIR, tilt_deg * self.TILT_DEG_DIR)
 
     def gotoPanPosition(self, pan_deg):
-        self.msg_if.pub_warn("gotoPanPosition: " + str(pan_deg) + " direction: " + str(self.PAN_DEG_DIR))
+        #self.msg_if.pub_warn("gotoPanPosition: " + str(pan_deg) + " direction: " + str(self.PAN_DEG_DIR))
         self.driver_moveToPanPosition(pan_deg * self.PAN_DEG_DIR)
 
     def gotoTiltPosition(self, tilt_deg):
-        self.msg_if.pub_warn("gotoTiltPosition: " + str(tilt_deg) + " direction: " + str(self.TILT_DEG_DIR))
+        #self.msg_if.pub_warn("gotoTiltPosition: " + str(tilt_deg) + " direction: " + str(self.TILT_DEG_DIR))
         self.driver_moveToTiltPosition(tilt_deg * self.TILT_DEG_DIR)
         
     def goHome(self):
@@ -728,7 +739,7 @@ class SidusSS109SerialPTXNode:
         pos_count = self.deg2pos_count(pan_deg)
         data_str = self.create_pos_str(pos_count)
         ser_msg= (self.pan_str + self.addr_str + 'MML' + data_str + 'W')
-        #self.msg_if.pub_warn("pos_count: " + str(pos_count) + "data_str: " + str(data_str))
+        #self.msg_if.pub_warn(" Will send move to pan pos with pos_count: " + str(pos_count) + "data_str: " + str(data_str))
         #self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
         [success,response] = self.send_msg(ser_msg)
 
@@ -861,7 +872,6 @@ class SidusSS109SerialPTXNode:
 
 
     def send_msg(self,ser_msg, wait_on_busy = True, verbose = True):
-        verbose = True
         caller_method = inspect.currentframe().f_back.f_code.co_name
         success = False
         response = "-999"
@@ -869,7 +879,7 @@ class SidusSS109SerialPTXNode:
             if self.serial_busy == True and wait_on_busy == True:
                 while self.serial_busy == True:
                     time.sleep(self.SERIAL_RECEIVE_DELAY/4)
-                time.sleep(self.SERIAL_RECEIVE_DELAY)
+                time.sleep(self.SERIAL_RECEIVE_DELAY)                
 
             if self.serial_busy == False:
                 self.serial_busy = True
@@ -882,6 +892,7 @@ class SidusSS109SerialPTXNode:
                 b=bytearray()
                 b.extend(map(ord, ser_str))
                 try:
+                    #self.msg_if.pub_warn(caller_method + ": send_msg: Sending message " + str(ser_str))
                     self.serial_port.write(b)
                 except Exception as e:
                     self.msg_if.pub_warn(caller_method + ": send_msg: Failed to send message " + str(e))
@@ -889,8 +900,8 @@ class SidusSS109SerialPTXNode:
                 try:
                     bs = self.serial_port.readline()
                     response = bs.decode()
-                    if verbose == True:
-                        self.msg_if.pub_warn(caller_method + ": send_msg: Device returned: " + str(response) + " for: " +  ser_str)
+                    #if verbose == True:
+                    #    self.msg_if.pub_warn(caller_method + ": send_msg: Device returned: " + str(response) + " for: " +  ser_str)
                 except Exception as e:
                     self.msg_if.pub_warn(caller_method + ": send_msg: Failed to recieve message " + str(e))
                 if verbose == True:
@@ -904,7 +915,7 @@ class SidusSS109SerialPTXNode:
                         bs = self.serial_port.readline()
                         response = bs.decode()
                         if verbose == True:
-                            self.msg_if.pub_debug(caller_method + ": send_msg: Device returned: " + str(response) + " for: " +  ser_str)
+                            self.msg_if.pub_debug(caller_method + ": send_msg: Fialed - Device returned: " + str(response) + " for: " +  ser_str)
                     except Exception as e:
                         self.msg_if.pub_warn(caller_method + ": send_msg: Failed to recieve message " + str(e))
                     if verbose == True:
@@ -913,20 +924,23 @@ class SidusSS109SerialPTXNode:
                         pass
 
 
+                    self.serial_fail_attempts += 1
+                    #self.msg_if.pub_warn(caller_method + ": send_msg: Updated serial_fail_attempts to " + str(self.serial_fail_attempts))
+                    #self.msg_if.pub_warn("serial_fail_attempts: " +  str(self.serial_fail_attempts))
+                    if self.serial_fail_attempts > self.max_serial_fail_attempts:
+                        self.max_serial_fail_attempts = copy.deepcopy(self.serial_fail_attempts)
+                        self.serial_send_delay = self.MIN_SERIAL_SEND_DELAY + self.MAX_SERIAL_SEND_DELAY * (self.max_serial_fail_attempts / self.MAX_SERIAL_ATTEMPTS)
+                        self.msg_if.pub_warn("Serial send delay updated to : " +  str(self.serial_send_delay))
+                    if self.serial_fail_attempts > self.MAX_SERIAL_ATTEMPTS:
+                        nepi_sdk.signal_shutdown("Exceeded Max Serial Fail attempts in a row, Shutting Down")
+                else:
+                    self.serial_fail_attempts = 0
+
+
                 self.serial_busy = False
-        else:
-            self.msg_if.pub_warn(caller_method + ": Serial port busy, can't send msg: " + ser_msg)
-        if success == False:
-            self.serial_fail_attempts += 1
-            self.msg_if.pub_warn("serial_fail_attempts: " +  str(self.serial_fail_attempts))
-            if self.serial_fail_attempts > self.max_serial_fail_attempts:
-                self.max_serial_fail_attempts = copy.deepcopy(self.serial_fail_attempts)
-                self.serial_send_delay = self.MAX_SERIAL_SEND_DELAY * (self.max_serial_fail_attempts / self.MAX_SERIAL_ATTEMPTS)
-                self.msg_if.pub_warn("Serial send delay updated to : " +  str(self.serial_send_delay))
-            if self.serial_fail_attempts > self.MAX_SERIAL_ATTEMPTS:
-                nepi_sdk.signal_shutdown("Exceeded Max Serial Fail attempts in a row, Shutting Down")
-        else:
-            self.serial_fail_attempts = 0
+            else:
+                self.msg_if.pub_warn(caller_method + ": Serial port busy, can't send msg: " + ser_msg)
+        
         
     
         return [success, response]
