@@ -728,8 +728,8 @@ class SidusSS109SerialPTXNode:
         pos_count = self.deg2pos_count(pan_deg)
         data_str = self.create_pos_str(pos_count)
         ser_msg= (self.pan_str + self.addr_str + 'MML' + data_str + 'W')
-        #self.msg_if.pub_warn("pos_count: " + str(pos_count) + "data_str: " + str(data_str))
-        #self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
+        self.msg_if.pub_warn("pos_count: " + str(pos_count) + "data_str: " + str(data_str))
+        self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
         [success,response] = self.send_msg(ser_msg)
 
         if self.set_speed == True:
