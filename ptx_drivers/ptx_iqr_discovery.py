@@ -168,7 +168,23 @@ class IqrPanTiltDiscovery:
         self.logger.log_info("Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
     return success
 
-    
+  def killAllDevices(self,active_paths_list):
+    #self.logger.log_warn("Entering Kill All Devices function for path: " + str(path_str))###
+    path_purge_list = []
+    for key in self.active_devices_dict.keys():
+      path_purge_list.append(key)
+    #self.logger.log_warn("Killing Devices: " + str(path_purge_list))
+    for path_str in path_purge_list:
+        path_entry = self.active_devices_dict[path_str]
+        node_name = path_entry['node_name']
+        sub_process = path_entry['sub_process']
+        success = nepi_drvs.killDriverNode(node_name,sub_process)
+        if path_str in active_paths_list:
+          active_paths_list.remove(path_str)
+    for path_str in path_purge_list:
+        del  self.active_devices_dict[path_str]
+    nepi_sdk.sleep(1)
+    return active_paths_list
 
 
 if __name__ == '__main__':

@@ -68,8 +68,13 @@ class V4L2CamDiscovery:
       self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
       self.msg_if.pub_warn("Initial Driver Dict: " + str(self.drv_dict))
     except Exception as e:
-      self.msg_if.pub_warn("Failed to load options " + str(e))#
+      self.msg_if.pub_warn("Failed to load drv_dict " + str(e))#
       nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
+      return
+    
+    if 'DISCOVERY_DICT' not in self.drv_dict.keys():
+      self.msg_if.pub_warn("Failed to load discovery dict ")#
+      nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Discovery Dict")
       return
 
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():

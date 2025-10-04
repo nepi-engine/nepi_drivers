@@ -88,7 +88,7 @@ class ZedCamDiscovery:
         if res_str in self.RES_DICT.keys():
           self.res_val = self.RES_DICT[res_str]
       if 'framerate' in self.drv_dict['DISCOVERY_DICT']['OPTIONS']:
-        fs_str = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['framerate']['value']
+        fr_str = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['framerate']['value']
         fr_val=int(fr_str)
         if fr_val < 1:
           fr_val = 1

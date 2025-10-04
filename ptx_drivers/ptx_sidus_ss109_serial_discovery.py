@@ -256,17 +256,20 @@ class SidusSS109SerialDiscovery:
       self.logger.log_warn("Driver Node launched successfully, adding to active device dict keys: " + str(self.active_devices_dict.keys()))###
 
 
-  def killAllDevices(self,path_str,active_paths_list):
+  def killAllDevices(self,active_paths_list):
     #self.logger.log_warn("Entering Kill All Devices function for path: " + str(path_str))###
-    path_purge_list = self.active_devices_dict.keys() 
+    path_purge_list = []
+    for key in self.active_devices_dict.keys():
+      path_purge_list.append(key)
     #self.logger.log_warn("Killing Devices: " + str(path_purge_list))
     for path_str in path_purge_list:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
         success = nepi_drvs.killDriverNode(node_name,sub_process)
-        del  self.active_devices_dict[path_str]
         if path_str in active_paths_list:
           active_paths_list.remove(path_str)
+    for path_str in path_purge_list:
+        del  self.active_devices_dict[path_str]
     nepi_sdk.sleep(1)
     return active_paths_list
