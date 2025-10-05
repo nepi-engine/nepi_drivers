@@ -66,7 +66,7 @@ class SidusSS109SerialDiscovery:
     self.logger.log_info("Starting Initialization")
     self.letters_list = list(string.ascii_uppercase)
     self.logger.log_info("Initialization Complete")
-    self.logger.log_warn("log_warn test      log_warn test         log_warn test       log_warn test       log_warn test      log_warn test: ")
+
 
 
   ##########  Nex Standard Discovery Function
@@ -83,13 +83,13 @@ class SidusSS109SerialDiscovery:
     # Get discovery options
     try:
       baudrate_dict = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']
-      self.logger.log_warn("Baud Rate dict: " + str(baudrate_dict))###
-      self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
+      #self.logger.log_warn("Baud Rate dict: " + str(baudrate_dict))###
+      #self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
       baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
-      self.logger.log_warn("Baud Rate options: " + str(baudrate_options))###
+      #self.logger.log_warn("Baud Rate options: " + str(baudrate_options))###
 
       baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
-      self.logger.log_warn("Baud Rate selected: " + str(baudrate_sel))###
+      #self.logger.log_warn("Baud Rate selected: " + str(baudrate_sel))###
       baudrate_list = []
       if baudrate_sel != "All":
         baudrate_list.append(baudrate_sel)
@@ -97,8 +97,8 @@ class SidusSS109SerialDiscovery:
           for baudrate in baudrate_options:
             if baudrate != 'All':
               baudrate_list.append(baudrate)
-      self.baudrate_list = baudrate_list
-      self.logger.log_warn("Baud Rate list: " + str(baudrate_list))###
+      #self.baudrate_list = baudrate_list
+      #self.logger.log_warn("Baud Rate list: " + str(baudrate_list))###
 
       start_addr = drv_dict['DISCOVERY_DICT']['OPTIONS']['start_addr']['value']
       try:

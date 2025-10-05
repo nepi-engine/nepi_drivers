@@ -40,7 +40,7 @@ FILE_TYPE = 'NODE'
 
 
 class SidusSS109SerialPTXNode:
-    set_speed = False
+    set_speed = True
 
     MAX_POSITION_UPDATE_RATE = 5
     SERIAL_RECEIVE_DELAY = 0.001
@@ -115,6 +115,7 @@ class SidusSS109SerialPTXNode:
 
 
     serial_port = None
+    serial_lock = False
     serial_busy = False
     
     connected = False
@@ -607,15 +608,17 @@ class SidusSS109SerialPTXNode:
         return speedRatio
 
     def driver_setSpeedRatios(self,speedRatio):
+        self.serial_lock = True
         method_name = sys._getframe().f_code.co_name
         success_list = []
         success_list.append(self.driver_setSpeedRatio(speedRatio, axis_str = self.pan_str))
-        nepi_sdk.sleep(self.serial_send_delay)
+        nepi_sdk.sleep(self.serial_send_delay) 
         success_list.append(self.driver_setSpeedRatio(speedRatio, axis_str = self.tilt_str))
+        self.serial_lock = False
         return False not in success_list
 
     def driver_setSpeedRatio(self,speedRatio, axis_str = '#'):
-        success = False
+        self.serial_lock = True
         try:
             speed_count = self.ratio2speed_count(speedRatio)
         except Exception as e:
@@ -688,19 +691,19 @@ class SidusSS109SerialPTXNode:
         method_name = sys._getframe().f_code.co_name
         pan_deg = self.current_position[0]
         success = False
-        data_str = self.create_blank_str()
-        ser_msg= (self.pan_str + self.addr_str + 'MRL' + data_str + 'R')
-        [success,response] = self.send_msg(ser_msg, wait_on_busy = wait_on_busy, verbose = verbose)
+        if self.serial_lock == False:
+            data_str = self.create_blank_str()
+            ser_msg= (self.pan_str + self.addr_str + 'MRL' + data_str + 'R')
+            [success,response] = self.send_msg(ser_msg, wait_on_busy = wait_on_busy, verbose = verbose)
 
-        if success == True:
-            try:
-                data_str = response[5:(5 + self.data_len)]
-                #self.msg_if.pub_warn(method_name + ": Will convert pan position str: " + data_str)
-                pan_count = int(data_str) 
-                pan_deg = self.pos_count2deg(pan_count) * -1
-            except Exception as e:
-                self.msg_if.pub_warn(method_name + ": Failed to convert message to int: " + data_str + " " + str(e))
-
+            if success == True:
+                try:
+                    data_str = response[5:(5 + self.data_len)]
+                    #self.msg_if.pub_warn(method_name + ": Will convert pan position str: " + data_str)
+                    pan_count = int(data_str) 
+                    pan_deg = self.pos_count2deg(pan_count) * -1
+                except Exception as e:
+                    self.msg_if.pub_warn(method_name + ": Failed to convert message to int: " + data_str + " " + str(e))
         return pan_deg
 
 
@@ -725,10 +728,12 @@ class SidusSS109SerialPTXNode:
 
 
     def driver_moveToPosition(self,pan_deg, tilt_deg):
+        self.serial_lock = True
         success = self.driver_moveToPanPosition(pan_deg)
+        nepi_sdk.sleep(self.serial_send_delay) 
         success = self.driver_moveToTiltPosition(tilt_deg)
         self.msg_if.pub_warn("driver_moveToPosition: " + str(success))
-
+        self.serial_lock = False
         return success
 
 
@@ -743,11 +748,11 @@ class SidusSS109SerialPTXNode:
         #self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
         [success,response] = self.send_msg(ser_msg)
 
-        if self.set_speed == True:
-            #self.msg_if.pub_warn("driver_setSpeedRatio called")
-            #self.msg_if.pub_warn("driver_setSpeedRatio: " + str(self.speed_ratio))
-            nepi_sdk.sleep(self.serial_send_delay)
-            self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.pan_str)
+        # if self.set_speed == True:
+        #     #self.msg_if.pub_warn("driver_setSpeedRatio called")
+        #     #self.msg_if.pub_warn("driver_setSpeedRatio: " + str(self.speed_ratio))
+        #     nepi_sdk.sleep(self.serial_send_delay)
+        #     self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.pan_str)
 
         
         return success
@@ -763,11 +768,11 @@ class SidusSS109SerialPTXNode:
         self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
         [success,response] = self.send_msg(ser_msg)
 
-        if self.set_speed == True:
-            #self.msg_if.pub_warn("driver_setSpeedRatio called")
-            #self.msg_if.pub_warn("driver_setSpeedRatio: " + str(self.speed_ratio))
-            nepi_sdk.sleep(self.serial_send_delay)
-            self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.pan_str)
+        # if self.set_speed == True:
+        #     #self.msg_if.pub_warn("driver_setSpeedRatio called")
+        #     #self.msg_if.pub_warn("driver_setSpeedRatio: " + str(self.speed_ratio))
+        #     nepi_sdk.sleep(self.serial_send_delay)
+        #     self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.pan_str)
 
 
         return success
@@ -780,6 +785,7 @@ class SidusSS109SerialPTXNode:
 
     def driver_stopAxisMotion(self, axis_str = '#'):
         method_name = sys._getframe().f_code.co_name
+        self.serial_lock = True
         success = False
         data_str = self.create_blank_str()
         if axis_str == self.pan_str:
@@ -796,12 +802,9 @@ class SidusSS109SerialPTXNode:
 
             ser_msg= (self.tilt_str + self.addr_str + 'MST' + data_str + 'W')
             self.msg_if.pub_warn(method_name + ": Sending Stop Tilt serial msg: " + ser_msg)
-
-
-
         else:
             return False
-
+        self.serial_lock = False
         [success,response] = self.send_msg(ser_msg)
         return success 
 
