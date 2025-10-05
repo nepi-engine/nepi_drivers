@@ -19,7 +19,8 @@ import os
 import subprocess
 import time
 import serial
-import serial.tools.list_ports
+import serial
+
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
@@ -80,11 +81,9 @@ class AfTowerLightDiscovery:
       self.retry = True
     ########################
 
-    # Create path search options    
-    self.path_list = []
-    ports = serial.tools.list_ports.comports()
-    for loc, desc, hwid in sorted(ports):
-      self.path_list.append(loc)
+    # Create path search options
+    self.path_list = nepi_serial.get_serial_ports_list()
+    #self.logger.log_warn("ports list: " + str(self.path_list))###
 
     ### Purge Unresponsive Connections
     path_purge_list = []

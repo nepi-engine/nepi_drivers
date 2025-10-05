@@ -20,7 +20,6 @@ import os
 import subprocess
 import time
 import serial
-import serial.tools.list_ports
 import socket
 
 from mavros_msgs.srv import VehicleInfoGet
@@ -29,6 +28,7 @@ from mavros_msgs.msg import VehicleInfo
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
+from nepi_sdk import nepi_serial
 
 from nepi_sdk.nepi_sdk import logger as Logger
 log_name = "iqr_pan_tilt"
@@ -102,7 +102,7 @@ class ArdupilotDiscovery:
     ### Purge Unresponsive Connections
     path_purge_list = []
     for path_str in self.active_devices_dict:
-        success = True #self.checkOnDevice(path_str)
+        success = self.checkOnDevice(path_str)
         if success == False:
           path_purge_list.append(path_str) 
     # Clean up the active_devices_dict
@@ -118,11 +118,10 @@ class ArdupilotDiscovery:
 
     # RUN SERIAL PROCESSES
     if connection_type == 'SERIAL':
-      self.path_list = []
-      ports = serial.tools.list_ports.comports()
-      for loc, desc, hwid in sorted(ports):
-        #self.logger.log_warn("Found serial_port at: " + loc)
-        self.path_list.append(loc)
+      # Create path search options
+      self.path_list = nepi_serial.get_serial_ports_list()
+      #self.logger.log_warn("ports list: " + str(self.path_list))###
+
       for path_str in self.path_list:
         valid_path = True
         if path_str in self.active_paths_list:

@@ -20,11 +20,12 @@ import os
 import subprocess
 import time
 import serial
-import serial.tools.list_ports
+
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
+from nepi_sdk import nepi_serial
 
 from nepi_sdk.nepi_sdk import logger as Logger
 log_name = "iqr_pan_tilt"
@@ -108,10 +109,8 @@ class SealiteDiscovery:
     ########################
 
     # Create path search options
-    self.path_list = []
-    ports = serial.tools.list_ports.comports()
-    for loc, desc, hwid in sorted(ports):
-      self.path_list.append(loc)
+    self.path_list = nepi_serial.get_serial_ports_list()
+    #self.logger.log_warn("ports list: " + str(self.path_list))###
 
     ### Purge Unresponsive Connections
     path_purge_list = []

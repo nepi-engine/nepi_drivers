@@ -20,12 +20,11 @@ import os
 import subprocess
 import time
 import serial
-import serial.tools.list_ports
 import string
-import glob 
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_drvs
+from nepi_sdk import nepi_serial
 
 PKG_NAME = 'PTX_SIDUS_SS109_SERIAL' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
@@ -68,7 +67,6 @@ class SidusSS109SerialDiscovery:
     self.logger.log_info("Initialization Complete")
 
 
-
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
   def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace,drv_dict):
@@ -86,10 +84,10 @@ class SidusSS109SerialDiscovery:
       #self.logger.log_warn("Baud Rate dict: " + str(baudrate_dict))###
       #self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
       baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
-      #self.logger.log_warn("Baud Rate options: " + str(baudrate_options))###
+      self.logger.log_warn("Baud Rate options: " + str(baudrate_options))###
 
       baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
-      #self.logger.log_warn("Baud Rate selected: " + str(baudrate_sel))###
+      self.logger.log_warn("Baud Rate selected: " + str(baudrate_sel))###
       baudrate_list = []
       if baudrate_sel != "All":
         baudrate_list.append(baudrate_sel)
@@ -97,35 +95,35 @@ class SidusSS109SerialDiscovery:
           for baudrate in baudrate_options:
             if baudrate != 'All':
               baudrate_list.append(baudrate)
-      #self.baudrate_list = baudrate_list
-      #self.logger.log_warn("Baud Rate list: " + str(baudrate_list))###
+      self.baudrate_list = baudrate_list
+      self.logger.log_warn("Baud Rate list: " + str(baudrate_list))###
 
       start_addr = drv_dict['DISCOVERY_DICT']['OPTIONS']['start_addr']['value']
       try:
         start_ind = self.letters_list.index(start_addr)
       except:
         start_ind = 0
-      self.logger.log_warn("Starting discovery addr: " + str(self.letters_list[start_ind]))
+      #self.logger.log_warn("Starting discovery addr: " + str(self.letters_list[start_ind]))
 
       stop_addr = drv_dict['DISCOVERY_DICT']['OPTIONS']['stop_addr']['value']
       try:
         stop_ind = self.letters_list.index(stop_addr)
       except:
         stop_ind = 0
-      self.logger.log_warn("Ending discovery addr: " + str(self.letters_list[stop_ind]))
+      #self.logger.log_warn("Ending discovery addr: " + str(self.letters_list[stop_ind]))
 
       self.addr_search_list = list(self.letters_list[start_ind:stop_ind + 1])
-      self.logger.log_warn("Disc Addr List: " + str(self.addr_search_list))
+      #self.logger.log_warn("Disc Addr List: " + str(self.addr_search_list))
 
     except Exception as e:
       self.logger.log_warn("" + self.log_name + ": Failed to setupoptions " + str(e))#
       return self.active_paths_list
 
     system_config = drv_dict['DISCOVERY_DICT']['OPTIONS']['system_config']['value']
-    self.logger.log_warn("Got system config type: " + str(system_config))
+    #self.logger.log_warn("Got system config type: " + str(system_config))
     try:
       self.data_len = self.DATA_LENGTH_DICT[system_config]
-      self.logger.log_warn("Got data length: " + str(self.data_len))
+      #self.logger.log_warn("Got data length: " + str(self.data_len))
     except:
       self.data_len = 4
       self.logger.log_warn("Using default data length: " + str(self.data_len))
@@ -136,24 +134,14 @@ class SidusSS109SerialDiscovery:
 
 
     # Create path search options
-    self.path_list = []
-    ports = serial.tools.list_ports.comports()
-    self.logger.log_warn("ports: " + str(ports))###
-    add_ports = sorted(set(
-        glob.glob('/dev/ttyTHS0')
-            ))
-    self.logger.log_warn("add port: " + str(add_ports))###
-
-    for add_port in add_ports:
-        if add_port not in ports:
-            self.path_list.append(add_port)
-    self.logger.log_warn("ports list: " + str(self.path_list))###
+    self.path_list = nepi_serial.get_serial_ports_list()
+    #self.logger.log_warn("ports list: " + str(self.path_list))###
 
 
     ### Purge Unresponsive Connections
     #self.logger.log_warn("Entering Check On Devices loop with active device keys: " + str(self.active_devices_dict.keys()))###
     path_purge_list = []
-    for path_str in self.active_devices_dict:
+    for path_str in self.active_devices_dict.keys():
         success = self.checkOnDevice(path_str)
         if success == False:
           path_purge_list.append(path_str) 
@@ -171,8 +159,7 @@ class SidusSS109SerialDiscovery:
         if path_str.find(id) != -1 or path_str in self.active_paths_list:
           valid_path = False
       if valid_path:
-        self.logger.log_warn("Looking for path: " + path_str)
-        self.logger.log_warn("In path_list: " + str(self.active_paths_list))
+        #self.logger.log_warn("Looking for path: " + path_str + " In path_list: " + str(self.active_paths_list))
         found = self.checkForDevice(path_str)
         if found:
           success = self.launchDeviceNode(path_str)
@@ -183,10 +170,19 @@ class SidusSS109SerialDiscovery:
 
   ##########  Device specific calls
   def checkForDevice(self,path_str):
+    self.logger.log_warn("" )###
+
     self.logger.log_warn("Entering check for device function for path: " + str(path_str))###
+
     found_device = False
+    self.logger.log_warn("active paths list: " + str(self.active_paths_list))###
+
     if path_str not in self.active_paths_list:
+      self.logger.log_warn("baudrate list: " + str(self.baudrate_list))###
+
       for baud_str in self.baudrate_list:
+        self.logger.log_warn("Baud Rate: " + str(baud_str))
+
         self.baud_str = baud_str
         self.baud_int = int(baud_str)
         try:
@@ -196,12 +192,15 @@ class SidusSS109SerialDiscovery:
           self.logger.log_info("Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
           continue
         #################################################
+        #self.logger.log_warn("addr_search_list: " + str(self.addr_search_list))
+
         for addr_str in self.addr_search_list:
           data_str = ''
           for i in range(self.data_len):
             data_str = data_str + '0'
           ser_msg= ('#' + addr_str + 'MRA' + data_str + 'R')
           ser_str = (ser_msg + '\r\n')
+          
           ################################################  
           # Send Serial String
           self.logger.log_warn("")
@@ -285,3 +284,7 @@ class SidusSS109SerialDiscovery:
         del  self.active_devices_dict[path_str]
     nepi_sdk.sleep(1)
     return active_paths_list
+  
+
+if __name__ == '__main__':
+    SidusSS109SerialDiscovery()

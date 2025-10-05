@@ -20,8 +20,8 @@ driver:
         options:
           - All
           - '9600'
-        default: All
-        value: All
+        default: '9600'
+        value: '9600'
 
       start_addr:
         type: 'String'
