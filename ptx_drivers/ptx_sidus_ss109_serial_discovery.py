@@ -84,10 +84,10 @@ class SidusSS109SerialDiscovery:
       #self.logger.log_warn("Baud Rate dict: " + str(baudrate_dict))###
       #self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
       baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
-      self.logger.log_warn("Baud Rate options: " + str(baudrate_options))###
+      #self.logger.log_warn("Baud Rate options: " + str(baudrate_options))###
 
       baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
-      self.logger.log_warn("Baud Rate selected: " + str(baudrate_sel))###
+      #self.logger.log_warn("Baud Rate selected: " + str(baudrate_sel))###
       baudrate_list = []
       if baudrate_sel != "All":
         baudrate_list.append(baudrate_sel)
@@ -96,7 +96,7 @@ class SidusSS109SerialDiscovery:
             if baudrate != 'All':
               baudrate_list.append(baudrate)
       self.baudrate_list = baudrate_list
-      self.logger.log_warn("Baud Rate list: " + str(baudrate_list))###
+      #self.logger.log_warn("Baud Rate list: " + str(baudrate_list))###
 
       start_addr = drv_dict['DISCOVERY_DICT']['OPTIONS']['start_addr']['value']
       try:
@@ -116,7 +116,7 @@ class SidusSS109SerialDiscovery:
       #self.logger.log_warn("Disc Addr List: " + str(self.addr_search_list))
 
     except Exception as e:
-      self.logger.log_warn("" + self.log_name + ": Failed to setupoptions " + str(e))#
+      self.logger.log_warn("" + self.log_name + ": Failed to setup options " + str(e))#
       return self.active_paths_list
 
     system_config = drv_dict['DISCOVERY_DICT']['OPTIONS']['system_config']['value']
@@ -126,7 +126,7 @@ class SidusSS109SerialDiscovery:
       #self.logger.log_warn("Got data length: " + str(self.data_len))
     except:
       self.data_len = 4
-      self.logger.log_warn("Using default data length: " + str(self.data_len))
+      #self.logger.log_warn("Using default data length: " + str(self.data_len))
       return self.active_paths_list
     
 
@@ -170,18 +170,16 @@ class SidusSS109SerialDiscovery:
 
   ##########  Device specific calls
   def checkForDevice(self,path_str):
-    self.logger.log_warn("" )###
-
-    self.logger.log_warn("Entering check for device function for path: " + str(path_str))###
+    #self.logger.log_warn("Entering check for device function for path: " + str(path_str))###
 
     found_device = False
-    self.logger.log_warn("active paths list: " + str(self.active_paths_list))###
+    #self.logger.log_warn("active paths list: " + str(self.active_paths_list))###
 
     if path_str not in self.active_paths_list:
-      self.logger.log_warn("baudrate list: " + str(self.baudrate_list))###
+      #self.logger.log_warn("baudrate list: " + str(self.baudrate_list))###
 
       for baud_str in self.baudrate_list:
-        self.logger.log_warn("Baud Rate: " + str(baud_str))
+        #self.logger.log_warn("Baud Rate: " + str(baud_str))
 
         self.baud_str = baud_str
         self.baud_int = int(baud_str)
@@ -203,20 +201,20 @@ class SidusSS109SerialDiscovery:
           
           ################################################  
           # Send Serial String
-          self.logger.log_warn("")
-          self.logger.log_warn("Sending serial message: " + ser_msg)
+          #self.logger.log_warn("")
+          #self.logger.log_warn("Sending serial message: " + ser_msg)
           b=bytearray()
           b.extend(map(ord, ser_str))
           try:
             serial_port.write(b)
-            self.logger.log_warn("Waiting for response")
+            #self.logger.log_warn("Waiting for response")
             nepi_sdk.sleep(.010)
             bs = serial_port.readline()
             response = bs.decode()
           except Exception as e:
             self.logger.log_info("Got a serial read/write error: " + str(e))
             break
-          self.logger.log_warn("Got response: " + response)
+          #self.logger.log_warn("Got response: " + response)
           if len(response) > 5:
             if response[0:5] == ser_msg[0:5]:
               self.addr_str = response[1]

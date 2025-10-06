@@ -33,6 +33,40 @@ logger = Logger(log_name = log_name)
 PKG_NAME = 'NPX_MICROSTRAIN_IMU'
 FILE_TYPE = 'DISCOVERY'
 
+
+
+
+PKG_NAME = 'NPX_MICROSTRAIN_AHAR'
+DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"
+ros_node_name = "npx_microstrain_node"  # driver name + base namespace
+
+def launch_ms_node(pkg_name, ros_node_name, param_file_path):
+    """
+    Launch the ROS1 MicroStrain driver via roslaunch and return (success, msg, subprocess_handle).
+    """
+    device_node_launch_cmd = [
+        'roslaunch', 'microstrain_inertial_driver', 'microstrain.launch',
+        f'node_name:={ros_node_name}',
+        f'namespace:=/nepi/device1/{ros_node_name}',
+        f'params_file:={param_file_path}',
+    ]
+
+    try:
+        sub_process = subprocess.Popen(device_node_launch_cmd)
+    except Exception as e:
+        return (False, f"Failed to launch {ros_node_name}: {e}", None)
+
+    # If the process died immediately, treat as failure
+    rc = sub_process.poll()
+    if rc is not None and rc != 0:
+        return (False,
+                f"Failed to start {ros_node_name} via: {' '.join(device_node_launch_cmd)} (rc={rc})",
+                None)
+
+    return (True, "Success", sub_process)
+
+
+
 #########################################
 # Discover Method
 #########################################
@@ -53,6 +87,7 @@ class MicrostrainDiscovery:
 
     includeDevices = []
     excludedDevices = ['ttyACM']
+
 
     ################################################          
     def __init__(self):
@@ -79,6 +114,11 @@ class MicrostrainDiscovery:
         ########################
         # Get discovery options
         try:
+
+            port_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['serial_port']['options'] = avail_ports
+            self.port_sel = '/dev/' + drv_dict['DISCOVERY_DICT']['OPTIONS']['serial_port']['value'] = avail_ports[0]
+
+
             #self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
             baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
             baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
@@ -154,51 +194,6 @@ class MicrostrainDiscovery:
 
                 connection = None
                 node = None
-
-                try:
-                    # Open and settle
-                    connection = mscl.Connection.Serial(path_str, self.baud_int)
-                    node = mscl.InertialNode(connection)
-                    time.sleep(0.2)  # small settle
-
-                    # Retry ping a couple of times (USB/FTDI can be spiky right after open)
-                    ok = False
-                    for _ in range(3):
-                        if node.ping():
-                            ok = True
-                            break
-                        time.sleep(0.2)
-                    if not ok:
-                        raise RuntimeError("No ping at this baud")
-
-                    # Use direct getters instead of deviceInfo()
-                    model_name      = node.modelName()
-                    model_number    = node.modelNumber()
-                    serial_number   = node.serialNumber()
-                    firmware_version= node.firmwareVersion()
-
-                    self.logger.log_info(
-                        f"Model: {model_name}, Serial: {serial_number}, Firmware: {firmware_version}"
-                    )
-
-                    if "3DM-CV5" in model_name:
-                        found_device = True
-                        break
-                    else:
-                        self.logger.log_info(f"Device is not supported: {model_name}")
-
-                except Exception as e:
-                    self.logger.log_warn(f"Exception during device check on {path_str}@{self.baud_int}: {e}")
-                    continue
-
-                finally:
-                    try:
-                        if node:
-                            del node
-                        if connection:
-                            del connection
-                    except:
-                        pass
 
         return found_device
 

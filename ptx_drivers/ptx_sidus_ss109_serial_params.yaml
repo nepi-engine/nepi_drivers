@@ -19,20 +19,22 @@ driver:
         type: Discrete
         options:
           - All
+          - '2400'
           - '9600'
+          - '19200'
+          - '38400'
+          - '57600'
+          - '115200'
         default: '9600'
         value: '9600'
-
       start_addr:
         type: 'String'
         default: 'A'
         value: 'A'
-
       stop_addr:
         type: 'String'
         default: 'B'
         value: 'B'
-
       system_config:
         type: Discrete
         options:

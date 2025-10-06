@@ -35,6 +35,7 @@ from nepi_sdk import nepi_nav
 from nepi_api.device_if_ptx import PTXActuatorIF
 from nepi_api.messages_if import MsgIF
 
+
 PKG_NAME = 'PTX_SIDUS_SS109_SERIAL' # Use in display menus
 FILE_TYPE = 'NODE'
 
