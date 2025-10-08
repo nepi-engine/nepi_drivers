@@ -74,8 +74,8 @@ class MicrostrainDiscovery:
         # Create path search options
         
         #self.logger.log_warn("Entering discovery function with available_paths_list: " + str(available_paths_list))###
-        self.logger.log_warn("Entering discovery function with active_paths_list: " + str(active_paths_list))###
-        self.logger.log_warn("Entering discovery function with drv_dict: " + str(drv_dict))###
+        #self.logger.log_warn("Entering discovery function with active_paths_list: " + str(active_paths_list))###
+        #self.logger.log_warn("Entering discovery function with drv_dict: " + str(drv_dict))###
 
         self.drv_dict = drv_dict
         self.available_paths_list = available_paths_list
@@ -91,19 +91,19 @@ class MicrostrainDiscovery:
 
         self.path_list = nepi_serial.get_serial_ports_list()
         if self.port_sel not in self.path_list:
-            self.logger.log_warn("Failed to find selected port in available serial ports " + str(self.port_sel) + " : " + str(self.path_list))
+            #self.logger.log_warn("Failed to find selected port in available serial ports " + str(self.port_sel) + " : " + str(self.path_list))
             return active_paths_list
 
-        self.logger.log_warn("Got serial port list: " + str(self.path_list))###
-        self.logger.log_warn("Got selected serial port: " + str(self.port_sel))###
+        #self.logger.log_warn("Got serial port list: " + str(self.path_list))###
+        #self.logger.log_warn("Got selected serial port: " + str(self.port_sel))###
 
         try:
                 
             #self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
             baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
             baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
-            self.logger.log_warn("Got baudrate list: " + str(baudrate_options))###
-            self.logger.log_warn("Got selected baudrate: " + str(baudrate_sel))###
+            #self.logger.log_warn("Got baudrate options: " + str(baudrate_options))###
+            #self.logger.log_warn("Got selected baudrate: " + str(baudrate_sel))###
             baudrate_list = []
             if baudrate_sel != "All":
                 baudrate_list.append(baudrate_sel)
@@ -112,7 +112,7 @@ class MicrostrainDiscovery:
                     if baudrate != "All":
                         baudrate_list.append(baudrate)
             self.baudrate_list = baudrate_list
-            self.logger.log_warn("Got selected baud rate" + str(self.baudrate_listt))
+            #self.logger.log_warn("Got selected baudrate list" + str(self.baudrate_list))
         except Exception as e:
             self.logger.log_warn("Failed to load options " + str(e))#
             return None
@@ -121,10 +121,12 @@ class MicrostrainDiscovery:
             self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
         else:
             self.retry = True
+        #self.logger.log_warn("Got retry" + str(self.retry))
         ########################
 
 
         ### Purge Unresponsive Connections
+        #self.logger.log_warn("Running Cleanup Check Process")
         path_purge_list = []
         for path_str in self.active_devices_dict:
             success = self.checkOnDevice(path_str)
@@ -138,11 +140,15 @@ class MicrostrainDiscovery:
                 self.active_paths_list.remove(path_str)
 
         ### Checking for devices on available paths
+        #self.logger.log_warn("Starting Check for Device Process with path list: " + str(self.path_list))
         for path_str in self.path_list:
             valid_path = True
-            for id in self.excludedDevices:
-                if path_str.find(id) != -1 or path_str in self.active_paths_list:
+            #self.logger.log_warn("Checking path against exclude list: " + str(self.excludedDevices))
+            for exclude in self.excludedDevices:
+                #self.logger.log_warn("Checking exclude : " + str(exclude) + " with active list " + str(self.active_paths_list))
+                if path_str.find(exclude) != -1 or path_str in self.active_paths_list:
                     valid_path = False
+            #self.logger.log_warn("Got path check valid: " + str(valid_path))
             if valid_path:
                 #self.logger.log_warn("Looking for path: " + path_str)
                 #self.logger.log_warn("In path_list: " + str(self.active_paths_list))
@@ -157,15 +163,15 @@ class MicrostrainDiscovery:
     ##########  Device specific calls
     def checkForDevice(self, path_str):
         found_device = False
+        #self.logger.log_warn("Checking for device on path: " + path_str)
 
-        if path_str not in self.active_paths_list:
+        if path_str not in self.active_paths_list and path_str == self.port_sel:
             for baud_str in self.baudrate_list:
                 self.baud_str = baud_str
                 self.baud_int = int(baud_str)
+                found_device = True
 
-                connection = None
-                node = None
-
+        #self.logger.log_warn("Check for device on path returned: " + str(found_device))
         return found_device
 
     def checkOnDevice(self,path_str):
@@ -183,6 +189,7 @@ class MicrostrainDiscovery:
         return active
 
     def launchDeviceNode(self, path_str):
+        self.logger.log_debug("Entering Launch device on path: " + str(path_str))###
         success = False
         launch_id = path_str
 
@@ -194,11 +201,11 @@ class MicrostrainDiscovery:
             launch_check = (cur_time - launch_time) > str(self.NODE_LOAD_TIME_SEC)
         if launch_check == False:
             return False   ###
-
+        #self.logger.log_debug("Starting Launch process on path: " + str(path_str))###
         ### Start Node Launch Process
         file_name = self.drv_dict['NODE_DICT']['file_name']
         node_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
-        self.logger.log_warn(" launching node: " + node_name)
+        self.logger.log_warn(" Launching node: " + node_name)
         
         dict_param_name = nepi_sdk.create_namespace(self.base_namespace, node_name + "/drv_dict")
         

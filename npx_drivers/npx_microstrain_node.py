@@ -49,7 +49,7 @@ DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"
 DRV_TEST_DICT = {
     'port': '/dev/ttyUSB0',
     'baudrate': 115200,
-    'aux_port': '/dev/ttyUSB0',
+    'aux_port': 'None',
     'aux_baudrate': 115200,
     'debug': True,
     'param_file': '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_microstrain_params.yaml'

@@ -19,7 +19,6 @@ driver:
         type: Discrete
         options:
           - 'None'
-          - 'ttyUSB0'
         default: 'None'
         value: 'None'
       baud_rate:
