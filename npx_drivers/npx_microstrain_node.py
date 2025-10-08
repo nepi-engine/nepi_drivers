@@ -5,8 +5,24 @@
 #
 import math
 import os
+
+########################
+# # Uncomment for test mode
+ros_namespace = '/nepi/device1'
+if 'ROS_NAMESPACE' not in os.environ:
+    os.environ['ROS_NAMESPACE'] = ros_namespace
+    print("Base namespace set to: " + ros_namespace)
+else:
+    # If it's already set and you want to ensure your desired namespace is used,
+    # you can overwrite it or add a check to see if it matches your desired value.
+    if os.environ['ROS_NAMESPACE'] != ros_namespace:
+        print(f"Warning: ROS_NAMESPACE is already set to '{os.environ['ROS_NAMESPACE']}'. Overwriting with '{ros_namespace}'.", file=sys.stderr)
+        os.environ['ROS_NAMESPACE'] = ros_namespace
+########################
+
 import subprocess
 
+from std_msgs.msg import Empty, Int8, UInt8, UInt32, Int32, Bool, String, Float32, Float64, Header
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
@@ -28,16 +44,28 @@ from nepi_interfaces.msg import DeviceNPXStatus
 
 PKG_NAME = 'NPX_MICROSTRAIN_AHAR'
 DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"
-ros_node_name = "npx_microstrain_node"  # driver name + base namespace
 
-def launch_ms_node(pkg_name, ros_node_name, param_file_path):
+
+DRV_TEST_DICT = {
+    'port': '/dev/ttyUSB0',
+    'baudrate': 115200,
+    'aux_port': '/dev/ttyUSB0',
+    'aux_baudrate': 115200,
+    'debug': True,
+    'param_file': '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_microstrain_params.yaml'
+}
+
+
+
+def launch_driver_node(base_namespace, node_name, param_file_path):
     """
     Launch the ROS1 MicroStrain driver via roslaunch and return (success, msg, subprocess_handle).
     """
+    nepi_namespace = nepi_sdk.create_namespace(base_namespace,node_name)
     device_node_launch_cmd = [
         'roslaunch', 'microstrain_inertial_driver', 'microstrain.launch',
-        f'node_name:={ros_node_name}',
-        f'namespace:=/nepi/device1/{ros_node_name}',
+        f'node_name:={node_name}',
+        f'namespace:={base_namespace}',
         f'params_file:={param_file_path}',
     ]
 
@@ -55,6 +83,25 @@ def launch_ms_node(pkg_name, ros_node_name, param_file_path):
 
     return (True, "Success", sub_process)
 
+def check_driver_node(sub_process):
+    """
+    Check on the ROS1 MicroStrain driver.
+    """
+    rc = sub_process.poll()
+    if rc is not None and rc != 0:
+        return False
+    return True
+
+
+def kill_driver_node(node_name):
+    """
+    Kill the ROS1 MicroStrain driver.
+    """
+
+    success = nepi_sdk.kill_node(node_name)
+
+    return success
+
 
 
 
@@ -62,10 +109,16 @@ class MicrostrainNode(object):
     navpose_update_rate = 20
     navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
 
+    drv_dict = None
 
-    def __init__(self):
+    driver_node_name = DEFAULT_NODE_NAME
+    driver_node_process = None
+    imu_sub = None
+
+    def __init__(self, drv_dict = None):
+
         ####  NODE Initialization ####
-        nepi_sdk.init_node(name= DEFAULT_NODE_NAME)
+        nepi_sdk.init_node(name= self.driver_node_name)
         self.class_name = type(self).__name__
         self.base_namespace = nepi_sdk.get_base_namespace()
         self.node_name = nepi_sdk.get_node_name()
@@ -75,38 +128,117 @@ class MicrostrainNode(object):
         # Create Msg Class
         self.msg_if = MsgIF(log_name = self.class_name)
         self.msg_if.pub_info("Starting Node Initialization Processes")
-        self.msg_if.pub_info("Starting MicroStrain node init")
+        
 
+        ##############################
+        # Gather Driver Settings
+        self.msg_if.pub_info("Gathering driver settings")
+        if drv_dict is None:
+            # Get required drv driver dict info
+            self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
+
+        self.drv_dict = drv_dict
+        if self.drv_dict is None:
+            self.msg_if.pub_info("Driver Dict not provided")
+            nepi_sdk.signal_shutdown(self.node_name + ": Driver Dict not provided")
+            return
+
+        try:
+            port = self.drv_dict['port']
+            self.msg_if.pub_info("Using port: " + str(port))
+
+            baudrate = self.drv_dict['baudrate']
+            self.msg_if.pub_info("Using baudrate: " + str(baudrate))
+
+            aux_port = self.drv_dict['aux_port']
+            self.msg_if.pub_info("Using aux_port: " + str(aux_port))
+
+            aux_baudrate = self.drv_dict['aux_baudrate']
+            self.msg_if.pub_info("Using aux_baudrate: " + str(aux_baudrate))
+
+            debug = False
+            if 'debug' in self.drv_dict.keys():
+                debug = self.drv_dict['debug']
+            self.msg_if.pub_info("Debug set to: " + str(debug))
+
+            param_file = self.drv_dict['param_file']
+            self.msg_if.pub_info("Using param_file: " + str(param_file))
+        except Exception as e:
+            self.msg_if.pub_info("Driver Dict missing entries: " + str(e) )
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting Down - Driver Dict missing entries")
+            return
+
+        
+
+        
+
+        ############################
+        # Update Driver Node Param File Values
+        if not os.path.exists(param_file):
+            self.msg_if.pub_warn("Could not find param file at: " + param_file)
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting Down - Could not find param file")
+
+            return
+
+        self.msg_if.pub_info("Updating params in: " + param_file)
+        # Read Param File Settings
+        node_params_dict = nepi_utils.read_dict_from_file(param_file)
+        if node_params_dict is None:
+            self.msg_if.pub_warn("Could not read params from file at: " + param_file)
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting Down - Could not read params from file")
+            return
+        
+        # Update Param File Values
+        node_params_dict['port'] = port
+        node_params_dict['baudrate'] = baudrate
+        node_params_dict['aux_port'] = aux_port
+        node_params_dict['aux_baudrate'] = aux_baudrate
+        node_params_dict['debug'] = debug
+        success = nepi_utils.write_dict_to_file(node_params_dict,param_file)
+        if success == False:
+            self.msg_if.pub_warn("Failed to update param file at: " + param_file)
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting Down - Failed to update param file")
+            return
+
+        #############################
+        # Launch Driver Node
+        self.driver_node_name = self.node_name + "_driver"
+        success, msg, self.driver_node_process = launch_driver_node(self.base_namespace, self.driver_node_name, param_file)
+        if success == False:
+            self.msg_if.pub_warn("Failed to launch driver process node: " + self.driver_node_name + " with return msg: " + str(msg))
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting Down - Failed to update param file")
+            return
+        self.msg_if.pub_info("Source Node launch return msg: " + msg)
+
+
+        #############################
+        # Wait for Driver Node to Start and Get device info
         self.device_info_dict = dict(node_name = self.node_name,
                             device_name = "3DM-GV7-AHRS",
                             identifier = "ttyTHS0",
                             serial_number = "",
                             hw_version = "",
                             sw_version = "")
-        
 
-        sub_namespace = nepi_sdk.create_namespace(self.base_namespace, "npx_microstrain_node/imu/data")
 
-        nepi_sdk.create_subscriber(sub_namespace, Imu, self.odom_topic_callback, queue_size = 10)
+        ############################
+        # Create Subscribers
+        #sub_base_namespace = nepi_sdk.create_namespace(self.base_namespace,self.driver_node_name)
+        sub_namespace = nepi_sdk.create_namespace(self.base_namespace, "imu/data")
+        self.msg_if.pub_warn("Starting Imu subscriber for namespace: " + sub_namespace) 
+        self.imu_sub = nepi_sdk.create_subscriber(sub_namespace, Imu, self.odomCb, queue_size = 10)
 
-        # Launch underlying MicroStrain ROS driver
-        self.source_node_name = self.node_name + "_source"
-        params_file_path = '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_microstrain_params.yaml'
-        driver_ros_node_name = ros_node_name
-
-        if not os.path.exists(params_file_path):
-            self.msg_if.pub_warn("Could not find param file at: " + params_file_path)
-        else:
-            success, msg, pub_process = launch_ms_node(self.source_node_name, driver_ros_node_name, params_file_path)
-            self.msg_if.pub_info("Source Node launch return msg: " + msg)
-
+        sub_namespace = nepi_sdk.create_namespace(self.node_namespace, "shutdown")
+        self.msg_if.pub_warn("Starting Shutdown subsriber for namespace: " + sub_namespace) 
+        self.imu_sub = nepi_sdk.create_subscriber(sub_namespace, Empty, self.shutdownCb, queue_size = 10)
       
         ###############################
         # Create a NPX Device IF
+        self.msg_if.pub_warn("Starting NPX Class Initialization")
         if self.getNavPoseCb is not None:
             self.msg_if.pub_warn("Starting NPX Device IF Initialization")
             self.npx_if = NPXDeviceIF(device_info = self.device_info_dict, 
-                data_source_description = "IMU", #self.data_source_description
+                data_source_description = "sensor", #self.data_source_description
                 data_ref_description = "sensor_center",
                 getNavPoseCb = self.getNavPoseCb,
                 get3DTransformCb = None,
@@ -123,13 +255,13 @@ class MicrostrainNode(object):
         # Now start zed node check process
         # self.attempts = 0
         # nepi_sdk.start_timer_process((1), self.checkZedNodeCb)
-        # rospy.on_shutdown(self.cleanup_actions)
+        nepi_sdk.on_shutdown(self.cleanup_actions)
         nepi_sdk.spin()
 
 
 
     ### Callback to publish RBX odom topic
-    def odom_topic_callback(self,imu_msg):
+    def odomCb(self,imu_msg):
         # Convert quaternion to roll,pitch,yaw
         pose = imu_msg.orientation
         xyzw = list([pose.x,pose.y,pose.z,pose.w])
@@ -148,5 +280,28 @@ class MicrostrainNode(object):
     def getNavPoseCb(self):
         return self.navpose_dict
 
+
+    def shutdownCb(self,msg):
+        self.msg_if.pub_warn("Recieved shutdown request for node: " + str(self.node_name))
+        if self.driver_node_process is not None:
+            self.msg_if.pub_warn("Killing driver node: " + str(self.driver_node_process))
+            success = kill_driver_node(self.driver_node_name)
+            if success == False:
+                self.msg_if.pub_warn("Failed to kill driver node: " + str(self.driver_node_process))
+        nepi_sdk.signal_shutdown(self.node_name + ": Shutting down on request")
+
+    #######################
+    ### Cleanup processes on node shutdown
+    def cleanup_actions(self):
+        self.msg_if.pub_warn("Shutting down: Executing script cleanup actions")
+        if self.driver_node_process is not None:
+            self.msg_if.pub_warn("Killing driver node: " + str(self.driver_node_process))
+            success = kill_driver_node(self.driver_node_name)
+            if success == False:
+                self.msg_if.pub_warn("Failed to kill driver node: " + str(self.driver_node_process))
+        self.msg_if.pub_warn("Shutdown cleanup actions complete")
+            
+
 if __name__ == '__main__':
-    MicrostrainNode()
+    drv_dict = DRV_TEST_DICT
+    MicrostrainNode(drv_dict)

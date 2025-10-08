@@ -30,42 +30,11 @@ from nepi_sdk.nepi_sdk import logger as Logger
 log_name = "microstrain_imu"
 logger = Logger(log_name = log_name)
 
-PKG_NAME = 'NPX_MICROSTRAIN_IMU'
+PKG_NAME = 'NPX_MICROSTRAIN_AHAR'
 FILE_TYPE = 'DISCOVERY'
 
 
-
-
-PKG_NAME = 'NPX_MICROSTRAIN_AHAR'
-DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"
-ros_node_name = "npx_microstrain_node"  # driver name + base namespace
-
-def launch_ms_node(pkg_name, ros_node_name, param_file_path):
-    """
-    Launch the ROS1 MicroStrain driver via roslaunch and return (success, msg, subprocess_handle).
-    """
-    device_node_launch_cmd = [
-        'roslaunch', 'microstrain_inertial_driver', 'microstrain.launch',
-        f'node_name:={ros_node_name}',
-        f'namespace:=/nepi/device1/{ros_node_name}',
-        f'params_file:={param_file_path}',
-    ]
-
-    try:
-        sub_process = subprocess.Popen(device_node_launch_cmd)
-    except Exception as e:
-        return (False, f"Failed to launch {ros_node_name}: {e}", None)
-
-    # If the process died immediately, treat as failure
-    rc = sub_process.poll()
-    if rc is not None and rc != 0:
-        return (False,
-                f"Failed to start {ros_node_name} via: {' '.join(device_node_launch_cmd)} (rc={rc})",
-                None)
-
-    return (True, "Success", sub_process)
-
-
+PARAM_FILE_PATH = '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_microstrain_params.yaml'
 
 #########################################
 # Discover Method
@@ -103,8 +72,10 @@ class MicrostrainDiscovery:
     def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace,drv_dict):
 
         # Create path search options
-        self.path_list = nepi_serial.get_serial_ports_list()
-        #self.logger.log_warn("ports list: " + str(self.path_list))###
+        
+        #self.logger.log_warn("Entering discovery function with available_paths_list: " + str(available_paths_list))###
+        self.logger.log_warn("Entering discovery function with active_paths_list: " + str(active_paths_list))###
+        self.logger.log_warn("Entering discovery function with drv_dict: " + str(drv_dict))###
 
         self.drv_dict = drv_dict
         self.available_paths_list = available_paths_list
@@ -114,14 +85,25 @@ class MicrostrainDiscovery:
         ########################
         # Get discovery options
         try:
+            self.port_sel = '/dev/' + drv_dict['DISCOVERY_DICT']['OPTIONS']['serial_port']['value']
+        except Exception as e:
+            self.port_sel = "None"
 
-            port_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['serial_port']['options'] = avail_ports
-            self.port_sel = '/dev/' + drv_dict['DISCOVERY_DICT']['OPTIONS']['serial_port']['value'] = avail_ports[0]
+        self.path_list = nepi_serial.get_serial_ports_list()
+        if self.port_sel not in self.path_list:
+            self.logger.log_warn("Failed to find selected port in available serial ports " + str(self.port_sel) + " : " + str(self.path_list))
+            return active_paths_list
 
+        self.logger.log_warn("Got serial port list: " + str(self.path_list))###
+        self.logger.log_warn("Got selected serial port: " + str(self.port_sel))###
 
+        try:
+                
             #self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
             baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
             baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
+            self.logger.log_warn("Got baudrate list: " + str(baudrate_options))###
+            self.logger.log_warn("Got selected baudrate: " + str(baudrate_sel))###
             baudrate_list = []
             if baudrate_sel != "All":
                 baudrate_list.append(baudrate_sel)
@@ -130,14 +112,7 @@ class MicrostrainDiscovery:
                     if baudrate != "All":
                         baudrate_list.append(baudrate)
             self.baudrate_list = baudrate_list
-
-            start_addr = int(drv_dict['DISCOVERY_DICT']['OPTIONS']['start_addr']['value'])
-            stop_addr = int(drv_dict['DISCOVERY_DICT']['OPTIONS']['stop_addr']['value'])
-            addr_range = stop_addr - start_addr
-            if addr_range > 0:
-                self.addr_search_list = list(range(start_addr,stop_addr+1))
-            else:
-                self.addr_search_list = [start_addr]
+            self.logger.log_warn("Got selected baud rate" + str(self.baudrate_listt))
         except Exception as e:
             self.logger.log_warn("Failed to load options " + str(e))#
             return None
@@ -148,10 +123,6 @@ class MicrostrainDiscovery:
             self.retry = True
         ########################
 
-
-        # Create path search options
-        self.path_list = nepi_serial.get_serial_ports_list()
-        #self.logger.log_warn("ports list: " + str(self.path_list))###
 
         ### Purge Unresponsive Connections
         path_purge_list = []
@@ -235,9 +206,11 @@ class MicrostrainDiscovery:
         nepi_drvs.checkLoadConfigFile(node_name)
         
         self.drv_dict['DEVICE_DICT'] = dict()
-        self.drv_dict['DEVICE_DICT']['device_path'] = path_str
-        self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str
-        self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
+        self.drv_dict['DEVICE_DICT']['port'] = path_str
+        self.drv_dict['DEVICE_DICT']['baudrate'] = int(self.baud_str)
+        self.drv_dict['DEVICE_DICT']['aux_port'] = 'None' # path_str
+        self.drv_dict['DEVICE_DICT']['aux_baudrate'] = int(self.baud_str)
+        self.drv_dict['DEVICE_DICT']['param_file'] = PARAM_FILE_PATH
         
         self.logger.log_warn("Launching node with path: " + path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str)
         
@@ -257,3 +230,23 @@ class MicrostrainDiscovery:
             else:
                 self.logger.log_warn("Will attempt relaunch for node: " + node_name + " in " + str(self.NODE_LOAD_TIME_SEC) + " secs")
         return success
+    
+
+
+    def killAllDevices(self,active_paths_list):
+        #self.logger.log_warn("Entering Kill All Devices function for path: " + str(path_str))###
+        path_purge_list = []
+        for key in self.active_devices_dict.keys():
+            path_purge_list.append(key)
+        #self.logger.log_warn("Killing Devices: " + str(path_purge_list))
+        for path_str in path_purge_list:
+            path_entry = self.active_devices_dict[path_str]
+            node_name = path_entry['node_name']
+            sub_process = path_entry['sub_process']
+            success = nepi_drvs.killDriverNode(node_name,sub_process)
+            if path_str in active_paths_list:
+                active_paths_list.remove(path_str)
+        for path_str in path_purge_list:
+            del  self.active_devices_dict[path_str]
+        nepi_sdk.sleep(1)
+        return active_paths_list
