@@ -26,14 +26,16 @@ import threading, time
 PKG_NAME = 'IDX_V4L2' # Use in display menus
 FILE_TYPE = 'DRIVER'
 
-
+mjpg = False
 
 class V4l2CamDriver(object):
   MAX_CONSEC_FRAME_FAIL_COUNT = 3
   
-  def __init__(self, device_path):
+  def __init__(self, device_path, mjpg = False):
     self.device_path = device_path
     self.v4l2ctl_prefix = ['v4l2-ctl', '-d', str(self.device_path)]
+
+    self.mjpg = mjpg
 
     # First check that the desired device exists:
     p = subprocess.Popen(self.v4l2ctl_prefix + ['--list-devices'],
@@ -517,7 +519,8 @@ class V4l2CamDriver(object):
 
     # Create the OpenCV cap object using V4L2 as the backend API -- TODO: Maybe other APIs would be better? (Seems FFMPEG doesn't work for USB cams, however)
     self.v4l2_cap = cv2.VideoCapture(self.device_path, cv2.CAP_V4L2)
-    self.v4l2_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+    if self.mjpg == True:
+      self.v4l2_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
     if not self.v4l2_cap.isOpened():
       self.img_acq_lock.release()
       return False, "Failed to open capture object for v4l2 device " + self.device_path 

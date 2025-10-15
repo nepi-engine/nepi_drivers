@@ -57,6 +57,8 @@ class V4l2CamNode:
                                     
     DEFAULT_DEVICE_PATH = '/dev/video0'
 
+    MJPG_CAMS = ['explorehd','miramar']
+
 
     #Factory Control Values 
     FACTORY_CONTROLS = dict( 
@@ -124,8 +126,14 @@ class V4l2CamNode:
         self.msg_if.pub_info("Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
         [success, msg, self.driver_class] = nepi_drvs.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
         if success:
+            mjpg = False
+            for cam in self.MJPG_CAMS:
+                if self.node_name.find(cam) != -1:
+                    mjpg = True
+                    break
+            self.msg_if.pub_info("Launching driver with mjpg mode: " + str(mjpg))
             try:
-                self.driver = self.driver_class(self.device_path)
+                self.driver = self.driver_class(self.device_path,mjpg=mjpg)
             except Exception as e:
                 # Only log the error every 30 seconds -- don't want to fill up log in the case that the camera simply isn't attached.
                 self.msg_if.pub_warn("Failed to instantiate driver " + str(e) )
