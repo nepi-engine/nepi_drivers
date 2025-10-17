@@ -47,7 +47,7 @@ DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"
 
 
 DRV_TEST_DICT = {
-    'port': '/dev/ttyUSB0',
+    'port': '/dev/ttyUSB9',
     'baudrate': 115200,
     'aux_port': 'None',
     'aux_baudrate': 115200,
@@ -109,13 +109,13 @@ class MicrostrainNode(object):
     navpose_update_rate = 20
     navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
 
-    drv_dict = None
+    device_dict = None
 
     driver_node_name = DEFAULT_NODE_NAME
     driver_node_process = None
     imu_sub = None
 
-    def __init__(self, drv_dict = None):
+    def __init__(self, device_dict = None):
 
         ####  NODE Initialization ####
         nepi_sdk.init_node(name= self.driver_node_name)
@@ -133,35 +133,37 @@ class MicrostrainNode(object):
         ##############################
         # Gather Driver Settings
         self.msg_if.pub_info("Gathering driver settings")
-        if drv_dict is None:
-            # Get required drv driver dict info
-            self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
-
-        self.drv_dict = drv_dict
-        if self.drv_dict is None:
+        try:
+            self.device_dict = nepi_sdk.get_param('~drv_dict',dict())['DEVICE_DICT'] 
+        except:
+            self.msg_if.pub_warn("Failed to load driver settings from params")
+            self.device_dict = device_dict
+        
+        self.msg_if.pub_info("Got drv dict: " + str(self.device_dict))
+        if self.device_dict is None:
             self.msg_if.pub_info("Driver Dict not provided")
             nepi_sdk.signal_shutdown(self.node_name + ": Driver Dict not provided")
             return
 
         try:
-            port = self.drv_dict['port']
+            port = self.device_dict['port']
             self.msg_if.pub_info("Using port: " + str(port))
 
-            baudrate = self.drv_dict['baudrate']
+            baudrate = self.device_dict['baudrate']
             self.msg_if.pub_info("Using baudrate: " + str(baudrate))
 
-            aux_port = self.drv_dict['aux_port']
+            aux_port = self.device_dict['aux_port']
             self.msg_if.pub_info("Using aux_port: " + str(aux_port))
 
-            aux_baudrate = self.drv_dict['aux_baudrate']
+            aux_baudrate = self.device_dict['aux_baudrate']
             self.msg_if.pub_info("Using aux_baudrate: " + str(aux_baudrate))
 
             debug = False
-            if 'debug' in self.drv_dict.keys():
-                debug = self.drv_dict['debug']
+            if 'debug' in self.device_dict.keys():
+                debug = self.device_dict['debug']
             self.msg_if.pub_info("Debug set to: " + str(debug))
 
-            param_file = self.drv_dict['param_file']
+            param_file = self.device_dict['param_file']
             self.msg_if.pub_info("Using param_file: " + str(param_file))
         except Exception as e:
             self.msg_if.pub_info("Driver Dict missing entries: " + str(e) )
@@ -195,7 +197,10 @@ class MicrostrainNode(object):
         node_params_dict['aux_baudrate'] = aux_baudrate
         node_params_dict['debug'] = debug
         success = nepi_utils.write_dict_to_file(node_params_dict,param_file)
-        if success == False:
+        
+        if success == True:
+            self.msg_if.pub_warn("Updated param file at: " + param_file + " with: " + str(node_params_dict))
+        else:
             self.msg_if.pub_warn("Failed to update param file at: " + param_file)
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting Down - Failed to update param file")
             return
@@ -303,5 +308,5 @@ class MicrostrainNode(object):
             
 
 if __name__ == '__main__':
-    drv_dict = DRV_TEST_DICT
-    MicrostrainNode(drv_dict)
+    device_dict = DRV_TEST_DICT
+    MicrostrainNode(device_dict)

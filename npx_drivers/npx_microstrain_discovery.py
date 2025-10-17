@@ -93,9 +93,12 @@ class MicrostrainDiscovery:
         if self.port_sel not in self.path_list:
             #self.logger.log_warn("Failed to find selected port in available serial ports " + str(self.port_sel) + " : " + str(self.path_list))
             return active_paths_list
+        if self.port_sel in self.active_devices_dict.keys():
+            #self.logger.log_warn("Allready connected to serial port " + str(self.port_sel))
+            return active_paths_list
 
-        #self.logger.log_warn("Got serial port list: " + str(self.path_list))###
-        #self.logger.log_warn("Got selected serial port: " + str(self.port_sel))###
+        self.logger.log_warn("Got serial port list: " + str(self.path_list))###
+        self.logger.log_warn("Got selected serial port: " + str(self.port_sel))###
 
         try:
                 
@@ -204,7 +207,7 @@ class MicrostrainDiscovery:
         #self.logger.log_debug("Starting Launch process on path: " + str(path_str))###
         ### Start Node Launch Process
         file_name = self.drv_dict['NODE_DICT']['file_name']
-        node_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
+        node_name = self.node_launch_name + "_" + path_str.split('/')[-1]
         self.logger.log_warn(" Launching node: " + node_name)
         
         dict_param_name = nepi_sdk.create_namespace(self.base_namespace, node_name + "/drv_dict")
@@ -219,7 +222,7 @@ class MicrostrainDiscovery:
         self.drv_dict['DEVICE_DICT']['aux_baudrate'] = int(self.baud_str)
         self.drv_dict['DEVICE_DICT']['param_file'] = PARAM_FILE_PATH
         
-        self.logger.log_warn("Launching node with path: " + path_str + " baudrate: " + self.baud_str + " addr: " + self.addr_str)
+        self.logger.log_warn("Launching node with path: " + path_str + " baudrate: " + self.baud_str)
         
         nepi_sdk.set_param(dict_param_name, self.drv_dict)
         
