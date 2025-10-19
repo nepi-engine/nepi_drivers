@@ -8,16 +8,16 @@ import os
 
 ########################
 # # Uncomment for test mode
-ros_namespace = '/nepi/device1'
-if 'ROS_NAMESPACE' not in os.environ:
-    os.environ['ROS_NAMESPACE'] = ros_namespace
-    print("Base namespace set to: " + ros_namespace)
-else:
-    # If it's already set and you want to ensure your desired namespace is used,
-    # you can overwrite it or add a check to see if it matches your desired value.
-    if os.environ['ROS_NAMESPACE'] != ros_namespace:
-        print(f"Warning: ROS_NAMESPACE is already set to '{os.environ['ROS_NAMESPACE']}'. Overwriting with '{ros_namespace}'.", file=sys.stderr)
-        os.environ['ROS_NAMESPACE'] = ros_namespace
+# ros_namespace = '/nepi/device1'
+# if 'ROS_NAMESPACE' not in os.environ:
+#     os.environ['ROS_NAMESPACE'] = ros_namespace
+#     print("Base namespace set to: " + ros_namespace)
+# else:
+#     # If it's already set and you want to ensure your desired namespace is used,
+#     # you can overwrite it or add a check to see if it matches your desired value.
+#     if os.environ['ROS_NAMESPACE'] != ros_namespace:
+#         print(f"Warning: ROS_NAMESPACE is already set to '{os.environ['ROS_NAMESPACE']}'. Overwriting with '{ros_namespace}'.", file=sys.stderr)
+#         os.environ['ROS_NAMESPACE'] = ros_namespace
 ########################
 
 import subprocess
