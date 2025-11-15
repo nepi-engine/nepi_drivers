@@ -113,13 +113,13 @@ class AfTowerLightDiscovery:
   def checkForDevice(self,path_str):
     #self.logger.log_warn("log_name + " checkForDevice")###
     found_device = False
-    #self.logger.log_warn("path_str " + path_str)
+    self.logger.log_warn("path_str " + path_str)
     if path_str.find('ttyUSB') != -1:
       ports_dict = nepi_serial.get_serial_ports_dict_list()
-      #self.logger.log_warn("serial_port_dict " + str(ports_dict))
+      self.logger.log_warn("serial_port_dict " + str(ports_dict))
       if path_str in ports_dict.keys():
-        #self.logger.log_warn("search ids " + str(self.search_ids))
-        #self.logger.log_warn("serial_port product id " + str(ports_dict[path_str]['product_id']))
+        self.logger.log_warn("search ids " + str(self.search_ids))
+        self.logger.log_warn("serial_port product id " + str(ports_dict[path_str]['product_id']))
         if str(ports_dict[path_str]['product_id']) in self.includeDevices:
           #self.logger.log_warn("found device on path: " + path_str)
           found_device = True
