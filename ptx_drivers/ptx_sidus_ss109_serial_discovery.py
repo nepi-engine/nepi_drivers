@@ -187,7 +187,7 @@ class SidusSS109SerialDiscovery:
           # Try and open serial port
           serial_port = serial.Serial(path_str,self.baud_int,timeout = 1)
         except Exception as e:
-          self.logger.log_info("Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
+          #self.logger.log_info("Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
           continue
         #################################################
         #self.logger.log_warn("addr_search_list: " + str(self.addr_search_list))
