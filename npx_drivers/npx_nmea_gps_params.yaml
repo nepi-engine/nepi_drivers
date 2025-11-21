@@ -1,0 +1,76 @@
+driver:
+  pkg_name: NPX_NMEA_GPS
+  display_name: NMEA GPS
+  description: NMEA GPS over TCP/Serial
+  type: NPX
+  group_id: None
+  NODE_DICT:
+    file_name: npx_nmea_gps_node.py
+    class_name: NMEAGPSNode
+  DRIVER_DICT:
+    file_name: None
+    class_name: None
+  DISCOVERY_DICT:
+    file_name: npx_nmea_gps_discovery.py
+    class_name: NMEAGPSDiscovery
+    process: CALL
+    OPTIONS:
+      # Connection options (TCP or Serial)
+      tcp_host:
+        type: String
+        default: '127.0.0.1'
+        value: '127.0.0.1'
+      tcp_port:
+        type: Int
+        default: '50000'
+        value: '50000'
+      serial_port:
+        type: Discrete
+        options: ['None']
+        default: 'None'
+        value: 'None'
+      baud_rate:
+        type: Discrete
+        options: ['9600','19200','38400','57600','115200']
+        default: '115200'
+        value: '115200'
+      auto_restart:
+        type: Bool
+        default: 'True'
+        value: 'True'
+
+      # Internal simulator (optional). When enabled, the discovery starts a local
+      # TCP NMEA server on tcp_host:tcp_port that emits GGA/RMC/VTG/HDG using the
+      # parameters below, so you can fix lat/lon/alt/heading without an external source.
+      simulate_nmea:
+        type: Bool
+        default: 'False'
+        value: 'False'
+      alt_latitude:
+        type: Float
+        default: '47.6205'
+        value: '47.6205'
+      alt_longitude:
+        type: Float
+        default: '-122.3493'
+        value: '-122.3493'
+      alt_altitude:
+        type: Float
+        default: '10.0'
+        value: '10.0'
+      alt_heading_deg:
+        type: Float
+        default: '5.0'
+        value: '1.0'
+      sim_rate_hz:
+        type: Int
+        default: '5'
+        value: '5'
+      speed_kts:
+        type: Float
+        default: '7.0'
+        value: '1.0'
+      course_deg:
+        type: Float
+        default: ''
+        value: ''
