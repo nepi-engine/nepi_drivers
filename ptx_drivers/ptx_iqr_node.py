@@ -364,13 +364,16 @@ class IqrPanTiltNode:
 
 
 
-    def setSetting(self,setting_name,val):
+    def setSetting(self, setting_name, val):
         success = False
         if setting_name in self.settingFunctions.keys():
             function_str_name = self.settingFunctions[setting_name]['set']
-            #self.msg_if.pub_info("Calling set setting function " + function_str_name)
-            set_function = globals()[function_str_name]
-            success = set_function(self,val)
+            # look up the method on this instance
+            set_function = getattr(self, function_str_name, None)
+            if set_function is None:
+                self.msg_if.pub_warn("Missing set function: " + function_str_name)
+            else:
+                success = set_function(val)
         return success
 
 

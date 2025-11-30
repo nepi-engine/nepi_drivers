@@ -45,6 +45,8 @@ DEFAULT_MIN = '1'
 DEFAULT_MAX = '50'
 DEFAULT_CURVE = [DEFAULT_MIN,DEFAULT_MAX,'1','5','70','95','4.5']
 
+
+
 #########################################
 # Sealite LSX Driver Node Class
 #########################################
@@ -97,6 +99,9 @@ class SidusSS182SerialNode(object):
   hw_version = ""
   sw_version = ""
 
+  connect_attempts = 0
+
+
   serial_port = None
   serial_busy = False
   connected = False
@@ -127,20 +132,20 @@ class SidusSS182SerialNode(object):
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
   drv_dict = dict()                                                    
   def __init__(self):
-      ####  NODE Initialization ####
-      nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
-      self.class_name = type(self).__name__
-      self.base_namespace = nepi_sdk.get_base_namespace()
-      self.node_name = nepi_sdk.get_node_name()
-      self.node_namespace = nepi_sdk.get_node_namespace()
-
-      ##############################  
-      # Create Msg Class
-      self.msg_if = MsgIF(log_name = self.class_name)
-      self.msg_if.pub_info("Starting Node Initialization Processes")
+    ####  NODE Initialization ####
+    nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
+    self.class_name = type(self).__name__
+    self.base_namespace = nepi_sdk.get_base_namespace()
+    self.node_name = nepi_sdk.get_node_name()
+    self.node_namespace = nepi_sdk.get_node_namespace()
 
     ##############################  
-    # Initialize Class Variables
+    # Create Msg Class
+    self.msg_if = MsgIF(log_name = self.class_name)
+    self.msg_if.pub_info("Starting Node Initialization Processes")
+
+  ##############################  
+  # Initialize Class Variables
 
     # Get required drv driver dict info
     self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
@@ -182,17 +187,27 @@ class SidusSS182SerialNode(object):
           
         # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
         self.msg_if.pub_info("Launching NEPI LSX () interface...")
+        self.msg_if.pub_info("0")
+        self.msg_if.pub_info("node name: " + str(self.node_name))
+
         self.device_info_dict["node_name"] = self.node_name
+        self.msg_if.pub_info("1")
+
         if self.node_name.find("_") != -1:
+            self.msg_if.pub_info("2")
+
             split_name = self.node_name.rsplit('_', 1)
             self.device_info_dict["device_name"] = split_name[0]
             self.device_info_dict["identifier"] = split_name[1]
         else:
+            self.msg_if.pub_info("3")
+
             self.device_info_dict["device_name"] = self.node_name
             self.device_info_dict["identifier"] = ""
         self.device_info_dict["serial_number"] = self.serial_num
         self.device_info_dict["hw_version"] = self.hw_version
         self.device_info_dict["sw_version"] = self.sw_version
+        self.msg_if.pub_info("4")
 
         self.lsx_if = LSXDeviceIF(
                     device_info = self.device_info_dict, 
@@ -209,7 +224,9 @@ class SidusSS182SerialNode(object):
                     reports_temp = True, 
                     reports_power = False
                     )
-        self.turnOnOff(False)
+        self.msg_if.pub_info("5")
+
+        #self.turnOnOff(False)
         # Start an sealite activity check process that kills node after some number of failed comms attempts
         self.msg_if.pub_info("Starting an activity check process")
         nepi_sdk.start_timer_process((0.2), self.check_timer_callback)
@@ -219,15 +236,24 @@ class SidusSS182SerialNode(object):
         nepi_sdk.on_shutdown(self.cleanup_actions)
         # Spin forever (until object is detected)
         nepi_sdk.spin()
-      else:
+        """         else:
         self.msg_if.pub_info("Shutting down node")
         self.msg_if.pub_info("Specified serial port not available")
-        nepi_sdk.signal_shutdown("Serial port not available")   
+        nepi_sdk.signal_shutdown("Serial port not available")    """
+
 
 
 
       #**********************
       # Device setting functions
+
+  def logDeviceInfo(self):
+      dev_info_string = self.node_name + " Device Info:\n"
+      dev_info_string += "Manufacturer: " + self.dev_info["Manufacturer"] + "\n"
+      dev_info_string += "Model: " + self.dev_info["Model"] + "\n"
+      dev_info_string += "Firmware Version: " + self.dev_info["FirmwareVersion"] + "\n"
+      dev_info_string += "Serial Number: " + self.dev_info["SerialNum"] + "\n"
+      self.msg_if.pub_info(dev_info_string)
 
 
   def getCapSettings(self):
@@ -252,13 +278,16 @@ class SidusSS182SerialNode(object):
           val = None
           if setting_name in self.settingFunctions.keys():
               function_str_name = self.settingFunctions[setting_name]['get']
-              #self.msg_if.pub_info("Calling get setting function " + function_str_name)
-              get_function = globals()[function_str_name]
-              val = get_function(self)
-              if val is not None:
-                  setting["value"] = str(val)
-                  settings[setting_name] = setting
-          return settings
+              # look up the method on *this instance*, not in globals
+              get_function = getattr(self, function_str_name, None)
+              if get_function is None:
+                  self.msg_if.pub_warn("Missing get function: " + function_str_name)
+              else:
+                  val = get_function()
+          if val is not None:
+              setting["value"] = str(val)
+              settings[setting_name] = setting
+      return settings
 
 
 
@@ -293,28 +322,34 @@ class SidusSS182SerialNode(object):
     ##############
     ### Settings Functions
 
-  global getMaxIntensityPercent
+  def getMinIntensityPercent(self):
+    min_intensity = 0
+    return min_intensity
+
+
+
   def getMaxIntensityPercent(self):
     data_str = '000'
     success = False
-    ser_msg= ('&' + self.addr_str + "LPMX" + data_str + "W")
-    [success,response] = self.send_msg(ser_msg)
+    ser_msg= ('&' + self.addr_str + "LPMX" + data_str + "R")
+    response = self.send_msg(ser_msg)
 
     if success:
       if response is not None and len(response) >= 9:
           try:
               data_str = response[6:9]
               max_intensity = int(data_str) * 0.1
+              self.msg_if.pub_warn("getMaxIntensityPercent: " + str(max_intensity))
+
               return max_intensity
           except ValueError:
               self.msg_if.pub_warn("Invalid response format")
 
-  global setMaxIntensityPercent
   def setMaxIntensityPercent(self, val):
       success = False
       data_str = create_zero_prefix_str(val)
       ser_msg= ("&" + self.addr_str + 'LMX' + data_str + 'W')
-      [success,response] = self.send_msg(ser_msg)
+      response = self.send_msg(ser_msg)
       return success
 
 
@@ -422,9 +457,9 @@ class SidusSS182SerialNode(object):
   def turnOnOff(self,turn_on_off):
     self.on_off_state = turn_on_off
     if turn_on_off == False:
-      self.setIntensityFunction(0)
+      self.setOnFunction()
     else:
-      self.setIntensityFunction(self.intensity_ratio)
+      self.setOffFunction()
     
   def blinkOnOff(self,blink_on_off):
     self.on_off_state = turn_on_off
@@ -446,17 +481,43 @@ class SidusSS182SerialNode(object):
     return success 
 
   def setIntensityFunction(self,intensity_ratio):
+    success = False
     level_val = int(100*intensity_ratio) * int(self.on_off_state)
     level_str = str(level_val)
     zero_prefix_len = 3-len(level_str)
     for z in range(zero_prefix_len):
       level_str = ('0' + level_str)
-    ser_msg = ('&' + self.addr_str + 'LIN' +  level_str + "W")
+    ser_msg = ('&' + self.addr_str + 'LIN' + "0" + level_str + "W")
+    self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
     response = self.send_msg(ser_msg)
+    self.msg_if.pub_warn("response: " + str(response))
+
     if response != None and response == ser_msg:
       success = True
     return success 
+  
+  def setOnFunction(self):
+    success = False
+    ser_msg = ('&' + self.addr_str + 'LON' + "0000" + "W")
+    self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
+    response = self.send_msg(ser_msg)
+    self.msg_if.pub_warn("response: " + str(response))
 
+    if response != None and response[0:5] == ser_msg[0:5]:
+      success = True
+    return success  
+
+  def setOffFunction(self):
+    success = False
+    ser_msg = ('&' + self.addr_str + 'LOF' + "0000" + "W")
+    self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
+    response = self.send_msg(ser_msg)
+    self.msg_if.pub_warn("response: " + str(response))
+
+    if response != None and response[0:5] == ser_msg[0:5]:
+      success = True
+    return success  
+  
   #######################
   ### Class Functions
   def check_timer_callback(self, timer):
@@ -507,6 +568,8 @@ class SidusSS182SerialNode(object):
   ### Function to try and connect to device at given port and baudrate
   def connect(self):
       success = False
+      self.connect_attempts += 1
+
       port_check = self.check_port(self.port_str)
       if port_check is True:
         try:
@@ -520,7 +583,7 @@ class SidusSS182SerialNode(object):
           #self.msg_if.pub_info("Sending serial string: " + ser_msg)
           response = self.send_msg(ser_msg)
           #self.msg_if.pub_info("Got response message: " + response)
-          if response is not None and len(response) == 9:
+          if response is not None and len(response) == 12:
                 expected_prefix = ('&' + self.addr_str + 'DSN')
                 if response[0:len(expected_prefix)] == expected_prefix:
                   self.serial_num = response[5:9]
@@ -554,7 +617,7 @@ class SidusSS182SerialNode(object):
                 else:
                     self.msg_if.pub_warn("Device returned unexpected Serial Number response format")
           else:
-              self.msg_if.pub_warn("Device returned invalid Serial Number response")
+              self.msg_if.pub_warn("Device returned invalid Serial Number response: " + str(response) + ' length: ' + str(len(response)))
                 
         except Exception as e:
             self.msg_if.pub_warn("Something went wrong with connect function at serial port: " + self.port_str + " (" + str(e) + ")")
@@ -562,40 +625,32 @@ class SidusSS182SerialNode(object):
           self.msg_if.pub_warn("serial port not active")
       return success
 
+      ret_addr = response[0:3]
+      #self.msg_if.pub_info("Returned address value: " + ret_addr)
+      if ret_addr == self.addr_str:
+        self.msg_if.pub_info("Connected to device at address: " +  self.addr_str)
+        res_split = response.split(',')
+        if len(res_split) > 5:
+        # Update serial, hardware, and software status values
+          self.serial_num = res_split[2]
+          self.hw_version = res_split[3]
+          self.sw_version = res_split[4]
+          success = True
 
 
-
-
-
-
-
-
-
-
-              ret_addr = response[0:3]
-              #self.msg_if.pub_info("Returned address value: " + ret_addr)
-              if ret_addr == self.addr_str:
-                self.msg_if.pub_info("Connected to device at address: " +  self.addr_str)
-                res_split = response.split(',')
-                if len(res_split) > 5:
-                # Update serial, hardware, and software status values
-                  self.serial_num = res_split[2]
-                  self.hw_version = res_split[3]
-                  self.sw_version = res_split[4]
-                success = True
-              else:
-                self.msg_if.pub_warn("Device returned address: " + ret_addr + " does not match: " +  self.addr_str)
-            else:
-              self.msg_if.pub_warn("Device returned invalid response")
-          else:
-            self.msg_if.pub_warn("Device returned empty response")
         else:
-          self.msg_if.pub_warn("Device returned invalid response")
-      except Exception as e:
-        self.msg_if.pub_warn("Something went wrong with connect function at serial port at: " + self.port_str + "(" + str(e) + ")" )
-    else:
-      self.msg_if.pub_warn("serial port not active")
-    return success
+          self.msg_if.pub_warn("Device returned address: " + ret_addr + " does not match: " +  self.addr_str)
+      else:
+        self.msg_if.pub_warn("Device returned invalid response")
+      """   else:
+              self.msg_if.pub_warn("Device returned empty response")
+          else:
+            self.msg_if.pub_warn("Device returned invalid response")
+        except Exception as e:
+          self.msg_if.pub_warn("Something went wrong with connect function at serial port at: " + self.port_str + "(" + str(e) + ")" )
+      else:
+        self.msg_if.pub_warn("serial port not active") """
+      return success
 
 
 
@@ -657,6 +712,28 @@ class SidusSS182SerialNode(object):
     for z in range(zero_prefix_len):
         data_str = ('0' + data_str)
     return data_str
+
+   #######################
+    ### Driver Interface Functions
+
+  def driver_getDeviceInfo(self):
+      method_name = sys._getframe().f_code.co_name
+      dev_info = dict()
+      dev_info["Manufacturer"] = 'Sidus'
+      dev_info["Model"] = 'SS182'
+
+
+      data_str = self.create_blank_str()
+      ser_msg= ('&' + self.addr_str + 'ADF' + data_str + 'R')
+      response = self.send_msg(ser_msg)
+
+      firmware = ""
+      if response is not None:
+          firmware = response[5:8]
+      dev_info["FirmwareVersion"] = firmware
+
+      dev_info["SerialNum"] = ""
+      return dev_info
 
   #######################
   ### Cleanup processes on node shutdown

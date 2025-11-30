@@ -171,18 +171,29 @@ class SealiteNode(object):
         self.turnOnOff(False)
 
         # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
+        self.msg_if.pub_info("-2")
+
         self.msg_if.pub_info("Launching NEPI LSX () interface...")
+        self.msg_if.pub_info("-1")
+        self.msg_if.pub_info("node name: " + str(self.node_name))
+
         self.device_info_dict["node_name"] = self.node_name
+        self.msg_if.pub_info("0")
+
         if self.node_name.find("_") != -1:
+            self.msg_if.pub_info("1")
+
             split_name = self.node_name.rsplit('_', 1)
             self.device_info_dict["device_name"] = split_name[0]
             self.device_info_dict["identifier"] = split_name[1]
         else:
+            self.msg_if.pub_info("2")
             self.device_info_dict["device_name"] = self.node_name
             self.device_info_dict["identifier"] = ""
         self.device_info_dict["serial_number"] = self.serial_num
         self.device_info_dict["hw_version"] = self.hw_version
         self.device_info_dict["sw_version"] = self.sw_version
+        self.msg_if.pub_info("3")
 
         self.lsx_if = LSXDeviceIF(
                     device_info = self.device_info_dict, 

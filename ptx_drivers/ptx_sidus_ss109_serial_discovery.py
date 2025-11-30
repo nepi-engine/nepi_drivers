@@ -56,6 +56,9 @@ class SidusSS109SerialDiscovery:
   includeDevices = []
   excludedDevices = ['ttyACM']
 
+  connect_attempts = 0
+
+
   ################################################          
   def __init__(self):
     # Create Message Logger

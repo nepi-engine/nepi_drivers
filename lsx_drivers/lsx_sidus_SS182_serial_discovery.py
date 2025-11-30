@@ -28,12 +28,12 @@ from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_serial
 
-PKG_NAME = 'PTX_SIDUS_SS182_SERIAL' # Use in display menus
+PKG_NAME = 'LSX_SIDUS_SS182_SERIAL' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
 
  
 #########################################
-# PTX Discover Method
+# LSX Discover Method
 #########################################
 
 
@@ -157,7 +157,8 @@ class SidusSS182SerialDiscovery:
       if valid_path:
         self.logger.log_debug("Looking for path: " + path_str)
         self.logger.log_debug("In path_list: " + str(self.active_paths_list))
-        found = self.checkForDevice(path_str)
+
+        found = self.checkForDevice("/dev/ttyUSB0")    #(path_str)
         if found:
           success = self.launchDeviceNode(path_str)
           if success:
@@ -177,7 +178,7 @@ class SidusSS182SerialDiscovery:
           # Try and open serial port
           serial_port = serial.Serial(path_str,self.baud_int,timeout = 1)
         except Exception as e:
-          self.logger.log_info("Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
+          #self.logger.log_info("Unable to open serial port " + path_str + " with baudrate: " + baud_str + "(" + str(e) + ")")
           continue
         #################################################
         for addr_str in self.addr_search_list:

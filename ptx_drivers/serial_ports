@@ -1,0 +1,195 @@
+###################
+### Setup Once
+# Give user dialout premission
+sudo gpasswd --add ${USER} dialout
+# Then log out and back in
+
+# Can also try
+#sudo chmod a+rw /dev/ttyUSB0
+#sudo chown root:dialout /dev/ttyUSB0
+
+###################
+# Connect and Test
+
+# Set serial port buadrate
+# STANDARD_BUAD_RATES = [110, 150, 300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600]
+sudo ls
+export TEST_PORT=USB0
+stty -F /dev/tty${TEST_PORT} icanon
+sudo stty -F /dev/tty${TEST_PORT} 9600
+sudo stty -F /dev/tty${TEST_PORT} -echo
+stty -F /dev/tty${TEST_PORT}
+echo -e '#AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+
+
+export TEST_PORT=ACM0
+stty -F /dev/tty${TEST_PORT} icanon
+sudo stty -F /dev/tty${TEST_PORT} 9600
+sudo stty -F /dev/tty${TEST_PORT} -echo
+stty -F /dev/tty${TEST_PORT}
+echo -e '#AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+
+
+
+
+sudo ls
+export TEST_PORT=TCU0
+stty -F /dev/tty${TEST_PORT} icanon
+sudo chmod 666 /dev/tty${TEST_PORT}
+sudo stty -F /dev/tty${TEST_PORT} 115200
+sudo stty -F /dev/tty${TEST_PORT} -echo
+stty -F /dev/tty${TEST_PORT}
+echo -e '#AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+
+export TEST_PORT=THS0
+stty -F /dev/tty${TEST_PORT} icanon
+sudo chmod 666 /dev/tty${TEST_PORT}
+sudo stty -F /dev/tty${TEST_PORT} 115200
+sudo stty -F /dev/tty${TEST_PORT} -echo
+stty -F /dev/tty${TEST_PORT}
+echo -e '#AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+
+
+sudo ls
+export TEST_PORT=THS0
+stty -F /dev/tty${TEST_PORT} icanon
+sudo stty -F /dev/tty${TEST_PORT} 9600
+sudo stty -F /dev/tty${TEST_PORT} -echo
+stty -F /dev/tty${TEST_PORT}
+echo -e '#AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+
+# Start Listener in Terminal
+export TEST_PORT=TCU0
+sudo chmod 666 /dev/tty${TEST_PORT}
+sudo cat /dev/tty${TEST_PORT}
+
+export TEST_PORT=THS0
+sudo chmod 666 /dev/tty${TEST_PORT}
+sudo cat /dev/tty${TEST_PORT}
+
+export TEST_PORT=USB0
+sudo chmod 666 /dev/tty${TEST_PORT}
+sudo cat /dev/tty${TEST_PORT}
+
+export TEST_PORT=ACM0
+sudo chmod 666 /dev/tty${TEST_PORT}
+sudo cat /dev/tty${TEST_PORT}
+
+# Send Message from a different Terminal
+sudo echo -e '<YOUR_MESSAGE_STRING>/r/n' > /dev/tty${TEST_PORT}
+
+
+echo -e '#AMRA0010W/r/n' > /dev/tty${TEST_PORT}
+
+echo -e '#AMMF0011R/r/n' > /dev/tty${TEST_PORT}
+
+echo -e '!001:INFO?/r/n' > /dev/tty${TEST_PORT}
+
+
+
+
+
+# Execution Command Sequence for RS485 to RS232
+# First change pan port
+echo -e '#AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+echo -e '#AMEE0000W/r/n' > /dev/tty${TEST_PORT}
+echo -e '#AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+
+shut down system, then turn back on
+
+# Then change tilt port
+echo -e '$AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+echo -e '$AMEE0000W/r/n' > /dev/tty${TEST_PORT}
+echo -e '$AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+
+shut down system, then turn back on
+
+
+
+
+
+Execution Command Sequence for RS232 to RS485
+echo -e '#AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+echo -e '#AMEE0001W/r/n' > /dev/tty${TEST_PORT}
+echo -e '#AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+
+shut down system, then turn back on
+
+
+echo -e '$AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+echo -e '$AMEE0001W/r/n' > /dev/tty${TEST_PORT}
+echo -e '$AMRE0011R/r/n' > /dev/tty${TEST_PORT}
+shut down system, then turn back on
+
+to disable the UART debug console on an NVIDIA Orin NX, 
+edit the /boot/extlinux/extlinux.conf file and remove 
+the console=ttyTCU0,115200 or similar entry from the APPEND line,
+then reboot the system. This prevents the UART from being used for debug output,
+freeing it for other uses. 
+
+#read speed
+echo -e '#AMRS0000R/r/n' > /dev/tty${TEST_PORT}
+#set speed
+echo -e '#AMSP0020W/r/n' > /dev/tty${TEST_PORT}
+
+#AMMF0000W
+echo -e '$AMMF0000W/r/n' > /dev/tty${TEST_PORT}
+
+4943.
+#move 
+echo -e '$AMML5056W/r/n' > /dev/tty${TEST_PORT}
+echo -e '$AMML4943W/r/n' > /dev/tty${TEST_PORT}
+
+4772
+#set speed
+echo -e '#AMSP0040W/r/n' > /dev/tty${TEST_PORT}
+#AMMB0000W<
+
+#AMMF0000W
+
+#factory reset
+echo -e '$AMFR0000W/r/n' > /dev/tty${TEST_PORT}
+
+AMMF0000W
+echo -e '$AMMF0000W/r/n' > /dev/tty${TEST_PORT}
+
+echo -e '$BMSP0009W/r/n' > /dev/tty${TEST_PORT}
+
+
+
+
+#Light
+#SN:
+echo -e '&ADSN0000R/r/n' > /dev/tty${TEST_PORT}
+
+echo -e '!AGSP0000R/r/n' > /dev/tty${TEST_PORT}
+
+!AGSP0000R
+
+&ALIN0070W
+#temp:
+echo -e '&ADTM0003R/r/n' > /dev/tty${TEST_PORT}
+
+#intensity
+echo -e '&ALIN0070W/r/n' > /dev/tty${TEST_PORT}
+
+echo -e '&ALIN0000R/r/n' > /dev/tty${TEST_PORT}
+
+
+
+#on
+echo -e '&ALON0000W/r/n' > /dev/tty${TEST_PORT}
+
+
+#off
+echo -e '&ALOF0000W/r/n' > /dev/tty${TEST_PORT}
+
+
+
+
+
+echo -e '&ALMX0100W/r/n' > /dev/tty${TEST_PORT}
+
+
+echo -e '&ALMX0000R/r/n' > /dev/tty${TEST_PORT}
+
