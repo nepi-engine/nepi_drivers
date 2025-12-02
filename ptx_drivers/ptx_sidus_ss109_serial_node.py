@@ -43,7 +43,7 @@ FILE_TYPE = 'NODE'
 
 
 class SidusSS109SerialPTXNode:
-    set_speed = True
+    set_speed = False
 
     MAX_POSITION_UPDATE_RATE = 5
     SERIAL_RECEIVE_DELAY = 0.001
@@ -898,7 +898,8 @@ class SidusSS109SerialPTXNode:
                 b=bytearray()
                 b.extend(map(ord, ser_str))
                 try:
-                    #self.msg_if.pub_warn(caller_method + ": send_msg: Sending message " + str(ser_str))
+                    if verbose == True:
+                        self.msg_if.pub_warn(caller_method + ": send_msg: Sending message " + str(ser_str))
                     self.serial_port.write(b)
                 except Exception as e:
                     self.msg_if.pub_warn(caller_method + ": send_msg: Failed to send message " + str(e))
@@ -906,8 +907,8 @@ class SidusSS109SerialPTXNode:
                 try:
                     bs = self.serial_port.readline()
                     response = bs.decode()
-                    #if verbose == True:
-                    #    self.msg_if.pub_warn(caller_method + ": send_msg: Device returned: " + str(response) + " for: " +  ser_str)
+                    if verbose == True:
+                        self.msg_if.pub_warn(caller_method + ": send_msg: Device returned: " + str(response) + " for: " +  ser_str)
                 except Exception as e:
                     self.msg_if.pub_warn(caller_method + ": send_msg: Failed to recieve message " + str(e))
                 if verbose == True:

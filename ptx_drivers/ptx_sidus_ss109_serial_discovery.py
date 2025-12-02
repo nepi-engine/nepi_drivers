@@ -165,7 +165,9 @@ class SidusSS109SerialDiscovery:
         #self.logger.log_warn("Looking for path: " + path_str + " In path_list: " + str(self.active_paths_list))
         found = self.checkForDevice(path_str)
         if found:
+          self.logger.log_warn("Found device for path: " + path_str )
           success = self.launchDeviceNode(path_str)
+          self.logger.log_warn("Got Launch success: " + str(success) )
           if success:
             self.active_paths_list.append(path_str)
     return self.active_paths_list
