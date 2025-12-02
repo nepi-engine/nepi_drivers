@@ -39,7 +39,7 @@ CONTROL_NAME_OVERRIDES = dict(IrCutFilterModes = "IrCutFilter",
 
 class GenericONVIF_NVT(object):
     #WSDL_FOLDER = "/home/josh/Desktop/Work/tmp/onvif_practice/python-onvif/wsdl/" # TODO: Update to the real location as installed via python-onvif
-    WSDL_FOLDER = "/opt/nepi/nepi_engine/etc/onvif/wsdl/"
+    WSDL_FOLDER = "/opt/nepi/nepi_engine/etc/wsdl/"
     RTSP_PORT = 554
     MAX_CONSEC_FRAME_FAIL_COUNT = 3
     secure_uri = None
