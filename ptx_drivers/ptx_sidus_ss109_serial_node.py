@@ -882,7 +882,14 @@ class SidusSS109SerialPTXNode:
         success = False
         response = "-999"
         if self.serial_port is not None:
-           
+
+
+            if self.serial_busy == True and wait_on_busy == True:
+                wait_attempts = 0
+                while wait_attempts < self.MAX_SERIAL_ATTEMPTS and self.serial_busy == True:
+                    nepi_sdk.sleep(self.MIN_SERIAL_SEND_DELAY)
+                    wait_attempts += 1
+
 
             if self.serial_busy == False:
                 self.serial_busy = True
