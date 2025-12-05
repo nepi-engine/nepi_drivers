@@ -49,7 +49,7 @@ class SidusSS109SerialPTXNode:
     SERIAL_RECEIVE_DELAY = 0.001
 
     MIN_SERIAL_SEND_DELAY = 0.01
-    MAX_SERIAL_SEND_DELAY = 0.05
+    MAX_SERIAL_SEND_DELAY = 0.01
     serial_send_delay = 0.0 # Adjusted Atuomatically based on serial_fail_attempts
 
     MAX_SERIAL_ATTEMPTS=10  # Com Loss Point
@@ -882,10 +882,7 @@ class SidusSS109SerialPTXNode:
         success = False
         response = "-999"
         if self.serial_port is not None:
-            if self.serial_busy == True and wait_on_busy == True:
-                while self.serial_busy == True:
-                    time.sleep(self.SERIAL_RECEIVE_DELAY/4)
-                time.sleep(self.SERIAL_RECEIVE_DELAY)                
+           
 
             if self.serial_busy == False:
                 self.serial_busy = True
@@ -922,7 +919,7 @@ class SidusSS109SerialPTXNode:
                         bs = self.serial_port.readline()
                         response = bs.decode()
                         if verbose == True:
-                            self.msg_if.pub_debug(caller_method + ": send_msg: Fialed - Device returned: " + str(response) + " for: " +  ser_str)
+                            self.msg_if.pub_debug(caller_method + ": send_msg: Fialed \ Device returned: " + str(response) + " for: " +  ser_str)
                     except Exception as e:
                         self.msg_if.pub_warn(caller_method + ": send_msg: Failed to recieve message " + str(e))
                     if verbose == True:
@@ -936,10 +933,12 @@ class SidusSS109SerialPTXNode:
                     #self.msg_if.pub_warn("serial_fail_attempts: " +  str(self.serial_fail_attempts))
                     if self.serial_fail_attempts > self.max_serial_fail_attempts:
                         self.max_serial_fail_attempts = copy.deepcopy(self.serial_fail_attempts)
-                        self.serial_send_delay = self.MIN_SERIAL_SEND_DELAY + self.MAX_SERIAL_SEND_DELAY * (self.max_serial_fail_attempts / self.MAX_SERIAL_ATTEMPTS)
+                        if self.serial_send_delay < self.MAX_SERIAL_SEND_DELAY:
+                            self.serial_send_delay = self.MIN_SERIAL_SEND_DELAY + self.MAX_SERIAL_SEND_DELAY * (self.max_serial_fail_attempts / self.MAX_SERIAL_ATTEMPTS)
                         self.msg_if.pub_warn("Serial send delay updated to : " +  str(self.serial_send_delay))
-                    if self.serial_fail_attempts > self.MAX_SERIAL_ATTEMPTS:
-                        nepi_sdk.signal_shutdown("Exceeded Max Serial Fail attempts in a row, Shutting Down")
+                        self.serial_fail_attempts = 0
+                    # if self.serial_fail_attempts > self.MAX_SERIAL_ATTEMPTS:
+                    #     nepi_sdk.signal_shutdown("Exceeded Max Serial Fail attempts in a row, Shutting Down")
                 else:
                     self.serial_fail_attempts = 0
 
