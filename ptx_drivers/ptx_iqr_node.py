@@ -209,12 +209,13 @@ class IqrPanTiltNode:
         ################################################  
         self.msg_if.pub_info("Connecting to Device on port " + self.port_str + " with baud " + self.baud_str)
         ### Try and connect to device
-        while self.connected == False and self.connect_attempts < 5:
-            self.connected = self.connect() 
-            if self.connected == False:
-                nepi_sdk.sleep(1)
+        # while self.connected == False and self.connect_attempts < 5:
+        #     self.connected = self.connect() 
+        #     if self.connected == False:
+        #         nepi_sdk.sleep(1)
+        self.connected = self.connect() 
         if self.connected == False:
-            self.msg_if.pub_info("Shutting down node")
+            self.msg_if.pub_info("Shutting down node, Unable to connect to Pan Tilt device")
             nepi_sdk.signal_shutdown("Unable to connect to Pan Tilt device")   
         else:
             ################################################
@@ -529,7 +530,7 @@ class IqrPanTiltNode:
                         success = False
                         pt_status = PanTiltStatus()
                         if rcvdBuf is not None:
-                            if len(rcvdBuf) == 19:
+                            if len(rcvdBuf) >= 19:
                                 pt_status.id = rcvdBuf[0]
                                 pt_status.serial_num = f"SN{int(rcvdBuf[1])}"
                                 pt_status.hw_version = f"v{int((rcvdBuf[2] & 0xff00) >> 8)}.{int(rcvdBuf[2] & 0x00ff)}"
@@ -552,6 +553,8 @@ class IqrPanTiltNode:
                                 pt_status.loop_ec = rcvdBuf[18]
                                 pt_status.loop_time = rcvdBuf[19]
                                 success = True
+            else:
+                self.msg_if.pub_info("Modebus Master is None. Failed to connect")
             return success,pt_status
                 
 
@@ -669,7 +672,7 @@ class IqrPanTiltNode:
     def connect(self):
         success = False
         self.connect_attempts += 1
-        port_check = self.check_port(self.port_str)
+        port_check = True #self.check_port(self.port_str)
         pt_status = None
         if port_check is True:
             try:
@@ -698,6 +701,8 @@ class IqrPanTiltNode:
                     self.fw_version = pt_status.sw_version
                     success = True
                     # Factory Reset Device
+                else:
+                    self.msg_if.pub_info("Failed to get status from device on port: " +  self.port_str)
     
 
                 self.driver_moveToPosition(0.0, 0.0)

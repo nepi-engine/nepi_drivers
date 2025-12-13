@@ -39,13 +39,14 @@ class IqrPanTiltDiscovery:
   active_devices_dict = dict()
   node_launch_name = "iqr_pan_tilt"
 
-  includeDevices = ['ttyACM']
-  excludedDevices = []
+  includeDevices = ['iqr_pan_tilt']
+  excludedDevices = ['ttyACM']
 
 
   baud_str = '115200'
   addr_str = '1'
 
+  source_path = 'None'
   ################################################          
   def __init__(self):
     ############
@@ -64,6 +65,7 @@ class IqrPanTiltDiscovery:
   def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict):
     self.drv_dict = drv_dict
     #self.logger.log_warn("Got drv_dict : " + str(self.drv_dict))
+    #self.logger.log_warn("Got available paths list : " + str(available_paths_list))
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
@@ -90,13 +92,14 @@ class IqrPanTiltDiscovery:
 
     ### Checking for devices on available paths
     for path_str in self.available_paths_list:
-      if path_str not in self.active_paths_list:
+      if path_str not in self.active_paths_list and path_str not in self.excludedDevices:
         found_device = self.checkForDevice(path_str)
         if found_device == True:
           self.logger.log_info("Found device on path: " + path_str)
           success = self.launchDeviceNode(path_str)
           if success == True:
             self.active_paths_list.append(path_str)
+            self.active_paths_list.append(self.source_path)
     return self.active_paths_list
   ################################################
 
@@ -139,7 +142,7 @@ class IqrPanTiltDiscovery:
     node_launch_name = 'iqr_pan_tilt_'
     self.logger.log_warn("Entering launch device function for path: " + str(path_str) )###
     file_name = self.drv_dict['NODE_DICT']['file_name']
-    device_node_name = self.node_launch_name + "_" + path_str.split('/')[-1]
+    device_node_name = self.node_launch_name
     self.logger.log_info(" launching node: " + device_node_name)
     #Setup required param server drv_dict for discovery node
     dict_param_name = nepi_sdk.create_namespace(self.base_namespace,device_node_name + "/drv_dict")
@@ -147,7 +150,8 @@ class IqrPanTiltDiscovery:
     nepi_drvs.checkLoadConfigFile(device_node_name)
     self.logger.log_warn(" launching node: " + str(self.drv_dict))
     self.drv_dict['DEVICE_DICT'] = dict()
-    self.drv_dict['DEVICE_DICT']['device_path'] = path_str
+    self.source_path = '/dev/' + os.readlink(path_str)
+    self.drv_dict['DEVICE_DICT']['device_path'] = self.source_path
     self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str
     self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
     nepi_sdk.set_param(dict_param_name,self.drv_dict)
@@ -181,6 +185,9 @@ class IqrPanTiltDiscovery:
         success = nepi_drvs.killDriverNode(node_name,sub_process)
         if path_str in active_paths_list:
           active_paths_list.remove(path_str)
+        if self.source_path in active_paths_list:
+          active_paths_list.remove(self.source_path)
+        self.source_path = 'None'
     for path_str in path_purge_list:
         del  self.active_devices_dict[path_str]
     nepi_sdk.sleep(1)
