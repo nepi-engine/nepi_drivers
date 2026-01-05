@@ -46,7 +46,7 @@ class SidusSS109SerialPTXNode:
     SET_SPEED = False
 
     MAX_POSITION_UPDATE_RATE = 5
-    SERIAL_RECEIVE_DELAY = 0.001
+    SERIAL_RECEIVE_DELAY = 0.005
 
     MIN_SERIAL_SEND_DELAY = 0.01
     MAX_SERIAL_SEND_DELAY = 0.01
@@ -886,7 +886,7 @@ class SidusSS109SerialPTXNode:
 
             if self.serial_busy == False:
                 self.serial_busy = True
-
+                self.serial_port.reset_input_buffer()
                 if verbose == True:
                     #self.msg_if.pub_warn(caller_method + ": send_msg: <<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
                     #self.msg_if.pub_warn(caller_method + ": send_msg: Locked serial with send msg: " + ser_msg)
@@ -926,9 +926,10 @@ class SidusSS109SerialPTXNode:
                     #     #self.msg_if.pub_warn(caller_method + ": send_msg: Unlocking serial")
                     #     #self.msg_if.pub_warn(caller_method + ": send_msg: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
                     #     pass
-                    self.msg_if.pub_warn(caller_method + ": Serial send " + str(ser_msg) + " returned bad response " + str(response))
+                    #self.msg_if.pub_warn(caller_method + ": Serial send " + str(ser_msg) + " returned bad response " + str(response))
                     self.serial_fail_attempts += 1
-                    self.msg_if.pub_warn(caller_method + ": Updated serial_fail_attempts to " + str(self.serial_fail_attempts))
+                    #self.msg_if.pub_warn(caller_method + ": Updated serial_fail_attempts to " + str(self.serial_fail_attempts))
+    
 
 
                 else:
@@ -937,15 +938,15 @@ class SidusSS109SerialPTXNode:
                 self.serial_busy = False
                 
             else:
-                self.msg_if.pub_warn(caller_method + ": Serial port busy, can't send msg: " + ser_msg)
+                #self.msg_if.pub_warn(caller_method + ": Serial port busy, can't send msg: " + ser_msg)
                 self.serial_fail_attempts += 1
-                self.msg_if.pub_warn(caller_method + ": Updated serial_fail_attempts to " + str(self.serial_fail_attempts))
+                #self.msg_if.pub_warn(caller_method + ": Updated serial_fail_attempts to " + str(self.serial_fail_attempts))
 
             if self.serial_fail_attempts > self.max_serial_fail_attempts:
                 self.max_serial_fail_attempts = copy.deepcopy(self.serial_fail_attempts)
                 if self.serial_send_delay < self.MAX_SERIAL_SEND_DELAY:
                     self.serial_send_delay = self.MIN_SERIAL_SEND_DELAY + self.MAX_SERIAL_SEND_DELAY * (self.max_serial_fail_attempts / self.MAX_SERIAL_ATTEMPTS)
-                self.msg_if.pub_warn(caller_method + ": Serial send delay updated to : " +  str(self.serial_send_delay))
+                #self.msg_if.pub_warn(caller_method + ": Serial send delay updated to : " +  str(self.serial_send_delay))
             if self.serial_fail_attempts > self.MAX_SERIAL_ATTEMPTS:
                 nepi_sdk.signal_shutdown(caller_method + ": Exceeded Max Serial Fail attempts in a row, Shutting Down")
         return [success, response]
