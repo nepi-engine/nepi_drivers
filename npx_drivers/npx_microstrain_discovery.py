@@ -85,13 +85,15 @@ class MicrostrainDiscovery:
         ########################
         # Get discovery options
         try:
-            self.port_sel = '/dev/' + drv_dict['DISCOVERY_DICT']['OPTIONS']['serial_port']['value']
+            self.port_sel = "/dev/" + drv_dict['DISCOVERY_DICT']['OPTIONS']['serial_port']['value']
         except Exception as e:
             self.port_sel = "None"
 
+        #self.logger.log_warn("port_sel" + " : " + str(self.port_sel))
         self.path_list = nepi_serial.get_serial_ports_list()
+        #Sself.logger.log_warn("path list" + " : " + str(self.path_list))
         if self.port_sel not in self.path_list:
-            #self.logger.log_warn("Failed to find selected port in available serial ports " + str(self.port_sel) + " : " + str(self.path_list))
+            self.logger.log_warn("Failed to find selected port in available serial ports " + str(self.port_sel) + " : " + str(self.path_list))
             return active_paths_list
         if self.port_sel in self.active_devices_dict.keys():
             #self.logger.log_warn("Allready connected to serial port " + str(self.port_sel))
@@ -102,11 +104,11 @@ class MicrostrainDiscovery:
 
         try:
                 
-            #self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
+            self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
             baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
             baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
-            #self.logger.log_warn("Got baudrate options: " + str(baudrate_options))###
-            #self.logger.log_warn("Got selected baudrate: " + str(baudrate_sel))###
+            self.logger.log_warn("Got baudrate options: " + str(baudrate_options))###
+            self.logger.log_warn("Got selected baudrate: " + str(baudrate_sel))###
             baudrate_list = []
             if baudrate_sel != "All":
                 baudrate_list.append(baudrate_sel)
@@ -166,7 +168,7 @@ class MicrostrainDiscovery:
     ##########  Device specific calls
     def checkForDevice(self, path_str):
         found_device = False
-        #self.logger.log_warn("Checking for device on path: " + path_str)
+        self.logger.log_warn("Checking for device on path: " + path_str)
 
         if path_str not in self.active_paths_list and path_str == self.port_sel:
             for baud_str in self.baudrate_list:
@@ -174,7 +176,7 @@ class MicrostrainDiscovery:
                 self.baud_int = int(baud_str)
                 found_device = True
 
-        #self.logger.log_warn("Check for device on path returned: " + str(found_device))
+        self.logger.log_warn("Check for device on path returned: " + str(found_device))
         return found_device
 
     def checkOnDevice(self,path_str):
