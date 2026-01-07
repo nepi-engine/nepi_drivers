@@ -248,7 +248,7 @@ class V4l2CamNode:
             [success,framerates] = self.driver.getCurrentResolutionAvailableFramerates()
             self.msg_if.pub_info(" " + "Driver returned framerate options: " + str(framerates))
             cap_setting = dict()
-            cap_setting['type'] = 'Descrete'
+            cap_setting['type'] = 'Discrete'
             options = []
             if len(framerates) > 0:
                 for rate in framerates:
