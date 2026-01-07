@@ -320,13 +320,23 @@ class GenicamCamNode:
                     elif setting_name == "Resolution":
                         data = data.split(":")
                         try:
+                            [success,framerate] = self.driver.getFramerate()
                             width = int(data[0])
                             height = int(data[1])
                             res_dict = {'width': width, 'height': height}
                             self.msg_if.pub_warn("Updating Res with Res Dict: " + str(res_dict))
                             success, msg = self.driver.setResolution(res_dict)
+                            # reset framerate if needed
+                            if 'framerate' in self.cap_settings.keys():
+                                try:
+                                    framerate = float(framerate)
+                                    success, msg = self.driver.setFramerate(framerate)
+                                    self.msg_if.pub_warn("Updated Framerate: " + str(framerate))
+                                except Exception as e:
+                                    self.msg_if.pub_warn("Framerate setting: " + data + " could not be parsed to float " + str(e))
+
                         except Exception as e:
-                            self.msg_if.pub_warn("Resoluton setting: " + data + " could not be parsed to float " + str(e))                            
+                            self.msg_if.pub_warn("Resoluton setting: " + data + " could not be parsed to float " + str(e))     
                         break     
                     elif setting_name == "Framerate":
                         try:
