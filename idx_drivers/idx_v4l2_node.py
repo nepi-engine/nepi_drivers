@@ -57,7 +57,7 @@ class V4l2CamNode:
                                     
     DEFAULT_DEVICE_PATH = '/dev/video0'
 
-    MJPG_CAMS = ['explorehd','miramar']
+    MJPG_CAMS = ['explorehd','miramar','boson']
 
 
     #Factory Control Values 
