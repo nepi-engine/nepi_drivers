@@ -15,12 +15,6 @@ driver:
     class_name: MicrostrainDiscovery
     process: CALL
     OPTIONS:
-      serial_port:
-        type: Discrete
-        options:
-          - 'None'
-        default: 'None'
-        value: 'None'
       baud_rate:
         type: Discrete
         options:

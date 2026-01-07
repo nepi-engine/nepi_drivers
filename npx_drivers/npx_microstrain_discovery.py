@@ -84,31 +84,18 @@ class MicrostrainDiscovery:
 
         ########################
         # Get discovery options
-        try:
-            self.port_sel = "/dev/" + drv_dict['DISCOVERY_DICT']['OPTIONS']['serial_port']['value']
-        except Exception as e:
-            self.port_sel = "None"
 
-        #self.logger.log_warn("port_sel" + " : " + str(self.port_sel))
+
         self.path_list = nepi_serial.get_serial_ports_list()
-        #Sself.logger.log_warn("path list" + " : " + str(self.path_list))
-        if self.port_sel not in self.path_list:
-            self.logger.log_warn("Failed to find selected port in available serial ports " + str(self.port_sel) + " : " + str(self.path_list))
-            return active_paths_list
-        if self.port_sel in self.active_devices_dict.keys():
-            #self.logger.log_warn("Allready connected to serial port " + str(self.port_sel))
-            return active_paths_list
-
-        self.logger.log_warn("Got serial port list: " + str(self.path_list))###
-        self.logger.log_warn("Got selected serial port: " + str(self.port_sel))###
+        
 
         try:
                 
-            self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
+            #self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
             baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
             baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
-            self.logger.log_warn("Got baudrate options: " + str(baudrate_options))###
-            self.logger.log_warn("Got selected baudrate: " + str(baudrate_sel))###
+            #self.logger.log_warn("Got baudrate options: " + str(baudrate_options))###
+            #self.logger.log_warn("Got selected baudrate: " + str(baudrate_sel))###
             baudrate_list = []
             if baudrate_sel != "All":
                 baudrate_list.append(baudrate_sel)
@@ -165,18 +152,63 @@ class MicrostrainDiscovery:
         return self.active_paths_list
     ################################################
 
+
+    # Function to verify the connection by sending a command
+    def verify_microstrain_connection(self,port_str,baud_str):
+        # Clear buffers
+
+        try:
+            self.baud_int = int(baud_str)
+            # Open the serial port (adjust baud rate as needed for your specific device)
+            # MicroStrain devices typically use 115200 baud rate.
+            ser = serial.Serial(port_str, baudrate=115200, timeout=1)
+            time.sleep(0.1) # Give the port a moment to open
+
+
+            #Clear buffers
+            ser.flushInput()
+            ser.flushOutput()
+            
+
+            # Send an ping command to the device
+            command = b'\x75\x65\x01\x02\x02\x01\xE0\xC6' # Placeholder: replace with actual command
+
+            ser.write(command)
+            #response = ser.readline().decode('utf-8').strip()
+            response = str(ser.readline().hex()) # Read the response
+            #print("Response: " + str(response))
+            ser.close()
+
+            # Check if the response is valid
+            if response and '7565010404f10100d56a' in response: # Check for expected response
+                #print(f"Successfully verified connection to MicroStrain device on {port_str}.")
+                return True
+            else:
+                #print(f"Device at {port_str} did not respond as expected.")
+                return False
+
+        except serial.SerialException as e:
+            #print(f"Error opening/communicating with port {port_str}: {e}")
+            return False
+
+
+
+
+
     ##########  Device specific calls
     def checkForDevice(self, path_str):
         found_device = False
-        self.logger.log_warn("Checking for device on path: " + path_str)
+        #self.logger.log_warn("Checking for device on path: " + path_str)
 
-        if path_str not in self.active_paths_list and path_str == self.port_sel:
+        if path_str not in self.active_paths_list:
             for baud_str in self.baudrate_list:
                 self.baud_str = baud_str
-                self.baud_int = int(baud_str)
-                found_device = True
+                found_device = self.verify_microstrain_connection(path_str,baud_str)
+                if found_device == True:
+                    self.logger.log_warn("Found device on path: " + path_str + " with baud rate: " + baud_str) 
+                    break
 
-        self.logger.log_warn("Check for device on path returned: " + str(found_device))
+        #self.logger.log_warn("Check for device on path returned: " + str(found_device))
         return found_device
 
     def checkOnDevice(self,path_str):
