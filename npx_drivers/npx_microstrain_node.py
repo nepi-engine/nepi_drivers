@@ -108,6 +108,7 @@ def kill_driver_node(node_name):
 class MicrostrainNode(object):
     navpose_update_rate = 20
     navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
+    navpose_dict['has_orientation'] = True
 
     device_dict = None
 
@@ -274,7 +275,6 @@ class MicrostrainNode(object):
 
         timestamp = nepi_sdk.sec_from_msg_stamp(imu_msg.header.stamp)
 
-        self.navpose_dict['has_orientation']
         self.navpose_dict['time_oreantation'] = timestamp
         # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
         self.navpose_dict['roll_deg'] = rpy[0]
