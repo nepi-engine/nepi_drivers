@@ -376,10 +376,23 @@ class V4l2CamNode:
                     elif setting_name == "resolution":
                         data = data.split(":")
                         try:
+                            [success,framerate] = self.driver.getFramerate()
                             width = int(data[0])
                             height = int(data[1])
                             res_dict = {'width': width, 'height': height}
                             success, msg = self.driver.setResolution(res_dict)
+                            # reset framerate if needed
+                            if 'framerate' in self.cap_settings.keys():
+                                try:
+                                    framerate = float(framerate)
+                                    success, msg = self.driver.setFramerate(framerate)
+                                    self.msg_if.pub_warn("Updated Framerate: " + str(framerate))
+                                except Exception as e:
+                                    self.msg_if.pub_warn("Framerate setting: " + data + " could not be parsed to float " + str(e))
+
+
+
+
                         except Exception as e:
                             self.msg_if.pub_info("Resoluton setting: " + data + " could not be parsed to float " + str(e))                            
                         break     
