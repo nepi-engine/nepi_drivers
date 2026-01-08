@@ -89,7 +89,7 @@ class V4l2CamNode:
     cl_img_last_time = None
 
 
-    framerate_ratio = 1.0
+    max_framerate = 100
 
 
     ################################################
@@ -175,8 +175,8 @@ class V4l2CamNode:
                                     settingUpdateFunction= self.settingUpdateFunction,
                                     getSettingsFunction=self.getSettings,
                                     factoryControls = self.factory_controls,
-                                    setFramerateRatio =self.setFramerateRatio, 
-                                    getFramerate = self.getFramerate,
+                                    setMaxFramerate =self.setMaxFramerate, 
+                                    getFramerate = self.driver.getFramerate,
                                     getColorImage = self.getColorImg, 
                                     stopColorImageAcquisition = self.stopColorImg,
                                     data_products = ['color_image'])
@@ -383,6 +383,7 @@ class V4l2CamNode:
                             success, msg = self.driver.setResolution(res_dict)
                             # reset framerate if needed
                             if 'framerate' in self.cap_settings.keys():
+                                nepi_sdk.sleep(1)
                                 try:
                                     framerate = float(framerate)
                                     success, msg = self.driver.setFramerate(framerate)
@@ -444,20 +445,19 @@ class V4l2CamNode:
         self.msg_if.pub_info(device_info_str)
 
         
-    def setFramerateRatio(self, ratio):
-        if ratio < 0.1:
-            ratio = 0.1
-        if ratio > .99:
-            ratio = 1.0
-        self.framerate_ratio = ratio
-        #self.msg_if.pub_warn("Updated framerate: " + str(self.framerate_ratio))
+    def setMaxFramerate(self, rate):
+        if rate is None:
+            return False, 'Got None Max Framerate'
+        if rate < 1:
+            rate = 1
+        if rate > 100:
+            rate = 100
+        self.max_framerate = rate
+        #print('Set FR Mode: ' +  str(self.current_controls["max_framerate"]))
         status = True
         err_str = ""
         return status, err_str
 
-    def getFramerate(self):
-        adj_fps =   nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
-        return adj_fps
 
     def setDriverCameraControl(self, control_name, value):
         return self.driver.setScaledCameraControl(control_name, value)
@@ -470,12 +470,9 @@ class V4l2CamNode:
         
         need_data = False
         if last_time != None and self.idx_if is not None:
-          adj_fr =   nepi_img.adjust_framerate_ratio(self.current_fps,self.framerate_ratio)
-          #self.msg_if.pub_warn("Current HW Framerate: " + str(self.current_fps))
-          #self.msg_if.pub_warn("Using Max Framerate: " + str(adj_fr))
-          fr_delay = float(1) / adj_fr
+          fr_delay = float(1) / self.max_framerate
           timer = current_time - last_time
-          if timer > fr_delay or self.framerate_ratio > 0.95:
+          if timer > fr_delay:
             need_data = True
         else:
           need_data = True
