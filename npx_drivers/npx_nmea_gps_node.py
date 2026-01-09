@@ -26,6 +26,7 @@ import os
 import socket
 import threading
 import time
+import copy
 
 from nepi_sdk import nepi_sdk, nepi_utils, nepi_nav
 from nepi_api.messages_if import MsgIF
@@ -62,7 +63,7 @@ def _nmea_latlon_to_decimal(field: str, hemi: str, is_lat: bool):
 
 class NMEAGPSNode(object):
     navpose_update_rate = 20
-    navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
+    driver_navpose_dict =  copy.deepcopy(nepi_nav.BLANK_NAVPOSE_DICT)
 
     def __init__(self, drv_dict=None):
         # Initialize ROS/NEPI node
@@ -198,22 +199,22 @@ class NMEAGPSNode(object):
 
         t = nepi_utils.get_time()
         with self._lock:
-            navpose_dict = self.navpose_dict
-            navpose_dict['latitude'] = lat_dd
-            navpose_dict['longitude'] = lon_dd
-            navpose_dict['latitude_deg'] = lat_dd
-            navpose_dict['longitude_deg'] = lon_dd
-            navpose_dict['timestamp'] = t
+            driver_navpose_dict = self.driver_navpose_dict
+            driver_navpose_dict['latitude'] = lat_dd
+            driver_navpose_dict['longitude'] = lon_dd
+            driver_navpose_dict['latitude_deg'] = lat_dd
+            driver_navpose_dict['longitude_deg'] = lon_dd
+            driver_navpose_dict['timestamp'] = t
 
-            navpose_dict['has_location'] = True
-            navpose_dict['time_location'] = t
-            navpose_dict['has_position'] = True
-            navpose_dict['time_position'] = t
+            driver_navpose_dict['has_location'] = True
+            driver_navpose_dict['time_location'] = t
+            driver_navpose_dict['has_position'] = True
+            driver_navpose_dict['time_position'] = t
 
             if alt_m is not None:
-                navpose_dict['altitude_m'] = alt_m
-                navpose_dict['time_altitude'] = t
-                navpose_dict['has_altitude'] = True
+                driver_navpose_dict['altitude_m'] = alt_m
+                driver_navpose_dict['time_altitude'] = t
+                driver_navpose_dict['has_altitude'] = True
 
         if self.debug:
             self.msg_if.pub_info(f"GGA pos: lat={lat_dd:.6f}, lon={lon_dd:.6f}, alt={alt_m}")
@@ -232,23 +233,23 @@ class NMEAGPSNode(object):
 
         t = nepi_utils.get_time()
         with self._lock:
-            navpose_dict = self.navpose_dict
+            driver_navpose_dict = self.driver_navpose_dict
             if lat_dd is not None and lon_dd is not None:
-                navpose_dict['latitude'] = lat_dd
-                navpose_dict['longitude'] = lon_dd
-                navpose_dict['latitude_deg'] = lat_dd
-                navpose_dict['longitude_deg'] = lon_dd
-                navpose_dict['timestamp'] = t
-                navpose_dict['has_location'] = True
-                navpose_dict['time_location'] = t
-                navpose_dict['has_position'] = True
-                navpose_dict['time_position'] = t
+                driver_navpose_dict['latitude'] = lat_dd
+                driver_navpose_dict['longitude'] = lon_dd
+                driver_navpose_dict['latitude_deg'] = lat_dd
+                driver_navpose_dict['longitude_deg'] = lon_dd
+                driver_navpose_dict['timestamp'] = t
+                driver_navpose_dict['has_location'] = True
+                driver_navpose_dict['time_location'] = t
+                driver_navpose_dict['has_position'] = True
+                driver_navpose_dict['time_position'] = t
 
             if sog >= self.heading_min_speed:
-                navpose_dict['heading_deg'] = cog
-                navpose_dict['has_heading'] = True
-                navpose_dict['time_heading'] = t
-            navpose_dict['sog_knots'] = sog
+                driver_navpose_dict['heading_deg'] = cog
+                driver_navpose_dict['has_heading'] = True
+                driver_navpose_dict['time_heading'] = t
+            driver_navpose_dict['sog_knots'] = sog
 
         if self.debug:
             self.msg_if.pub_info(f"RMC vel: cog={cog:.1f}deg")
@@ -259,12 +260,12 @@ class NMEAGPSNode(object):
         sog = _safe_float(p[5] if len(p) > 5 else "", 0.0)
         t = nepi_utils.get_time()
         with self._lock:
-            navpose_dict = self.navpose_dict
+            driver_navpose_dict = self.driver_navpose_dict
             if sog >= self.heading_min_speed:
-                navpose_dict['heading_deg'] = cog
-                navpose_dict['has_heading'] = True
-                navpose_dict['time_heading'] = t
-            navpose_dict['sog_knots'] = sog
+                driver_navpose_dict['heading_deg'] = cog
+                driver_navpose_dict['has_heading'] = True
+                driver_navpose_dict['time_heading'] = t
+            driver_navpose_dict['sog_knots'] = sog
         if self.debug:
             self.msg_if.pub_info(f"VTG: cog={cog:.1f}deg, sog={sog:.2f}kt")
 
@@ -273,15 +274,15 @@ class NMEAGPSNode(object):
         cog = _safe_float(p[1] if len(p) > 1 else "", 0.0)
         t = nepi_utils.get_time()
         with self._lock:
-            navpose_dict = self.navpose_dict
-            navpose_dict['heading_deg'] = cog
-            navpose_dict['has_heading'] = True
-            navpose_dict['time_heading'] = t
+            driver_navpose_dict = self.driver_navpose_dict
+            driver_navpose_dict['heading_deg'] = cog
+            driver_navpose_dict['has_heading'] = True
+            driver_navpose_dict['time_heading'] = t
         if self.debug:
             self.msg_if.pub_info(f"HDT: heading_true={cog:.1f}deg")
 
     def getNavPoseCb(self):
-        return self.navpose_dict
+        return self.driver_navpose_dict
 
     def cleanup_actions(self):
         self.msg_if.pub_warn("Shutdown cleanup actions complete")
