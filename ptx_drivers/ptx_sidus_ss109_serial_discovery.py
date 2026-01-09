@@ -252,12 +252,11 @@ class SidusSS109SerialDiscovery:
     self.logger.log_warn("Entering launch device function for path: " + str(path_str) + ' addr: ' + str(self.addr_str))###
     file_name = self.drv_dict['NODE_DICT']['file_name']
     node_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
-    self.logger.log_info(" launching node: " + node_name)
+    self.logger.log_warn(" launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
     dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
     # Try and load save node params
     nepi_drvs.checkLoadConfigFile(node_name)
-    self.logger.log_warn(" launching node: " + str(self.drv_dict))
     self.drv_dict['DEVICE_DICT'] = dict()
     self.drv_dict['DEVICE_DICT']['device_path'] = path_str
     self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Numurus / NEPI — NMEA GPS Discovery (TCP) — matches MicroStrain discovery structure
+# Numurus / NEPI — NMEA UDP Discovery (TCP) — matches MicroStrain discovery structure
 import os
 import time
 import socket
@@ -9,20 +9,20 @@ import datetime
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_drvs
 
-PKG_NAME = 'NPX_NMEA_GPS'
+PKG_NAME = 'NPX_NMEA_UDP'
 FILE_TYPE = 'DISCOVERY'
 
-PARAM_FILE_PATH = '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_nmea_gps_params.yaml'
-DEFAULT_NODE_FILE = 'npx_nmea_gps_node.py'  # sensible default
+PARAM_FILE_PATH = '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_nmea_udp_params.yaml'
+DEFAULT_NODE_FILE = 'npx_nmea_udp_node.py'  # sensible default
 
-class NMEAGPSDiscovery:
+class NMEAUDPDiscovery:
     NODE_LOAD_TIME_SEC = 10
     launch_time_dict = dict()
     retry = True
     dont_retry_list = []
 
     active_devices_dict = dict()
-    node_launch_name = "npx_nmea_gps_node"
+    node_launch_name = "nmea"
 
     # simulator tracking
     sim_threads = {}   # key: "host:port" -> {'thread': t, 'stop': threading.Event()}
@@ -136,9 +136,9 @@ class NMEAGPSDiscovery:
             pass
 
         # Form node_name in the same style you already use in logs
-        node_name = f"{self.node_launch_name}"
+        node_name = self.node_launch_name + "_" + str(launch_key).replace('.','').replace(':','_').replace('-','_')
 
-        self.logger.log_warn(f"Launching node: {node_name}")
+        self.logger.log_warn("Launching node: " + node_name)
 
         # Load any saved config for this node (same pattern as MicroStrain)
         nepi_drvs.checkLoadConfigFile(node_name)

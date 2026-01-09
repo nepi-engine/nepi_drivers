@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Numurus NPX NMEA GPS Node (fixed)
+# Numurus NPX NMEA UDP Node (fixed)
 # - Keeps ~drv_dict from discovery (no clobbering)
 # - Reads connection fields from drv_dict["DEVICE_DICT"]
 # - Connects to TCP host:port and parses NMEA (GGA/RMC/VTG/HDT)
@@ -12,7 +12,7 @@
 #     "DEVICE_DICT": {
 #        "tcp_host": "127.0.0.1",
 #        "tcp_port": 50000,
-#        "param_file": "/opt/nepi/nepi_engine/lib/nepi_drivers/npx_nmea_gps_params.yaml"
+#        "param_file": "/opt/nepi/nepi_engine/lib/nepi_drivers/npx_nmea_udp_params.yaml"
 #     },
 #     "heading_min_speed_knots": 0.5,
 #     "SAVE_DATA": {"debug": false}
@@ -32,7 +32,7 @@ from nepi_sdk import nepi_sdk, nepi_utils, nepi_nav
 from nepi_api.messages_if import MsgIF
 from nepi_api.device_if_npx import NPXDeviceIF
 
-PKG_NAME = 'NPX_NMEA_GPS'
+PKG_NAME = 'NPX_NMEA_UDP'
 DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"
 
 
@@ -61,7 +61,7 @@ def _nmea_latlon_to_decimal(field: str, hemi: str, is_lat: bool):
         return None
 
 
-class NMEAGPSNode(object):
+class NMEAUDPNode(object):
     navpose_update_rate = 20
     driver_navpose_dict =  copy.deepcopy(nepi_nav.BLANK_NAVPOSE_DICT)
 
@@ -91,7 +91,7 @@ class NMEAGPSNode(object):
         dev = self.drv_dict.get('DEVICE_DICT', {}) or {}
         self.host = str(dev.get('tcp_host', '127.0.0.1'))
         self.port = int(dev.get('tcp_port', 50000))
-        self.param_file = dev.get('param_file', '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_nmea_gps_params.yaml')
+        self.param_file = dev.get('param_file', '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_nmea_udp_params.yaml')
 
         save_data = self.drv_dict.get('SAVE_DATA', {}) or {}
         self.debug = bool(save_data.get('debug', False) or self.drv_dict.get('debug', False))
@@ -125,8 +125,8 @@ class NMEAGPSNode(object):
         # 6) Register NPXDeviceIF so the rest of NEPI can query navpose
         self.device_info_dict = dict(
             node_name=self.node_name,
-            device_name="nmea-gps",
-            identifier="gps",
+            device_name="nmea-udp",
+            identifier="udp",
             serial_number="", hw_version="", sw_version=""
         )
         self.npx_if = NPXDeviceIF(
@@ -291,4 +291,4 @@ class NMEAGPSNode(object):
 if __name__ == '__main__':
     # Normal launches are handled via discovery setting ~drv_dict and starting this script.
     # Direct run is supported for sanity (will attempt to read ~drv_dict).
-    NMEAGPSNode()
+    NMEAUDPNode()
