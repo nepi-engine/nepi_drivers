@@ -136,7 +136,10 @@ class NMEAUDPDiscovery:
             pass
 
         # Form node_name in the same style you already use in logs
-        node_name = self.node_launch_name + "_" + str(launch_key).replace('.','').replace(':','_').replace('-','_')
+        try:
+            node_name = self.node_launch_name + "_" + str(launch_key).split(':')[0].replace('.','').replace('-','_')
+        except:
+            node_name = self.node_launch_name + "_" + str(launch_key).replace(':','_').replace('.','').replace('-','_')
 
         self.logger.log_warn("Launching node: " + node_name)
 
