@@ -1,18 +1,18 @@
 driver:
-  pkg_name: NPX_NMEA_GPS
-  display_name: NMEA GPS
-  description: NMEA GPS over TCP/Serial
+  pkg_name: NPX_NMEA_UDP
+  display_name: NMEA UDP
+  description: NMEA UDP over TCP/Serial
   type: NPX
   group_id: None
   NODE_DICT:
-    file_name: npx_nmea_gps_node.py
-    class_name: NMEAGPSNode
+    file_name: npx_nmea_udp_node.py
+    class_name: NMEAUDPNode
   DRIVER_DICT:
     file_name: None
     class_name: None
   DISCOVERY_DICT:
-    file_name: npx_nmea_gps_discovery.py
-    class_name: NMEAGPSDiscovery
+    file_name: npx_nmea_udp_discovery.py
+    class_name: NMEAUDPDiscovery
     process: CALL
     OPTIONS:
       # Connection options (TCP or Serial)
