@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+#
+# Copyright (c) 2024 Numurus <https://www.numurus.com>.
+#
+# License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
+#
+
 # Numurus / NEPI — NMEA UDP Discovery (TCP) — matches MicroStrain discovery structure
 import os
 import time

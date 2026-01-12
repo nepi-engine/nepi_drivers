@@ -1,27 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #
-# Numurus NPX NMEA UDP Node (fixed)
-# - Keeps ~drv_dict from discovery (no clobbering)
-# - Reads connection fields from drv_dict["DEVICE_DICT"]
-# - Connects to TCP host:port and parses NMEA (GGA/RMC/VTG/HDT)
-# - Publishes a NPXDeviceIF getNavPoseCb for NEPI consumers
+# Copyright (c) 2024 Numurus <https://www.numurus.com>.
 #
-# Expected drv_dict (set by discovery) minimal keys:
-#   {
-#     "DEVICE_DICT": {
-#        "tcp_host": "127.0.0.1",
-#        "tcp_port": 50000,
-#        "param_file": "/opt/nepi/nepi_engine/lib/nepi_drivers/npx_nmea_udp_params.yaml"
-#     },
-#     "heading_min_speed_knots": 0.5,
-#     "SAVE_DATA": {"debug": false}
-#   }
+# License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
-# Notes:
-# - This node intentionally does NOT subscribe to "nmea/data". It opens the TCP stream
-#   configured by discovery (which can be a simulator you start there).
-#
+
 import os
 import socket
 import threading

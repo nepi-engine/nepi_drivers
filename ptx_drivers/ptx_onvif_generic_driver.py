@@ -2,18 +2,7 @@
 #
 # Copyright (c) 2024 Numurus <https://www.numurus.com>.
 #
-# This file is part of nepi applications (nepi_apps) repo
-# (see https://https://github.com/nepi-engine/nepi_apps)
-#
-# License: nepi applications are licensed under the "Numurus Software License", 
-# which can be found at: <https://numurus.com/wp-content/uploads/Numurus-Software-License-Terms.pdf>
-#
-# Redistributions in source code must retain this top-level comment block.
-# Plagiarizing this software to sidestep the license obligations is illegal.
-#
-# Contact Information:
-# ====================
-# - mailto:nepi@numurus.com
+# License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
 import time
@@ -162,11 +151,7 @@ class GenericONVIF_PTZ(object):
         #request = self.ptz_service.create_type('Stop')
         #request.ProfileToken = self.profile_token
         #self.ptz_service.Stop(request)
-<<<<<<< HEAD
-        self.jog(1,100)
-=======
         self.jog(1,1,0.0)
->>>>>>> 014b0f1
 
     def jog(self, pan_direction, tilt_direction, speed_ratio, time_s = 1):
         self.continuous_move_request.Velocity.PanTilt.x = speed_ratio * pan_direction
