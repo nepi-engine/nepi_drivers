@@ -117,7 +117,6 @@ class NMEAUDPNode(object):
             data_source_description="sensor",
             data_ref_description="sensor_center",
             getNavPoseCb=self.getNavPoseCb,
-            get3DTransformCb=None,
             max_navpose_update_rate=self.navpose_update_rate,
             msg_if=self.msg_if
         )
