@@ -256,6 +256,7 @@ class SidusSS109SerialDiscovery:
       self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
       self.active_paths_list.append(path_str)
       self.logger.log_warn("Driver Node launched successfully, adding to active device dict keys: " + str(self.active_devices_dict.keys()))###
+    return success
 
 
   def killAllDevices(self,active_paths_list):
