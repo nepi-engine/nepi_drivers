@@ -67,6 +67,8 @@ class SidusSS109SerialDiscovery:
     #self.logger.log_warn("Entering discovery function with drv_dict: " + str(drv_dict))###
     self.drv_dict = drv_dict
     self.available_paths_list = available_paths_list
+    if active_paths_list != self.active_paths_list:
+      self.logger.log_warn("Discovery function got updated active_paths_list: " + str(active_paths_list))
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
     ########################
@@ -255,7 +257,7 @@ class SidusSS109SerialDiscovery:
     if success:
       self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
       self.active_paths_list.append(path_str)
-      self.logger.log_warn("Driver Node launched successfully, adding to active device dict keys: " + str(self.active_devices_dict.keys()))###
+      self.logger.log_warn("Driver Node launched successfully, added to active device dict keys: " + str(self.active_devices_dict.keys()))###
     return success
 
 
@@ -264,16 +266,36 @@ class SidusSS109SerialDiscovery:
     path_purge_list = []
     for key in self.active_devices_dict.keys():
       path_purge_list.append(key)
-    #self.logger.log_warn("Killing Devices: " + str(path_purge_list))
+    self.logger.log_warn("Killing Devices: " + str(path_purge_list))
     for path_str in path_purge_list:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
         success = nepi_drvs.killDriverNode(node_name,sub_process)
-        if path_str in active_paths_list:
-          active_paths_list.remove(path_str)
+
     for path_str in path_purge_list:
-        del  self.active_devices_dict[path_str]
+        try:
+          del  self.active_devices_dict[path_str]
+        except Exception as e:
+          self.logger.log_warn("Failed to remove driver from active paths dict: " + str(e))
+
+        try:
+          self.logger.log_warn("Removing path from active paths list: " + str(path_str))
+          self.active_paths_list.remove(path_str)
+          active_paths_list.remove(path_str)
+          self.logger.log_warn("Updated active paths list: " + str(active_paths_list))
+        except Exception as e:
+          self.logger.log_warn("Failed to remove driver from active paths list: " + str(e))
+
+
+        try:
+          self.logger.log_warn("Removing path from class active paths list: " + str(path_str))
+          self.active_paths_list.remove(path_str)
+        except Exception as e:
+          #self.logger.log_warn("Failed to remove driver from class active paths list: " + str(e))
+          pass
+
+
     nepi_sdk.sleep(1)
     return active_paths_list
   
