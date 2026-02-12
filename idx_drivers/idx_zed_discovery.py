@@ -15,6 +15,7 @@ import time
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
+from nepi_sdk import nepi_system
 
 from nepi_api.messages_if import MsgIF
 
@@ -249,6 +250,8 @@ class ZedCamDiscovery:
         else:
           id = str(same_type_count)
         device_node_name += '_' + id
+
+        device_node_name = nepi_system.check_node_name(device_node_name)
 
         device_exists = False
         for path in self.DEVICE_DICT.keys():
