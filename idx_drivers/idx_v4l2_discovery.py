@@ -74,6 +74,7 @@ class V4L2CamDiscovery:
     ########################
 
     nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.on_shutdown(self.cleanup_actions)
     # Now start the node
     self.msg_if.pub_info("Initialization Complete")
     nepi_sdk.spin()
@@ -274,12 +275,12 @@ class V4L2CamDiscovery:
 
     return success
 
-  def stopAndPurgeDeviceNode(self, node_namespace):
+  def stopAndPurgeDeviceNode(self, node_namespace = 'All'):
     success = False
     self.msg_if.pub_info("stopping " + node_namespace)
     purge_index = None
     for i, device in enumerate(self.deviceList):
-      if device['node_namespace'] == node_namespace:
+      if device['node_namespace'] == node_namespace or node_namespace == 'All':
         node_name = device['node_namespace'].split("/")[-1]
         sub_process = device['node_subprocess']
         success = nepi_drvs.killDriverNode(node_name,sub_process)
@@ -316,6 +317,11 @@ class V4L2CamDiscovery:
     short_name = split[0]
     return short_name
     
+
+  def cleanup_actions(self):
+    self.msg_if.pub_info("Shutting down: Executing script cleanup actions")
+    self.stopAndPurgeDeviceNode('All')
+
 if __name__ == '__main__':
   node = V4L2CamDiscovery()            
 

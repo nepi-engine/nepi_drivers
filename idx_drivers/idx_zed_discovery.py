@@ -99,6 +99,7 @@ class ZedCamDiscovery:
     ########################
 
     nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.on_shutdown(self.cleanup_actions)
 
     self.msg_if.pub_info("Initialization Complete")
     nepi_sdk.spin()
@@ -158,34 +159,34 @@ class ZedCamDiscovery:
               device = self.DEVICE_DICT[path]
               if device['device_path'] == path_str:
                 known_device = True
-                if device['device_type'] != device_type:
-                  # Uh oh -- device has switched on us!
-                  # Kill previous and start new?
-                  self.msg_if.pub_warn("detected Zed device type change (" + device['device_type'] + "-->" + 
-                                device_type + ") for device at " + path_str)
-                  self.stopAndPurgeDeviceNode(device['node_namespace'])
+                # if device['device_type'] != device_type:
+                #   # Uh oh -- device has switched on us!
+                #   # Kill previous and start new?
+                #   self.msg_if.pub_warn("detected Zed device type change (" + device['device_type'] + "-->" + 
+                #                 device_type + ") for device at " + path_str)
+                #   self.stopAndPurgeDeviceNode(device['node_namespace'])
 
-                  # Remove from dont_retry_list
-                  launch_id = path_str
-                  if launch_id in self.dont_retry_list:
-                    self.dont_retry_list.remove(launch_id)
+                #   # Remove from dont_retry_list
+                #   launch_id = path_str
+                #   if launch_id in self.dont_retry_list:
+                #     self.dont_retry_list.remove(launch_id)
 
-                  break
+                #   break
                 
-                elif not self.deviceNodeIsRunning(device['node_namespace']):
-                  self.stopAndPurgeDeviceNode(device['node_namespace'])
+                # elif not self.deviceNodeIsRunning(device['node_namespace']):
+                #   self.stopAndPurgeDeviceNode(device['node_namespace'])
                   
-                  ### DON'T REMOVE FROM dont_retry_list ###
-                  launch_id = path_str
-                  if launch_id in self.dont_retry_list:
-                    self.msg_if.pub_warn("node " + device['node_name'] + " is not running. WILL NOT RESTART")
-                  else:
-                    self.msg_if.pub_warn("node " + device['node_name'] + " is not running. RESTARTING")
+                #   ### DON'T REMOVE FROM dont_retry_list ###
+                #   launch_id = path_str
+                #   if launch_id in self.dont_retry_list:
+                #     self.msg_if.pub_warn("node " + device['node_name'] + " is not running. WILL NOT RESTART")
+                #   else:
+                #     self.msg_if.pub_warn("node " + device['node_name'] + " is not running. RESTARTING")
                     
-                  time.sleep(1)
+                #   time.sleep(1)
 
-                  self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
-                  break
+                #   self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
+                #   break
               
 
             if known_device == False:
@@ -298,20 +299,21 @@ class ZedCamDiscovery:
                 self.msg_if.pub_info(" Will attemp relaunch for node: " + node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
     return success
 
-  def stopAndPurgeDeviceNode(self, node_namespace):
+  def stopAndPurgeDeviceNode(self, node_namespace = 'All'):
     success = False
     self.msg_if.pub_info("stopping " + node_namespace)
-    purge_path = None
+    purge_paths = []
     for i, path_str in enumerate(self.DEVICE_DICT.keys()):
       device = self.DEVICE_DICT[path_str]
-      if device['node_namespace'] == node_namespace:
+      if device['node_namespace'] == node_namespace or node_namespace == 'All':
         node_name = device['node_namespace'].split("/")[-1]
         sub_process = device['node_subprocess']
         success = nepi_drvs.killDriverNode(node_name,sub_process)
         # And remove it from the list
-        self.deviceList.remove(node_name) 
-    if purge_path is not None:
-      del self.DEVICE_DICT[purge_path]
+        purge_paths.append(path_str)
+    for path_str in purge_paths:
+      del self.DEVICE_DICT[path_str]
+
   
   def deviceNodeIsRunning(self, node_namespace):
     for i, path_str in enumerate(self.DEVICE_DICT.keys()):
@@ -330,6 +332,10 @@ class ZedCamDiscovery:
     else:
       short_name = name
     return short_name
+  
+  def cleanup_actions(self):
+    self.msg_if.pub_info("Shutting down: Executing script cleanup actions")
+    self.stopAndPurgeDeviceNode('All')
     
 if __name__ == '__main__':
   node = ZedCamDiscovery()            

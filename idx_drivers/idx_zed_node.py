@@ -7,16 +7,11 @@
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
-# import os
-# import sys
-# import time
-# import math
-# import ros_numpy
 import threading
 import cv2
 import open3d as o3d
-# import copy
-# import yaml
+import numpy as np
+
 
 
 import pyzed.sl as sl
@@ -305,16 +300,16 @@ class ZedCamNode(object):
         self.msg_if.pub_info("Initialization Complete")
         # Now start zed node check process
         self.attempts = 0
-        nepi_sdk.start_timer_process((1), self.checkZedNodeCb)
+        nepi_sdk.start_timer_process((1), self.checkZedStatusCb)
         nepi_sdk.on_shutdown(self.cleanup_actions)
         nepi_sdk.spin()
 
-    def checkZedNodeCb(self,timer):
-        
+    def checkZedStatusCb(self,timer):
+        timestamp = None
         try:
           timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)
         except:
-          timestamp = None
+          pass
         
         if timestamp is None:
           nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
@@ -467,14 +462,15 @@ class ZedCamNode(object):
       msg = ""
       cv2_img = None
       timestamp = None
+      encoding = 'bgr8'
       # Grab an image, a RuntimeParameters object must be given to grab()
-      if self.zedgrab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+      if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
           status = True
           zed_img = sl.Mat()
           # A new image is available if grab() returns SUCCESS
-          self.zedretrieve_image(zed_img, sl.VIEW.LEFT)
+          self.zed.retrieve_image(zed_img, sl.VIEW.LEFT)
           cv2_img = cv2.cvtColor(zed_img.get_data(), cv2.COLOR_BGRA2BGR)
-          timestamp = self.zedget_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
+          timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
       return status, msg, cv2_img, timestamp, encoding
 
       
@@ -494,16 +490,18 @@ class ZedCamNode(object):
     def getDepthMap(self):
       status = False
       msg = ""
-      cv2_img = None
+      np_depth_map = None
+      encoding = '32FC1'
       # Grab an depth_image_zed, a RuntimeParameters object must be given to grab()
-      if self.zedgrab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+      if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
           status = True
-          zed_img = sl.Mat()
-          # A new image is available if grab() returns SUCCESS
-          self.zedretrieve_image(zed_img, sl.VIEW.DEPTH)
-          cv2_img = zed_img #cv2.cvtColor(zed_img.get_data(), cv2.COLOR_BGRA2BGR)
-          timestamp = self.zedget_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
-      return status, msg, cv2_img, timestamp, encoding
+          zed_depth = sl.Mat()
+          self.zed.retrieve_measure(zed_depth, sl.MEASURE.DEPTH, sl.MEM.CPU)
+          np_depth_map = zed_depth.get_data() 
+          np_depth_map[np.isinf(np_depth_map)] = np.nan
+          #print('Node Min Max Depths: ' + str([np.nanmin(np_depth_map),np.nanmax(np_depth_map)]) )
+          timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
+      return status, msg, np_depth_map, timestamp, encoding
 
 
     def stopDepthMap(self):
@@ -526,11 +524,11 @@ class ZedCamNode(object):
         msg = ""    
         o3d_pc = None
         # Initialize some process return variables
-        if self.zedgrab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+        if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
             status = True
             # Retrieve the point cloud
             point_cloud = sl.Mat()
-            self.zedretrieve_measure(point_cloud, sl.MEASURE.XYZRGBA)
+            self.zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA)
             # Get the point cloud data as a numpy array
             zed_pc = point_cloud.get_data()
             # Extract the XYZ data
@@ -540,7 +538,7 @@ class ZedCamNode(object):
             o3d_pc = o3d.geometry.PointCloud()
             o3d_pc.points = o3d.utility.Vector3dVector(xyz_data)
 
-        timestamp = self.zedget_timestamp(sl.TIME_REFERENCE.CURRENT)
+        timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)
         frame_id = "sensor frame"
 
         if o3d_pc is None:
