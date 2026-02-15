@@ -16,6 +16,7 @@ import time
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
+from nepi_sdk import nepi_system
 
 
 # Needed for GenICam auto-detect
@@ -190,12 +191,15 @@ class GenicamCamDiscovery:
         node_needs_serial_number = True
         break
     device_node_name = root_name if not node_needs_serial_number else unique_root_name
-    device_node_namespace = os.path.join(self.base_namespace, device_node_name)
+
+    node_name = nepi_system.get_node_name(device_node_name)
+    self.logger.log_warn(" launching node: " + node_name)
+    node_namespace = os.path.join(self.base_namespace, node_name)
 
 
 
 
-    launch_id = device_node_namespace
+    launch_id = node_namespace
 
     # Check if should try to launch
     launch_check = True
@@ -210,47 +214,50 @@ class GenicamCamDiscovery:
     # TODO: fair to assume uniqueness of device serial numbers?
  
 
-    self.msg_if.pub_warn("Initiating new Genicam node " + device_node_namespace)
+    self.msg_if.pub_warn("Initiating new Genicam node " + node_namespace)
 
-    self.msg_if.pub_warn("Starting node " + device_node_name + " via rosrun")
+    self.msg_if.pub_warn("Starting node " + node_name + " via rosrun")
 
     # NOTE: have to make serial_number look like a string by prefixing with "sn", otherwise ROS
     #       treats it as an int param and it causes an overflow. Better way to handle this?
+
+    # Try and load saved node params if file exists
+    nepi_sdk.load_node_config(device_node_name, node_name)
+    
     #Setup required param server drv_dict for discovery node
+    dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
     self.drv_dict['DEVICE_DICT']={'model': model}
     self.drv_dict['DEVICE_DICT']['serial_number'] = serial_number
-    dict_param_name = device_node_name + "/drv_dict"
     nepi_sdk.set_param(dict_param_name,self.drv_dict)
-    # Try and load save node params
-    nepi_drvs.checkLoadConfigFile(device_node_name)
+
 
     file_name = self.drv_dict['NODE_DICT']['file_name']
     #Try and launch node
-    [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name)
+    [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, node_name)
     time.sleep(1)
     if sub_process.poll() is not None:
       success = False
-      msg = "Node " + device_node_name + " did not responde after launching"
+      msg = "Node " + node_name + " did not responde after launching"
     else:
       self.deviceList.append({"device_class": "genicam",
                               "model": model,
                               "serial_number": serial_number,
                               "device_type": model,
-                              "node_name": device_node_name,
-                              "node_namespace": device_node_namespace,
+                              "node_name": node_name,
+                              "node_namespace": node_namespace,
                               "node_subprocess": sub_process})
 
     # Process luanch results
     self.launch_time_dict[launch_id] = nepi_sdk.get_time()
     if success:
-      self.msg_if.pub_info(" Launched node: " + device_node_name)
+      self.msg_if.pub_info(" Launched node: " + node_name)
     else:
-      self.msg_if.pub_info(" Failed to lauch node: " + device_node_name + " with msg: " + msg)
+      self.msg_if.pub_info(" Failed to lauch node: " + node_name + " with msg: " + msg)
       if self.retry == False:
-        self.msg_if.pub_info(" Will not try relaunch for node: " + device_node_name)
+        self.msg_if.pub_info(" Will not try relaunch for node: " + node_name)
         self.dont_retry_list.append(launch_id)
       else:
-        self.msg_if.pub_info(" Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+        self.msg_if.pub_info(" Will attemp relaunch for node: " + node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
     return success
 
   def stopAndPurgeDeviceNode(self, node_namespace):

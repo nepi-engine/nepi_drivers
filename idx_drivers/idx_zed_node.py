@@ -7,41 +7,28 @@
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
-import os
-import sys
-import time
-import math
-import ros_numpy
+# import os
+# import sys
+# import time
+# import math
+# import ros_numpy
 import threading
 import cv2
-import copy
-import yaml
+import open3d as o3d
+# import copy
+# import yaml
 
-import rospy
 
-
-import subprocess
-import dynamic_reconfigure.client
-import numpy as np
-import tf
+import pyzed.sl as sl
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_nav
-from nepi_sdk import nepi_img
+# nepi_sdk import nepi_img
 from nepi_sdk import nepi_pc
-from nepi_sdk import nepi_drvs
+#from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_settings
 
-from datetime import datetime
-from std_msgs.msg import UInt8, Empty, String, Bool, Float32
-from sensor_msgs.msg import Image, PointCloud2
-from nepi_interfaces.msg import RangeWindow, SaveDataStatus, SaveDataRate
-from nepi_interfaces.srv import IDXCapabilitiesQuery, IDXCapabilitiesQueryResponse
-from nav_msgs.msg import Odometry
-
-from dynamic_reconfigure.msg import Config
-from rospy.numpy_msg import numpy_msg
 
 from nepi_api.device_if_idx import IDXDeviceIF
 from nepi_api.messages_if import MsgIF
@@ -62,7 +49,7 @@ TEST_DRV_DICT = {
     'file_name': 'idx_zed_driver.py' ,
     'class_name':  'ZedCamDriver'
 },
-'DEVICE_DICT': {'zed_type': 'zed2','res_val': 3},
+'DEVICE_DICT': {'zed_type': 'zed2','resolution': 'VGA'},
 }
 
 
@@ -70,27 +57,28 @@ TEST_DRV_DICT = {
 class ZedCamNode(object):
     CHECK_INTERVAL_S = 3.0
     CAL_SRC_PATH = "/usr/local/zed/settings"
-    USER_CFG_PATH = "/mnt/nepi_storage/user_cfg"
-    CAL_BACKUP_PATH = USER_CFG_PATH + "/zed_cals"
-    ZED_PARAMS_PATH = '/opt/nepi/nepi_engine/share/zed_wrapper/params/'
+    CAL_BACKUP_PATH = "/mnt/nepi_storage/user_cfg/cals"
 
-    CAP_SETTINGS = dict(
-      pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","15"]},
-      depth_confidence = {"type":"Int","name":"depth_confidence","options":["0","100"]},
-      depth_texture_conf = {"type":"Int","name":"depth_texture_conf","options":["0","100"]},
-      point_cloud_freq = {"type":"Int","name":"point_cloud_freq","options":["0.1","100"]},
-      brightness = {"type":"Int","name":"brightness","options":["0","8"]},
-      contrast ={"type":"Int","name":"contrast","options":["0","8"]},
-      hue = {"type":"Int","name":"hue","options":["0","11"]},
-      saturation ={"type":"Int","name":"saturation","options":["0","8"]},
-      sharpness ={"type":"Int","name":"sharpness","options":["0","8"]},
-      gamma ={"type":"Int","name":"gamma","options":["1","9"]},
-      auto_exposure_gain = {"type":"Bool","name":"auto_exposure_gain"},
-      gain = {"type":"Int","name":"gain","options":["0","100"]},
-      exposure = {"type":"Int","name":"exposure","options":["0","100"]},
-      auto_whitebalance = {"type":"Bool","name":"auto_whitebalance"},
-      whitebalance_temperature = {"type":"Int","name":"whitebalance_temperature","options":["1","100"]}
-    )
+
+
+    CAP_SETTINGS = nepi_settings.NONE_CAP_SETTINGS
+    # CAP_SETTINGS = dict(
+    #   pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","15"]},
+    #   depth_confidence = {"type":"Int","name":"depth_confidence","options":["0","100"]},
+    #   depth_texture_conf = {"type":"Int","name":"depth_texture_conf","options":["0","100"]},
+    #   point_cloud_freq = {"type":"Int","name":"point_cloud_freq","options":["0.1","100"]},
+    #   brightness = {"type":"Int","name":"brightness","options":["0","8"]},
+    #   contrast ={"type":"Int","name":"contrast","options":["0","8"]},
+    #   hue = {"type":"Int","name":"hue","options":["0","11"]},
+    #   saturation ={"type":"Int","name":"saturation","options":["0","8"]},
+    #   sharpness ={"type":"Int","name":"sharpness","options":["0","8"]},
+    #   gamma ={"type":"Int","name":"gamma","options":["1","9"]},
+    #   auto_exposure_gain = {"type":"Bool","name":"auto_exposure_gain"},
+    #   gain = {"type":"Int","name":"gain","options":["0","100"]},
+    #   exposure = {"type":"Int","name":"exposure","options":["0","100"]},
+    #   auto_whitebalance = {"type":"Bool","name":"auto_whitebalance"},
+    #   whitebalance_temperature = {"type":"Int","name":"whitebalance_temperature","options":["1","100"]}
+    # )
 
     FACTORY_SETTINGS_OVERRIDES = dict( )
     
@@ -105,6 +93,8 @@ class ZedCamNode(object):
 
     ZED_MIN_RANGE_M_OVERRIDES = { 'zed': .2, 'zedm': .15, 'zed2': .2, 'zedx': .2} 
     ZED_MAX_RANGE_M_OVERRIDES = { 'zed':  15, 'zedm': 15, 'zed2': 20, 'zedx': 15} 
+
+    zed = None
 
     zed_type = 'zed'
 
@@ -163,7 +153,15 @@ class ZedCamNode(object):
     pc_img_last_time = None
     pc_last_time = None
 
+    zed_type = 'zed'
+    resolution = 'VGA'
+    framerate = 15
+    data_products = []
+
     max_framerate = 100
+
+    runtime_parameters = sl.RuntimeParameters()
+
 
     navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
  
@@ -201,110 +199,45 @@ class ZedCamNode(object):
 
         # Connect to Zed node
         self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
-        self.res_val = self.drv_dict['DEVICE_DICT']['res_val']
+        self.resolution = self.drv_dict['DEVICE_DICT']['resolution']
         self.framerate = self.drv_dict['DEVICE_DICT']['framerate']
         self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
         self.msg_if.pub_warn("Got discovery data products: " + str(self.data_products))
-        ZED_BASE_NAMESPACE = os.path.join(self.base_namespace, self.zed_type + "/zed_node/")
 
 
-        '''
-        # First check if zed wrapper already running
-        zed_wrapper_not_running = True
-        try:
-          self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=3)
-          zed_wrapper_not_running = nepi_drvs.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
-          nepi_sdk.sleep(2,20)
-        except Exception as e:
-          pass #self.msg_if.pub_info(str(e))
+        # Create a Camera object
+        self.zed = sl.Camera()
 
-        if zed_wrapper_not_running == False:
-          rospy.signal_shutdown("Zed  Wrapper still running, Shutting Down")
+        # Create a InitParameters object and set configuration parameters
+        init_params = sl.InitParameters()
+
+        res_dict = {
+            'HD2K': sl.RESOLUTION.HD2K,
+            'HD1080': sl.RESOLUTION.HD1080,
+            'HD720': sl.RESOLUTION.HD720,
+            'VGA': sl.RESOLUTION.VGA
+        }
+
+        if self.resolution in res_dict.keys():
+           resolution = res_dict[self.resolution]
         else:
-        '''
+           resolution = sl.RESOLUTION.AUTO
 
-        # Set resolution in zed wrapper param file
-        zed_params_path = os.path.join(self.ZED_PARAMS_PATH,self.zed_type + ".yaml")
-        if os.path.exists(zed_params_path):
-          try:
-            with open(zed_params_path) as f:
-              cfg = yaml.load(f, Loader=yaml.FullLoader)
-            #self.msg_if.pub_warn("Updating zed param config with resolution " + str(self.res_val))
-            cfg['general']['resolution'] = self.res_val
-            cfg['general']['grab_frame_rate'] = self.framerate
-            self.msg_if.pub_warn("Updating zed param file: " + zed_params_path + " with cfg " + str(cfg))
-            with open(zed_params_path, "w") as f:
-                cfg = yaml.dump(
-                    cfg, stream=f, default_flow_style=False, sort_keys=False
-                )
-          except:
-            self.msg_if.pub_warn("Failed to update zed param file: " + zed_params_path + " " + str(e))
-        else:
-          self.msg_if.pub_warn("Failed to find zed param file: " + zed_params_path)
+        init_params.camera_resolution = resolution #sl.RESOLUTION.AUTO # Use HD720 opr HD1200 video mode, depending on camera type.
+        init_params.camera_fps = self.framerate #30  # Set fps at 30
 
-        # Run the correct zed_ros_wrapper launch file
-        zed_launchfile = self.zed_type + '.launch'
-        zed_ros_wrapper_run_cmd = ['roslaunch', 'zed_wrapper', zed_launchfile]
-        # TODO: Some process management for the Zed  wrapper
-        self.zed_ros_wrapper_proc = subprocess.Popen(zed_ros_wrapper_run_cmd)
-        # Now that Zed SDK is started, we can set up the reconfig client
-        nepi_sdk.sleep(5,10)
-        success = False
-        timeout = 10
-        waittime = 1
-        timer = 0
-        self.zed_dynamic_reconfig_client = None
-        while success == False and timer < timeout and not nepi_sdk.is_shutdown():
-          try:
-            self.zed_dynamic_reconfig_client = dynamic_reconfigure.client.Client(ZED_BASE_NAMESPACE, timeout=3)
-            success = True
-          except Exception as e:
-            self.msg_if.pub_info(str(e))
-            nepi_sdk.sleep(waittime,10)
-            timer += waittime
-        if timer >= timeout or self.zed_dynamic_reconfig_client is None:
-          self.msg_if.pub_warn("Failed to connect to zed_node using launch process" + str(zed_ros_wrapper_run_cmd))
-          self.msg_if.pub_warn("Killing node named: " + ZED_BASE_NAMESPACE)
-          success = nepi_drvs.killDriverNode(ZED_BASE_NAMESPACE,self.zed_ros_wrapper_proc)
-          if success:
-            time.sleep(2)
-          nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
-          return
-        self.msg_if.pub_warn("Zed DRC: " + str(self.zed_dynamic_reconfig_client))
-        time.sleep(2)
+        # Open the camera
+        err = self.zed.open(init_params)
+        if err != sl.ERROR_CODE.SUCCESS:
+            self.msg_if.pub_warn("Camera Open : " + str(err))
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Not Able to Connect to Zed Camera")
 
-
-
-        # Zed control topics
-        # ZED_PARAMETER_UPDATES_TOPIC = ZED_BASE_NAMESPACE + "parameter_updates"
-        # Zed data stream topics
-        self.image_topic = ZED_BASE_NAMESPACE + "left/image_rect_color"
-        self.depth_map_topic = ZED_BASE_NAMESPACE + "depth/depth_registered"
-        self.pc_topic = ZED_BASE_NAMESPACE + "point_cloud/cloud_registered"
-        ZED_MIN_RANGE_PARAM = ZED_BASE_NAMESPACE + "depth/min_depth"
-        ZED_MAX_RANGE_PARAM = ZED_BASE_NAMESPACE + "depth/max_depth"
+        self.msg_if.pub_info("Zed Camera Connected!")
 
 
 
 
-        # Wait for zed camera topic to publish, then subscribeCAPS SETTINGS
-        self.msg_if.pub_info("Waiting for topic: " + self.image_topic)
-        nepi_sdk.wait_for_topic(self.image_topic)
-
-        self.msg_if.pub_info("Starting Zed IDX subscribers and publishers")
-        self.color_img_sub = None
-        self.depth_map_sub = None
-        self.depth_img_sub = None
-        self.pc_sub = None
-        self.pc_img_sub = None
-
-        ZED_ODOM_TOPIC = ZED_BASE_NAMESPACE + "odom"
-        odom_sub = rospy.Subscriber(ZED_ODOM_TOPIC, Odometry, self.odom_topic_callback)
-
-        # Launch the  node
-        self.msg_if.pub_info("... Connected!")
-
-        # Initialize controls
+       # Initialize controls
         self.factory_controls = self.FACTORY_CONTROLS
         # Apply OVERRIDES
         if self.zed_type in self.ZED_MIN_RANGE_M_OVERRIDES:
@@ -339,7 +272,7 @@ class ZedCamNode(object):
                                     getSettingsFunction=self.getSettings,
                                     factoryControls = self.factory_controls,
                                     setMaxFramerate =self.setMaxFramerate, 
-                                    getFramerate = self.driver.getFramerate,
+                                    getFramerate = self.getFramerate,
                                     setRangeRatio = self.setRangeRatio,
                                     getColorImage = self.getColorImage, 
                                     stopColorImageAcquisition = self.stopColorImage,
@@ -347,7 +280,7 @@ class ZedCamNode(object):
                                     stopDepthMapAcquisition = self.stopDepthMap,
                                     getPointcloud = self.getPointcloud, 
                                     stopPointcloudAcquisition = self.stopPointcloud,                                  
-                                    getNavPoseCb = self.getNavPoseDict, 
+                                    getNavPoseCb = None, #self.getNavPoseDict, 
                                     navpose_update_rate = 10 
                                     )
         self.msg_if.pub_info("... IDX interface running")
@@ -373,18 +306,18 @@ class ZedCamNode(object):
         # Now start zed node check process
         self.attempts = 0
         nepi_sdk.start_timer_process((1), self.checkZedNodeCb)
-        rospy.on_shutdown(self.cleanup_actions)
+        nepi_sdk.on_shutdown(self.cleanup_actions)
         nepi_sdk.spin()
 
     def checkZedNodeCb(self,timer):
-      poll = self.zed_ros_wrapper_proc.poll()
-      running = poll is None
-      if running:
-        self.attempts = 0
-      else:
-        self.attempts += 1
-      if self.attempts > 2:
-        nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
+        
+        try:
+          timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)
+        except:
+          timestamp = None
+        
+        if timestamp is None:
+          nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
 
       
 
@@ -407,17 +340,18 @@ class ZedCamNode(object):
 
 
     def getSettings(self):
-      settings = dict()
-      config_dict = self.zed_dynamic_reconfig_client.get_configuration()
-      if config_dict is not None:
-        for setting_name in self.cap_settings.keys():
-          cap_setting = self.cap_settings[setting_name]
-          setting = dict()
-          setting["name"] = cap_setting['name']
-          setting["type"] = cap_setting['type']
-          if setting_name in config_dict.keys():
-            setting["value"] = str(config_dict[setting_name])
-            settings[setting_name] = setting
+      settings = nepi_settings.NONE_SETTINGS
+      # settings = dict()
+      # config_dict = ???????????
+      # if config_dict is not None:
+      #   for setting_name in self.cap_settings.keys():
+      #     cap_setting = self.cap_settings[setting_name]
+      #     setting = dict()
+      #     setting["name"] = cap_setting['name']
+      #     setting["type"] = cap_setting['type']
+      #     if setting_name in config_dict.keys():
+      #       setting["value"] = str(config_dict[setting_name])
+      #       settings[setting_name] = setting
       return settings
 
     def settingUpdateFunction(self,setting):
@@ -427,9 +361,9 @@ class ZedCamNode(object):
       if data is not None:
         setting_name = setting['name']
         setting_data = data
-        config_dict = self.zed_dynamic_reconfig_client.get_configuration()
+        config_dict = dict() #????????self.zed_dynamic_reconfig_client.get_configuration()
         if setting_name in config_dict.keys():
-          self.zed_dynamic_reconfig_client.update_configuration({setting_name:setting_data})
+          #self.zed_dynamic_reconfig_client.update_configuration({setting_name:setting_data})
           success = True
           msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
         else:
@@ -442,114 +376,6 @@ class ZedCamNode(object):
     #**********************
     # Zed camera data callbacks
 
-    # callback to get color 2d image data
-    def color_2d_image_callback(self, image_msg):
-        # Check for control framerate adjustment
-        last_time = self.cl_img_last_time
-        current_time = nepi_utils.get_time()
-
-        need_data = False
-        if last_time != None and self.idx_if is not None:
-          fr_delay = float(1) / self.max_framerate
-          timer = current_time - last_time
-          if timer > fr_delay:
-            need_data = True
-        else:
-          need_data = True
-
-        # Get and Process Data if Needed
-        if need_data == True:
-          self.cl_img_last_time = current_time
-
-          self.color_img_lock.acquire()
-          self.color_img_msg = image_msg
-          self.color_img_lock.release()
-
-    # callback to get depthmap
-    def depth_map_callback(self, image_msg):
-        # Check for control framerate adjustment
-        last_time = self.dm_img_last_time
-        current_time = nepi_utils.get_time()
-
-        need_data = False
-        if last_time != None and self.idx_if is not None:
-          fr_delay = float(1) / self.max_framerate
-          timer = current_time - last_time
-          if timer > fr_delay:
-            need_data = True
-        else:
-          need_data = True
-
-
-        # Get and Process Data if Needed
-        if need_data == True:
-          self.dm_img_last_time = current_time
-
-          image_msg.header.stamp = nepi_sdk.get_msg_stamp()
-          self.depth_map_lock.acquire()
-          self.depth_map_msg = image_msg
-          self.depth_map_lock.release()
-
-    # callback to get depthmap
-    def depth_image_callback(self, image_msg):
-        # Check for control framerate adjustment
-        last_time = self.di_img_last_time
-        current_time = nepi_utils.get_time()
-
-        
-        need_data = False
-        if last_time != None and self.idx_if is not None:
-          fr_delay = float(1) / self.max_framerate
-          timer = current_time - last_time
-          if timer > fr_delay:
-            need_data = True
-        else:
-          need_data = True
-
-
-        # Get and Process Data if Needed
-        if need_data == True:
-          self.di_img_last_time = current_time
-
-          image_msg.header.stamp = nepi_sdk.get_msg_stamp()
-          self.depth_img_lock.acquire()
-          self.depth_img_msg = image_msg
-          self.depth_img_lock.release()
-
-    # callback to get and republish point_cloud
-    def pointcloud_callback(self, pointcloud_msg):
-        # Check for control framerate adjustment
-        last_time = self.pc_last_time
-        current_time = nepi_utils.get_time()
-
-
-        need_data = False
-        if last_time != None and self.idx_if is not None:
-          fr_delay = float(1) / self.max_framerate
-          timer = current_time - last_time
-          if timer > fr_delay:
-            need_data = True
-        else:
-          need_data = True
-
-
-        # Get and Process Data if Needed
-        if need_data == True:
-          self.pc_last_time = current_time
-
-          self.pc_lock.acquire()
-          self.pc_msg = pointcloud_msg
-          self.pc_lock.release()
-
-
-          self.pc_img_last_time = current_time
-
-          self.pc_img_lock.acquire()
-          self.pc_img_msg = pointcloud_msg
-          self.pc_img_lock.release()
-
-        # callback to get and process point_cloud image
-
 
     def getNavPoseDict(self):
       return self.navpose_dict
@@ -558,33 +384,33 @@ class ZedCamNode(object):
       return self.orientation_dict
 
         
-    ### Callback to publish RBX odom topic
-    def odom_topic_callback(self,odom_msg):
-        # Convert quaternion to roll,pitch,yaw
-        pose = odom_msg.pose.pose.orientation
-        xyzw = list([pose.x,pose.y,pose.z,pose.w])
-        rpy = nepi_nav.convert_quat2rpy(xyzw)
+    # ### Callback to publish RBX odom topic
+    # def odom_topic_callback(self,odom_msg):
+    #     # Convert quaternion to roll,pitch,yaw
+    #     pose = odom_msg.pose.pose.orientation
+    #     xyzw = list([pose.x,pose.y,pose.z,pose.w])
+    #     rpy = nepi_nav.convert_quat2rpy(xyzw)
 
-        # Convert position body to position ENU
-        body = odom_msg.pose.pose.position
-        xyz_body_o = list([body.x, body.y, body.z])
-        xyz = nepi_nav.convert_point_body2enu(xyz_body_o,rpy[2])
+    #     # Convert position body to position ENU
+    #     body = odom_msg.pose.pose.position
+    #     xyz_body_o = list([body.x, body.y, body.z])
+    #     xyz = nepi_nav.convert_point_body2enu(xyz_body_o,rpy[2])
 
-        timestamp = nepi_sdk.sec_from_msg_stamp(odom_msg.header.stamp)
+    #     timestamp = nepi_sdk.sec_from_msg_stamp(odom_msg.header.stamp)
 
-        self.navpose_dict['has_orientation']
-        self.navpose_dict['time_oreantation'] = timestamp
-        # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
-        self.navpose_dict['roll_deg'] = rpy[0]
-        self.navpose_dict['pitch_deg'] = rpy[1]
-        self.navpose_dict['yaw_deg'] = rpy[2]
+    #     self.navpose_dict['has_orientation']
+    #     self.navpose_dict['time_oreantation'] = timestamp
+    #     # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
+    #     self.navpose_dict['roll_deg'] = rpy[0]
+    #     self.navpose_dict['pitch_deg'] = rpy[1]
+    #     self.navpose_dict['yaw_deg'] = rpy[2]
 
-        self.navpose_dict['has_position']
-        self.navpose_dict['time_position'] = timestamp
-        # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
-        self.navpose_dict['x_m'] = xyz[0]
-        self.navpose_dict['y_m'] = xyz[1]
-        self.navpose_dict['z_m'] = xyz[2]
+    #     self.navpose_dict['has_position']
+    #     self.navpose_dict['time_position'] = timestamp
+    #     # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
+    #     self.navpose_dict['x_m'] = xyz[0]
+    #     self.navpose_dict['y_m'] = xyz[1]
+    #     self.navpose_dict['z_m'] = xyz[2]
 
 
     #**********************
@@ -631,172 +457,107 @@ class ZedCamNode(object):
 
 
  
+    def getFramerate(self):
+       return int(self.framerate)
+
 
     # Good base class candidate - Shared with ONVIF
     def getColorImage(self):
-        if self.color_img_sub == None:
-          self.color_img_sub = rospy.Subscriber(self.image_topic, Image, self.color_2d_image_callback, queue_size = 1)
-          time.sleep(0.1)
+      status = False
+      msg = ""
+      cv2_img = None
+      timestamp = None
+      # Grab an image, a RuntimeParameters object must be given to grab()
+      if self.zedgrab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+          status = True
+          zed_img = sl.Mat()
+          # A new image is available if grab() returns SUCCESS
+          self.zedretrieve_image(zed_img, sl.VIEW.LEFT)
+          cv2_img = cv2.cvtColor(zed_img.get_data(), cv2.COLOR_BGRA2BGR)
+          timestamp = self.zedget_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
+      return status, msg, cv2_img, timestamp, encoding
 
-        
-
-        # Set process input variables
-        data_product = "color_2d_image"
-        self.color_img_lock.acquire()
-        img_msg = None
-        if self.color_img_msg != None:
-          img_msg = copy.deepcopy(self.color_img_msg)    
-          self.color_img_msg = None   
-        self.color_img_lock.release()
-        encoding = 'bgr8'
-
-        # Run get process
-        # Initialize some process return variables
-        status = False
-        msg = ""
-        cv2_img = None
-        timestamp = None
-        if img_msg is not None:
-          if img_msg.header.stamp != self.color_img_last_stamp:
-            timestamp = nepi_sdk.sec_from_msg_stamp(img_msg.header.stamp)
-            status = True
-            msg = ""
-            timestamp = nepi_sdk.sec_from_msg_stamp(img_msg.header.stamp)
-            cv2_img =  nepi_img.rosimg_to_cv2img(img_msg, encoding = encoding)
-            self.color_img_last_stamp = timestamp
-          else:
-            msg = "No new data for " + data_product + " available"
-        else:
-          msg = "Received None type data for " + data_product + " process"
-        return status, msg, cv2_img, timestamp, encoding
-
-    
+      
     # Good base class candidate - Shared with ONVIF
     def stopColorImage(self):
-        self.color_img_lock.acquire()
-        self.color_img_sub.unregister()
-        self.color_img_sub = None
-        self.color_img_msg = None
-        self.color_img_lock.release()
+        self.stop_color_img = True
+        # self.color_img_lock.acquire()
+        # self.color_img_sub.unregister()
+        # self.color_img_sub = None
+        # self.color_img_msg = None
+        # self.color_img_lock.release()
         self.msg_if.pub_warn("Stoped Color Image Acquire")
         ret = True
         msg = "Success"
         return ret,msg
     
     def getDepthMap(self):
-        if self.depth_map_sub == None:
-          self.depth_map_sub =rospy.Subscriber(self.depth_map_topic, Image, self.depth_map_callback, queue_size = 1)
-          time.sleep(0.1)
+      status = False
+      msg = ""
+      cv2_img = None
+      # Grab an depth_image_zed, a RuntimeParameters object must be given to grab()
+      if self.zedgrab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+          status = True
+          zed_img = sl.Mat()
+          # A new image is available if grab() returns SUCCESS
+          self.zedretrieve_image(zed_img, sl.VIEW.DEPTH)
+          cv2_img = zed_img #cv2.cvtColor(zed_img.get_data(), cv2.COLOR_BGRA2BGR)
+          timestamp = self.zedget_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
+      return status, msg, cv2_img, timestamp, encoding
 
-        # Set process input variables
-        data_product = "depth_map"
-        self.depth_map_lock.acquire()
-        img_msg = None
-        if self.depth_map_msg != None:
-          img_msg = copy.deepcopy(self.depth_map_msg)    
-          self.depth_map_msg = None 
-        self.depth_map_lock.release()
-        encoding = '32FC1'
-        # Run get process
-        # Initialize some process return variables
-        status = False
-        msg = ""
-        cv2_img = None
-        timestamp = None
-        if img_msg is not None:
-          if img_msg.header.stamp != self.depth_map_last_stamp:
-            timestamp = nepi_sdk.sec_from_msg_stamp(img_msg.header.stamp)
-            self.depth_map_last_stamp = timestamp
-            status = True
-            msg = ""
-            # Adjust range Limits if IDX Controls enabled and range ratios are not min/max
-            start_range_ratio = self.current_controls.get("start_range_ratio")
-            stop_range_ratio = self.current_controls.get("stop_range_ratio")
-            # Convert ros depth_map to cv2_img and numpy depth data
-            cv2_depth_map = nepi_img.rosimg_to_cv2img(img_msg, encoding="passthrough")
-            depth_data = (np.array(cv2_depth_map, dtype=np.float32)) # replace nan values
-            # Get range data
-            min_range_m = self.current_controls.get("min_range_m")
-            max_range_m = self.current_controls.get("max_range_m")
-            #Update range limits and crop depth map
-            delta_range_m = max_range_m - min_range_m
-            max_range_m = min_range_m + stop_range_ratio * delta_range_m
-            min_range_m = min_range_m + start_range_ratio * delta_range_m
-            delta_range_m = max_range_m - min_range_m
-            # Filter depth_data in range
-            depth_data[np.isnan(depth_data)] = float('nan')  # set to NaN
-            depth_data[depth_data <= min_range_m] = float('nan')  # set to NaN
-            depth_data[depth_data >= max_range_m] = float('nan')  # set to NaN
-            cv2_img = depth_data
-            #img_msg = nepi_img.cv2img_to_rosimg(cv2_depth_image,encoding)
-          
-          else:
-            msg = "No new data for " + data_product + " available"
-        else:
-          msg = "Received None type data for " + data_product + " process"
-        if cv2_img is not None:
-          return status, msg, cv2_img, timestamp, encoding
-        else: 
-          return status, msg, img_msg, timestamp, encoding
-    
+
     def stopDepthMap(self):
-        self.depth_map_lock.acquire()
+        self.stop_depth_map = True
 
-        self.depth_map_sub.unregister()
-        self.depth_map_sub = None
+        # self.depth_map_lock.acquire()
 
-        self.depth_map_msg = None
-        self.depth_map_lock.release()
-        self.msg_if.pub_warn("Stoped Depthmap Acquire")
+        # self.depth_map_sub.unregister()
+        # self.depth_map_sub = None
+
+        # self.depth_map_msg = None
+        # self.depth_map_lock.release()
+        self.msg_if.pub_warn("Stopped Depthmap Acquire")
         ret = True
         msg = "Success"
         return ret,msg
 
-    def getPointcloud(self):     
-        if self.pc_sub == None:
-          self.pc_sub =rospy.Subscriber(self.pc_topic, PointCloud2, self.pointcloud_callback, queue_size = 1)
-          time.sleep(0.1)
-
-        # Set process input variables
-        data_product = "pointcloud"
-        self.pc_lock.acquire()
-        pc_msg = None
-        if self.pc_msg != None:
-          pc_msg = copy.deepcopy(self.pc_msg)    
-          self.pc_msg = None 
-        self.pc_lock.release()
-        # Run get process
-        # Initialize some process return variables
+    def getPointcloud(self): 
         status = False
-        msg = ""
+        msg = ""    
         o3d_pc = None
-        timestamp = None
-        frame_id = None
-        if pc_msg is not None:
-          if pc_msg.header.stamp != self.pc_last_stamp:
-            timestamp = nepi_sdk.sec_from_msg_stamp(pc_msg.header.stamp)
-            frame_id = pc_msg.header.frame_id
+        # Initialize some process return variables
+        if self.zedgrab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
             status = True
-            msg = ""
-            self.pc_last_stamp = timestamp
-            start_range_ratio = self.current_controls.get("start_range_ratio")
-            stop_range_ratio = self.current_controls.get("stop_range_ratio")
-            min_range_m = self.current_controls.get("min_range_m")
-            max_range_m = self.current_controls.get("max_range_m")
-            delta_range_m = max_range_m - min_range_m
-            range_clip_min_range_m = min_range_m + start_range_ratio  * delta_range_m
-            range_clip_max_range_m = min_range_m + stop_range_ratio  * delta_range_m
-            if start_range_ratio > 0 or stop_range_ratio < 1:
-              o3d_pc = nepi_pc.rospc_to_o3dpc(pc_msg, remove_nans=False)
-              o3d_pc = nepi_pc.range_clip_spherical( o3d_pc, range_clip_min_range_m, range_clip_max_range_m)
-          else:
-            msg = "No new data for " + data_product + " available"
-        else:
-          msg = "Received None type data for " + data_product + " process"
-        if o3d_pc is not None:
+            # Retrieve the point cloud
+            point_cloud = sl.Mat()
+            self.zedretrieve_measure(point_cloud, sl.MEASURE.XYZRGBA)
+            # Get the point cloud data as a numpy array
+            zed_pc = point_cloud.get_data()
+            # Extract the XYZ data
+            xyz_data = zed_pc[:, :, :3]
+            xyz_data = xyz_data.reshape(-1,3)
+            # Create an Open3D point cloud
+            o3d_pc = o3d.geometry.PointCloud()
+            o3d_pc.points = o3d.utility.Vector3dVector(xyz_data)
+
+        timestamp = self.zedget_timestamp(sl.TIME_REFERENCE.CURRENT)
+        frame_id = "sensor frame"
+
+        if o3d_pc is None:
           return status, msg, o3d_pc, timestamp, frame_id
-        else: 
-          return status, msg, pc_msg, timestamp, frame_id
+        else:
+          self.pc_last_stamp = timestamp
+          start_range_ratio = self.current_controls.get("start_range_ratio")
+          stop_range_ratio = self.current_controls.get("stop_range_ratio")
+          min_range_m = self.current_controls.get("min_range_m")
+          max_range_m = self.current_controls.get("max_range_m")
+          delta_range_m = max_range_m - min_range_m
+          range_clip_min_range_m = min_range_m + start_range_ratio  * delta_range_m
+          range_clip_max_range_m = min_range_m + stop_range_ratio  * delta_range_m
+          if start_range_ratio > 0 or stop_range_ratio < 1:
+            o3d_pc = nepi_pc.range_clip_spherical( o3d_pc, range_clip_min_range_m, range_clip_max_range_m)
+          return status, msg, o3d_pc, timestamp, frame_id
+
 
     
     def stopPointcloud(self):
@@ -815,17 +576,10 @@ class ZedCamNode(object):
     def cleanup_actions(self):
       self.msg_if.pub_info("Shutting down: Executing script cleanup actions")
       try:
-        zed_type = self.zed_type
-        zed_node_namespace = os.path.join(self.base_namespace,zed_type,'zed_node')
-        nepi_sdk.kill_node_namespace(zed_node_namespace)
+        self.zed.close()
+        self.msg_if.pub_warn("Closed zed sdk connection")
       except Exception as e:
-        self.msg_if.pub_warn("Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
-      try:
-        zed_type = self.zed_type
-        zed_node_namespace = os.path.join(self.base_namespace,zed_type,zed_type + '_state_publisher')
-        nepi_sdk.kill_node_namespace(zed_node_namespace)
-      except Exception as e:
-        self.msg_if.pub_warn("Failed to kill zed node namespace " + zed_node_namespace + " " + str(e))
+        self.msg_if.pub_warn("Failed to close zed sdk connection" + str(e))
         
 if __name__ == '__main__':
     node = ZedCamNode()

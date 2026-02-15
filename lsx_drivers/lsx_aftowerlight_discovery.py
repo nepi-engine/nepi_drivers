@@ -15,6 +15,7 @@ import serial
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
+from nepi_sdk import nepi_system
 from nepi_sdk import nepi_serial
 
 from nepi_sdk.nepi_sdk import logger as Logger
@@ -154,10 +155,15 @@ class AfTowerLightDiscovery:
 
     ### Start Node Luanch Process
     file_name = self.drv_dict['NODE_DICT']['file_name']
-    node_name = self.node_launch_name + "_" + path_str.split('/')[-1]
+    device_node_name = self.node_launch_name + "_" + path_str.split('/')[-1]
+    node_name = nepi_system.get_node_name(device_node_name)
+    self.logger.log_warn(" launching node: " + node_name)
 
-    self.logger.log_warn("launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
+
+    # Try and load saved node params if file exists
+    nepi_sdk.load_node_config(device_node_name, node_name)
+
     dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
     self.logger.log_warn("launching node: " + str(self.drv_dict))
     self.drv_dict['DEVICE_DICT'] = dict()

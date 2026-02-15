@@ -13,6 +13,7 @@ import time
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
+from nepi_sdk import nepi_system
 
 from nepi_api.messages_if import MsgIF
 
@@ -214,65 +215,82 @@ class V4L2CamDiscovery:
             same_type_count += 1
 
         device_node_name = self.short_name(root_name)
-        device_node_namespace = os.path.join(self.base_namespace, device_node_name)
         if bus is not None:
           id = bus
         else:
           id = str(same_type_count)
         device_node_name += '_' + id
 
+        node_name = nepi_system.get_node_name(device_node_name)
+        node_namespace = os.path.join(self.base_namespace, node_name)
+
         device_exists = False
         for device in self.deviceList:
-          if device['node_name'] == device_node_name:
+          if device['node_name'] == node_name:
             device_exists = True
 
         if device_exists is False:
-          self.msg_if.pub_info("Initiating new V4L2 node " + device_node_namespace)
+          self.msg_if.pub_info("Initiating new V4L2 node " + node_namespace)
           # Now start the node via rosrun
           # rosrun nepi_drivers_idx v4l2_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
-          self.msg_if.pub_info("" + "Launching node " + device_node_name)
+          self.msg_if.pub_info("" + "Launching node " + node_name)
           if dtype not in self.excludedDevices:
+
+
+            # Try and load saved node params if file exists
+            nepi_sdk.load_node_config(device_node_name, node_name)
+
+
             #Setup required param server drv_dict for discovery node
             self.drv_dict['DEVICE_DICT'] = {'device_path': path_str}
-            dict_param_name = os.path.join(self.base_namespace,device_node_name + "/drv_dict")
+            dict_param_name = os.path.join(self.base_namespace,node_name + "/drv_dict")
             nepi_sdk.set_param(dict_param_name,self.drv_dict)
-            # Try and load save node params
-            nepi_drvs.checkLoadConfigFile(device_node_name)
+
+           
             
             file_name = self.drv_dict['NODE_DICT']['file_name']
             self.msg_if.pub_info("Starting new V4L2 node with drv_dict " +str(self.drv_dict))
             #Try and launch node
-            [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, device_node_name)
+            [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, node_name)
             if success:
               self.deviceList.append({'device_class': 'v4l2', 'device_path': path_str, 'device_type': dtype, 
-                                      'node_name': device_node_name, 'node_namespace': device_node_namespace,
+                                      'node_name': node_name, 'node_namespace': node_namespace,
                                       'node_subprocess': sub_process})
+
+            self.msg_if.pub_warn("Added device to active list " + node_name)
+            self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
 
             # Process luanch results
             self.launch_time_dict[launch_id] = nepi_utils.get_time()
             if success:
-              self.msg_if.pub_info(" Launched node: " + device_node_name)
+              self.msg_if.pub_info(" Launched node: " + node_name)
             else:
-              self.msg_if.pub_info(" Failed to lauch node: " + device_node_name + " with msg: " + msg)
+              self.msg_if.pub_info(" Failed to lauch node: " + node_name + " with msg: " + msg)
               if self.retry == False:
-                self.msg_if.pub_info(" Will not try relaunch for node: " + device_node_name)
+                self.msg_if.pub_info(" Will not try relaunch for node: " + node_name)
                 self.dont_retry_list.append(launch_id)
               else:
-                self.msg_if.pub_info(" Will attemp relaunch for node: " + device_node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
+                self.msg_if.pub_info(" Will attemp relaunch for node: " + node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
 
     return success
 
   def stopAndPurgeDeviceNode(self, node_namespace):
+    success = False
     self.msg_if.pub_info("stopping " + node_namespace)
+    purge_index = None
     for i, device in enumerate(self.deviceList):
       if device['node_namespace'] == node_namespace:
         node_name = device['node_namespace'].split("/")[-1]
         sub_process = device['node_subprocess']
         success = nepi_drvs.killDriverNode(node_name,sub_process)
         # And remove it from the list
-        self.deviceList.pop(i)  
-    if success == False:
-      self.msg_if.pub_warn("Unable to stop unknown node " + node_namespace)
+        purge_index = i
+
+    self.deviceList.pop(i) 
+    self.msg_if.pub_warn("Removed device from active list " + node_name)
+    self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
+    # if success == False:
+    #   self.msg_if.pub_warn("Unable to stop node " + node_namespace)
 
   def deviceNodeIsRunning(self, node_namespace):
     for device in self.deviceList:

@@ -25,7 +25,10 @@ driver:
         default: HD720
       framerate:
         type: INT
-        default: 15
+        options:
+          - '15'
+          - '30'
+        default: '15'
       data_products:
         type: Discrete
         options:

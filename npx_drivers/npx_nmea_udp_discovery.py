@@ -14,6 +14,7 @@ import datetime
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_drvs
+from nepi_sdk import nepi_system
 
 PKG_NAME = 'NPX_NMEA_UDP'
 FILE_TYPE = 'DISCOVERY'
@@ -143,14 +144,19 @@ class NMEAUDPDiscovery:
 
         # Form node_name in the same style you already use in logs
         try:
-            node_name = self.node_launch_name + "_" + str(launch_key).split(':')[0].replace('.','').replace('-','_')
+            device_node_name = self.node_launch_name + "_" + str(launch_key).split(':')[0].replace('.','').replace('-','_')
         except:
-            node_name = self.node_launch_name + "_" + str(launch_key).replace(':','_').replace('.','').replace('-','_')
+            device_node_name = self.node_launch_name + "_" + str(launch_key).replace(':','_').replace('.','').replace('-','_')
+        node_name = nepi_system.get_node_name(device_node_name)
+        self.logger.log_warn(" launching node: " + node_name)
 
-        self.logger.log_warn("Launching node: " + node_name)
 
-        # Load any saved config for this node (same pattern as MicroStrain)
-        nepi_drvs.checkLoadConfigFile(node_name)
+
+        # Try and load saved node params if file exists
+        nepi_sdk.load_node_config(device_node_name, node_name)
+        
+        #Setup required param server drv_dict for discovery node
+        dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
 
         # Ensure DEVICE_DICT and SAVE_DATA blocks exist (avoid NoneType in SaveDataIF)
         self.drv_dict.setdefault('DEVICE_DICT', {})
@@ -164,9 +170,6 @@ class NMEAUDPDiscovery:
         self.drv_dict.setdefault('SAVE_DATA', {})
         self.drv_dict['SAVE_DATA']['save_rate_dict'] = self.drv_dict['SAVE_DATA'].get('save_rate_dict', {})
         self.drv_dict['SAVE_DATA']['save_data_enable'] = bool(self.drv_dict['SAVE_DATA'].get('save_data_enable', False))
-
-        # Push the complete driver dict under the node namespace (same as MicroStrain flow)
-        dict_param_name = nepi_sdk.create_namespace(self.base_namespace, node_name + "/drv_dict")
         nepi_sdk.set_param(dict_param_name, self.drv_dict)
 
         # Start internal NMEA simulator if requested (before launching client node so it can connect)
