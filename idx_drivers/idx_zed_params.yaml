@@ -24,7 +24,7 @@ driver:
           - VGA
         default: HD720
       framerate:
-        type: INT
+        type: Int
         options:
           - '15'
           - '30'

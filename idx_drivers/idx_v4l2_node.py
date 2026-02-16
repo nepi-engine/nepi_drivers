@@ -51,6 +51,8 @@ class V4l2CamNode:
 
     #Factory Control Values 
     FACTORY_CONTROLS = dict( 
+    width_deg = 90,
+    weight_deg = 60,    
     frame_id = 'sensor_frame' 
     )
 

@@ -83,11 +83,18 @@ class ZedCamNode(object):
     stop_range_ratio = 1.0,
     min_range_m = 0.0,
     max_range_m = 20.0,
+    width_deg = 110,
+    height_deg = 70,
     frame_id = 'sensor_frame' 
     )
 
+    data_source_description = 'stereo_camera'
+    data_ref_description = 'left_camera_lense'
+
     ZED_MIN_RANGE_M_OVERRIDES = { 'zed': .2, 'zedm': .15, 'zed2': .2, 'zedx': .2} 
     ZED_MAX_RANGE_M_OVERRIDES = { 'zed':  15, 'zedm': 15, 'zed2': 20, 'zedx': 15} 
+    ZED_WIDTH_DEG_OVERRIDES = { 'zed': 110, 'zedm': 110, 'zed2': 110, 'zedx': 110} 
+    ZED_HEIGHT_DEG_OVERRIDES = { 'zed':  70, 'zedm': 70, 'zed2': 70, 'zedx': 80} 
 
     zed = None
 
@@ -143,7 +150,7 @@ class ZedCamNode(object):
 
     current_fps = 100
     cl_img_last_time = None
-    dm_img_last_time = None
+    dm_data_last_time = None
     di_img_last_time = None
     pc_img_last_time = None
     pc_last_time = None
@@ -239,6 +246,10 @@ class ZedCamNode(object):
           self.factory_controls['min_range_m'] = self.ZED_MIN_RANGE_M_OVERRIDES[self.zed_type]
         if self.zed_type in self.ZED_MAX_RANGE_M_OVERRIDES:
           self.factory_controls['max_range_m'] = self.ZED_MAX_RANGE_M_OVERRIDES[self.zed_type]
+        if self.zed_type in self.ZED_WIDTH_DEG_OVERRIDES:
+          self.factory_controls['width_deg'] = self.ZED_WIDTH_DEG_OVERRIDES[self.zed_type]
+        if self.zed_type in self.ZED_HEIGHT_DEG_OVERRIDES:
+          self.factory_controls['height_deg'] = self.ZED_HEIGHT_DEG_OVERRIDES[self.zed_type]
         
         self.current_controls = self.factory_controls # Updateded during initialization
         self.current_fps = self.framerate # Should be updateded when settings read
@@ -259,8 +270,8 @@ class ZedCamNode(object):
             self.device_info_dict["device_name"] = self.node_name
         self.idx_if = IDXDeviceIF(device_info = self.device_info_dict,
                                     data_products =  self.data_products,
-                                    data_source_description = 'stereo_camera',
-                                    data_ref_description = 'left_camera_lense',
+                                    data_source_description = self.data_source_description,
+                                    data_ref_description = self.data_ref_description,
                                     capSettings = self.cap_settings,
                                     factorySettings = self.factory_settings,
                                     settingUpdateFunction=self.settingUpdateFunction,
@@ -463,15 +474,34 @@ class ZedCamNode(object):
       cv2_img = None
       timestamp = None
       encoding = 'bgr8'
-      # Grab an image, a RuntimeParameters object must be given to grab()
-      if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
-          status = True
-          zed_img = sl.Mat()
-          # A new image is available if grab() returns SUCCESS
-          self.zed.retrieve_image(zed_img, sl.VIEW.LEFT)
-          cv2_img = cv2.cvtColor(zed_img.get_data(), cv2.COLOR_BGRA2BGR)
-          timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
-      return status, msg, cv2_img, timestamp, encoding
+      # Check for control framerate adjustment
+      last_time = self.cl_img_last_time
+      current_time = nepi_utils.get_time()
+      
+      need_data = False
+      if last_time != None and self.idx_if is not None:
+        fr_delay = float(1) / self.max_framerate
+        timer = current_time - last_time
+        if timer > fr_delay:
+          need_data = True
+      else:
+        need_data = True
+
+      #need_data = True
+      # Get and Process Data if Needed
+      if need_data == False:
+        return False, "Waiting for Timer", None, None, None  # Return None data
+      else:
+        # Grab an image, a RuntimeParameters object must be given to grab()
+        if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+            status = True
+            zed_img = sl.Mat()
+            # A new image is available if grab() returns SUCCESS
+            self.zed.retrieve_image(zed_img, sl.VIEW.LEFT)
+            cv2_img = cv2.cvtColor(zed_img.get_data(), cv2.COLOR_BGRA2BGR)
+            timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
+            self.cl_img_last_time = nepi_utils.get_time()
+        return status, msg, cv2_img, timestamp, encoding
 
       
     # Good base class candidate - Shared with ONVIF
@@ -492,16 +522,35 @@ class ZedCamNode(object):
       msg = ""
       np_depth_map = None
       encoding = '32FC1'
-      # Grab an depth_image_zed, a RuntimeParameters object must be given to grab()
-      if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
-          status = True
-          zed_depth = sl.Mat()
-          self.zed.retrieve_measure(zed_depth, sl.MEASURE.DEPTH, sl.MEM.CPU)
-          np_depth_map = zed_depth.get_data() 
-          np_depth_map[np.isinf(np_depth_map)] = np.nan
-          #print('Node Min Max Depths: ' + str([np.nanmin(np_depth_map),np.nanmax(np_depth_map)]) )
-          timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
-      return status, msg, np_depth_map, timestamp, encoding
+      # Check for control framerate adjustment
+      last_time = self.dm_data_last_time
+      current_time = nepi_utils.get_time()
+      
+      need_data = False
+      if last_time != None and self.idx_if is not None:
+        fr_delay = float(1) / self.max_framerate
+        timer = current_time - last_time
+        if timer > fr_delay:
+          need_data = True
+      else:
+        need_data = True
+
+      #need_data = True
+      # Get and Process Data if Needed
+      if need_data == False:
+        return False, "Waiting for Timer", None, None, None  # Return None data
+      else:
+        # Grab an depth_image_zed, a RuntimeParameters object must be given to grab()
+        if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+            status = True
+            zed_depth = sl.Mat()
+            self.zed.retrieve_measure(zed_depth, sl.MEASURE.DEPTH, sl.MEM.CPU)
+            np_depth_map = zed_depth.get_data() 
+            np_depth_map[np.isinf(np_depth_map)] = np.nan
+            #print('Node Min Max Depths: ' + str([np.nanmin(np_depth_map),np.nanmax(np_depth_map)]) )
+            timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
+            self.dm_data_last_time = nepi_utils.get_time()
+        return status, msg, np_depth_map, timestamp, encoding
 
 
     def stopDepthMap(self):
@@ -522,38 +571,43 @@ class ZedCamNode(object):
     def getPointcloud(self): 
         status = False
         msg = ""    
-        o3d_pc = None
-        # Initialize some process return variables
-        if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
-            status = True
-            # Retrieve the point cloud
-            point_cloud = sl.Mat()
-            self.zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA)
-            # Get the point cloud data as a numpy array
-            zed_pc = point_cloud.get_data()
-            # Extract the XYZ data
-            xyz_data = zed_pc[:, :, :3]
-            xyz_data = xyz_data.reshape(-1,3)
-            # Create an Open3D point cloud
-            o3d_pc = o3d.geometry.PointCloud()
-            o3d_pc.points = o3d.utility.Vector3dVector(xyz_data)
-
-        timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)
         frame_id = "sensor frame"
-
-        if o3d_pc is None:
-          return status, msg, o3d_pc, timestamp, frame_id
+        o3d_pc = None
+        # Check for control framerate adjustment
+        last_time = self.pc_data_last_time
+        current_time = nepi_utils.get_time()
+        
+        need_data = False
+        if last_time != None and self.idx_if is not None:
+          fr_delay = float(1) / self.max_framerate
+          timer = current_time - last_time
+          if timer > fr_delay:
+            need_data = True
         else:
-          self.pc_last_stamp = timestamp
-          start_range_ratio = self.current_controls.get("start_range_ratio")
-          stop_range_ratio = self.current_controls.get("stop_range_ratio")
-          min_range_m = self.current_controls.get("min_range_m")
-          max_range_m = self.current_controls.get("max_range_m")
-          delta_range_m = max_range_m - min_range_m
-          range_clip_min_range_m = min_range_m + start_range_ratio  * delta_range_m
-          range_clip_max_range_m = min_range_m + stop_range_ratio  * delta_range_m
-          if start_range_ratio > 0 or stop_range_ratio < 1:
-            o3d_pc = nepi_pc.range_clip_spherical( o3d_pc, range_clip_min_range_m, range_clip_max_range_m)
+          need_data = True
+
+        #need_data = True
+        # Get and Process Data if Needed
+        if need_data == False:
+          return False, "Waiting for Timer", None, None, None  # Return None data
+        else:
+          # Initialize some process return variables
+          if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+              status = True
+              # Retrieve the point cloud
+              point_cloud = sl.Mat()
+              self.zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA)
+              # Get the point cloud data as a numpy array
+              zed_pc = point_cloud.get_data()
+              # Extract the XYZ data
+              xyz_data = zed_pc[:, :, :3]
+              xyz_data = xyz_data.reshape(-1,3)
+              # Create an Open3D point cloud
+              o3d_pc = o3d.geometry.PointCloud()
+              o3d_pc.points = o3d.utility.Vector3dVector(xyz_data)
+
+              timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)
+              self.pc_data_last_time = nepi_utils.get_time()            
           return status, msg, o3d_pc, timestamp, frame_id
 
 
