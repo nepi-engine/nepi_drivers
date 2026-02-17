@@ -545,10 +545,11 @@ class ZedCamNode(object):
             status = True
             zed_depth = sl.Mat()
             self.zed.retrieve_measure(zed_depth, sl.MEASURE.DEPTH, sl.MEM.CPU)
-            np_depth_map = zed_depth.get_data() 
-            np_depth_map[np.isinf(np_depth_map)] = np.nan
-            #print('Node Min Max Depths: ' + str([np.nanmin(np_depth_map),np.nanmax(np_depth_map)]) )
+            zed_depth_map = zed_depth.get_data() 
+            zed_depth_map[np.isinf(zed_depth_map)] = np.nan
+            #print('Zed Depth Map Min Max: ' + str([np.nanmin(zed_depth_map),np.nanmax(zed_depth_map)]) )
             timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
+            np_depth_map = (np.array(zed_depth_map, dtype=np.float32)) # replace nan values
             self.dm_data_last_time = nepi_utils.get_time()
         return status, msg, np_depth_map, timestamp, encoding
 
