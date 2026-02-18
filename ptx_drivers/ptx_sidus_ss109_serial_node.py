@@ -231,13 +231,13 @@ class SidusSS109SerialPTXNode:
                                         getSettingsFunction=self.getSettings,
                                         factoryControls = self.FACTORY_CONTROLS,
                                         factoryLimits = self.LIMITS_DICT,
-                                        stopMovingCb = self.stopMoving,
+                                        stopMovingCb = None, #self.stopMoving,
                                         movePanCb = None, #self.movePan,  # Stop command not working on jog
                                         moveTiltCb = None, #self.moveTilt, # Stop command not working on jog
                                         getSoftLimitsCb = None, #self.getSoftLimits, # 109 does not return response
                                         setSoftLimitsCb = self.setSoftLimits,
                                         getSpeedRatioCb = self.getSpeedRatio,
-                                        setSpeedRatioCb = self.setSpeedRatio,
+                                        setSpeedRatioCb = None, #self.setSpeedRatio,
                                         getPositionCb = self.getPosition,
                                         gotoPositionCb = self.gotoPosition,
                                         gotoPanPositionCb = self.gotoPanPosition,

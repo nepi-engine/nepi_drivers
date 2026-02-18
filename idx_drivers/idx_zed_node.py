@@ -7,6 +7,8 @@
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
+import os
+import sys
 import threading
 import cv2
 import open3d as o3d
@@ -14,13 +16,15 @@ import numpy as np
 
 
 
+pyzed_folder = '/home/nepi/.local/lib/python3.8/site-packages'
+sys.path.insert(0, pyzed_folder)
 import pyzed.sl as sl
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_nav
 # nepi_sdk import nepi_img
-from nepi_sdk import nepi_pc
+# from nepi_sdk import nepi_pc
 #from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_settings
 
@@ -181,8 +185,10 @@ class ZedCamNode(object):
         ##############################  
         # Create Msg Class
         self.msg_if = MsgIF(log_name = self.class_name)
-        self.msg_if.pub_info("Starting Node Initialization Processes")
+        self.msg_if.pub_info("Starting Node Initialization Processes")  
 
+
+           
         ##############################  
         # Initialize Class Variables
 
@@ -202,7 +208,7 @@ class ZedCamNode(object):
         # Connect to Zed node
         self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
         self.resolution = self.drv_dict['DEVICE_DICT']['resolution']
-        self.framerate = self.drv_dict['DEVICE_DICT']['framerate']
+        self.framerate = 15 # self.drv_dict['DEVICE_DICT']['framerate']
         self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
         self.msg_if.pub_warn("Got discovery data products: " + str(self.data_products))
 
@@ -311,10 +317,13 @@ class ZedCamNode(object):
         self.msg_if.pub_info("Initialization Complete")
         # Now start zed node check process
         self.attempts = 0
-        nepi_sdk.start_timer_process((1), self.checkZedStatusCb)
+        #nepi_sdk.start_timer_process((1), self.checkZedStatusCb)
         nepi_sdk.on_shutdown(self.cleanup_actions)
         nepi_sdk.spin()
 
+    
+    
+    
     def checkZedStatusCb(self,timer):
         timestamp = None
         try:
@@ -323,6 +332,7 @@ class ZedCamNode(object):
           pass
         
         if timestamp is None:
+          self.msg_if.pub_info("Failed to get timestamp from zed camera")
           nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
 
       
