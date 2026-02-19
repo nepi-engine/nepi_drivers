@@ -51,6 +51,8 @@ class ZedCamDiscovery:
   retry = True
   failed_node_list = []
 
+  check_for_devices = True
+
   def __init__(self):
     ####  NODE Initialization ####
     nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
@@ -109,6 +111,9 @@ class ZedCamDiscovery:
 
 
   def detectAndManageDevices(self, timer): # Extra arg since this is a Timer callback
+    if self.check_for_devices == False:
+      self.msg_if.pub_warn("Stopping device discovery process") 
+      return
     # First grab the current list of known V4L2 devices
     sub_process = subprocess.Popen(['v4l2-ctl', '--list-devices'],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -300,6 +305,8 @@ class ZedCamDiscovery:
     return success
 
   def stopAndPurgeDeviceNode(self, node_namespace = 'All'):
+    if node_namespace == 'All':
+      self.check_for_devices = False
     success = False
     self.msg_if.pub_info("stopping " + node_namespace)
     purge_paths = []

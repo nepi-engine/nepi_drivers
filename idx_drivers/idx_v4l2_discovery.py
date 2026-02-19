@@ -23,6 +23,7 @@ FILE_TYPE = 'DISCOVERY'
 class V4L2CamDiscovery:
 
   NODE_LOAD_TIME_SEC = 10
+  NODE_LAUNCH_DELAY_SEC = 2
   launch_time_dict = dict()
   retry = True
   dont_retry_list = []
@@ -30,9 +31,11 @@ class V4L2CamDiscovery:
   includeDevices = []
   excludedDevices = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X']     
 
-  CHECK_INTERVAL_S = 3.0
+  CHECK_INTERVAL_S = 2.0
 
+  launch_delay_sec = NODE_LAUNCH_DELAY_SEC
 
+  check_for_devices = True
 
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
@@ -71,6 +74,13 @@ class V4L2CamDiscovery:
       self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
     else:
       self.retry = True
+
+    if 'launch_delay_sec' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
+      self.launch_delay_sec = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['launch_delay_sec']['value']
+    else:
+      self.launch_delay_sec = self.NODE_LAUNCH_DELAY_SEC
+    
+
     ########################
 
     nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
@@ -83,6 +93,10 @@ class V4L2CamDiscovery:
   # Discovery functions
 
   def detectAndManageDevices(self, timer): # Extra arg since this is a Timer callback
+    if self.check_for_devices == False:
+      self.msg_if.pub_warn("Stopping device discovery process") 
+      return
+    success = False
     # First grab the current list of known V4L2 devices
     sub_process = subprocess.Popen(['v4l2-ctl', '--list-devices'],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -159,7 +173,7 @@ class V4L2CamDiscovery:
 
                   time.sleep(1)
 
-                  self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
+                  success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
               break
         
             if known_device == False:
@@ -187,7 +201,9 @@ class V4L2CamDiscovery:
         if launch_id in self.dont_retry_list:
           self.dont_retry_list.remove(launch_id)
 
-    nepi_sdk.sleep(self.CHECK_INTERVAL_S,100)
+    launch_delay_sec = self.CHECK_INTERVAL_S
+    if success == True:
+      launch_delay_sec = self.launch_delay_sec
     nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
 
   def startDeviceNode(self, dtype, path_str, bus):
@@ -277,21 +293,24 @@ class V4L2CamDiscovery:
 
   def stopAndPurgeDeviceNode(self, node_namespace = 'All'):
     success = False
-    self.msg_if.pub_info("stopping " + node_namespace)
-    purge_index = None
-    for i, device in enumerate(self.deviceList):
-      if device['node_namespace'] == node_namespace or node_namespace == 'All':
-        node_name = device['node_namespace'].split("/")[-1]
-        sub_process = device['node_subprocess']
-        success = nepi_drvs.killDriverNode(node_name,sub_process)
-        # And remove it from the list
-        purge_index = i
+    
+    if len(self.deviceList) > 0:
+      if node_namespace == 'All':
+        self.check_for_devices = False
+      for i, device in enumerate(self.deviceList):
+        if device['node_namespace'] == node_namespace or node_namespace == 'All':
+          node_name = device['node_namespace'].split("/")[-1]
+          sub_process = device['node_subprocess']
+          self.msg_if.pub_info("Killing device node: " + node_namespace)
+          success = nepi_drvs.killDriverNode(node_name,sub_process)
+          if success == False:
+            self.msg_if.pub_warn("Unable to kill device node " + node_name)
+          else:
+            self.msg_if.pub_warn("Node killed. Removed device from active list " + node_name)
 
-    self.deviceList.pop(i) 
-    self.msg_if.pub_warn("Removed device from active list " + node_name)
-    self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
-    # if success == False:
-    #   self.msg_if.pub_warn("Unable to stop node " + node_namespace)
+      self.deviceList = []
+      self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
+
 
   def deviceNodeIsRunning(self, node_namespace):
     for device in self.deviceList:

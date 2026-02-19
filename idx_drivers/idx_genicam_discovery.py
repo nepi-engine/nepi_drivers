@@ -53,6 +53,7 @@ class GenicamCamDiscovery:
   drv_dict = dict()
   deviceList = []          
 
+  check_for_devices = True
 
   def __init__(self):
     ####  NODE Initialization ####
@@ -100,6 +101,9 @@ class GenicamCamDiscovery:
   # Discovery functions
 
   def detectAndManageDevices(self, timer):
+    if self.check_for_devices == False:
+      self.msg_if.pub_warn("Stopping device discovery process") 
+      return
     #self.msg_if.pub_warn("Starting detection process")
     # Make sure our genicam harvesters context is up to date.
     self.genicam_harvester.update()
@@ -262,16 +266,21 @@ class GenicamCamDiscovery:
     return success
 
   def stopAndPurgeDeviceNode(self, node_namespace = 'All'):
-    self.msg_if.pub_info("stopping " + node_namespace)
-    for i, device in enumerate(self.deviceList):
-      if device['node_namespace'] == node_namespace or node_namespace == 'All':
-        node_name = device['node_namespace'].split("/")[-1]
-        sub_process = device['node_subprocess']
-        success = nepi_drvs.killDriverNode(node_name,sub_process)
-        # And remove it from the list
-        self.deviceList.pop(i)  
-    if success == False:
-      self.msg_if.pub_warn("Unable to stop unknown node " + node_namespace)
+      if node_namespace == 'All':
+        self.check_for_devices = False
+      for i, device in enumerate(self.deviceList):
+        if device['node_namespace'] == node_namespace or node_namespace == 'All':
+          node_name = device['node_namespace'].split("/")[-1]
+          sub_process = device['node_subprocess']
+          self.msg_if.pub_info("Killing device node: " + node_namespace)
+          success = nepi_drvs.killDriverNode(node_name,sub_process)
+          if success == False:
+            self.msg_if.pub_warn("Unable to kill device node " + node_name)
+          else:
+            self.msg_if.pub_warn("Node killed. Removed device from active list " + node_name)
+
+      self.deviceList = []
+      self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
 
   def deviceNodeIsRunning(self, node_namespace):
     for device in self.deviceList:
