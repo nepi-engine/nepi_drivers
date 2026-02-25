@@ -382,7 +382,18 @@ class V4l2CamNode:
                                 except Exception as e:
                                     self.msg_if.pub_warn("Framerate setting: " + data + " could not be parsed to float " + str(e))
 
-
+                            ## Force updates for remaining settings
+                            cur_settings = self.getSettings()
+                            for setting_name in cur_settings.keys():
+                                    try:
+                                        if setting_name != "resolution" and setting_name != "framerate":
+                                            setting = cur_settings[setting_name]
+                                            [setting_name, setting_type, data] = nepi_settings.get_data_from_setting(setting)
+                                            success, msg = self.driver.setCameraControl(setting_name,setting_data)
+                                            if success:
+                                                msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
+                                    except Exception as e:
+                                        pass
 
 
                         except Exception as e:
