@@ -82,6 +82,7 @@ class V4l2CamNode:
 
     max_framerate = 100
 
+    last_brightness_setting = 50
 
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
@@ -346,24 +347,35 @@ class V4l2CamNode:
         setting['name'] = 'framerate'
         settings['framerate'] = setting
         self.current_fps = framerate
+
+        if 'brightness' in settings.keys():
+            self.last_brightness_setting = int(settings['brightness']['value'])
         return settings
 
 
 
     def settingUpdateFunction(self,setting):
+        cur_settings = self.getSettings()
+        skip_brightness = False
+        # if 'exposure_auto' in cur_settings.keys():
+        #     skip_brightness = cur_settings['exposure_auto'] = 'Manual Mode:1'
         success = False
         setting_str = str(setting)
+        
         [setting_name, setting_type, data] = nepi_settings.get_data_from_setting(setting)
+        msg = ''
         if data is not None:
+            self.msg_if.pub_warn("Update Setting:" + setting_str + " with value: " + str(data))
             setting_data = data
             found_setting = False
             for cap_setting in self.cap_settings.keys():
                 if setting_name in cap_setting:
                     found_setting = True
                     if setting_name != "resolution" and setting_name != "framerate":
-                        success, msg = self.driver.setCameraControl(setting_name,setting_data)
-                        if success:
-                            msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
+                        if setting_name == 'brightness' and skip_brightness == False:
+                            success, msg = self.driver.setCameraControl(setting_name,setting_data)
+                            if success:
+                                msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
                     elif setting_name == "resolution":
                         data = data.split(":")
                         try:
@@ -372,30 +384,38 @@ class V4l2CamNode:
                             height = int(data[1])
                             res_dict = {'width': width, 'height': height}
                             success, msg = self.driver.setResolution(res_dict)
-                            # reset framerate if needed
-                            if 'framerate' in self.cap_settings.keys():
-                                nepi_sdk.sleep(1)
-                                try:
-                                    framerate = float(framerate)
-                                    success, msg = self.driver.setFramerate(framerate)
-                                    self.msg_if.pub_warn("Updated Framerate: " + str(framerate))
-                                except Exception as e:
-                                    self.msg_if.pub_warn("Framerate setting: " + data + " could not be parsed to float " + str(e))
-
-                            ## Force updates for remaining settings
-                            cur_settings = self.getSettings()
-                            for setting_name in cur_settings.keys():
+                            if success:
+                                # reset framerate if needed
+                                if 'framerate' in self.cap_settings.keys():
+                                    nepi_sdk.sleep(1)
                                     try:
-                                        if setting_name != "resolution" and setting_name != "framerate":
-                                            setting = cur_settings[setting_name]
-                                            [setting_name, setting_type, data] = nepi_settings.get_data_from_setting(setting)
-                                            success, msg = self.driver.setCameraControl(setting_name,setting_data)
-                                            if success:
-                                                msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
+                                        framerate = float(framerate)
+                                        ret = self.driver.setFramerate(framerate)
+                                        if ret[0]:
+                                            self.msg_if.pub_warn("Updated framerate: " + str(framerate) )
+                                        else:
+                                            self.msg_if.pub_warn("Failed to update framerate: " + str(framerate) + " : " + ret[1])
                                     except Exception as e:
-                                        pass
+                                        self.msg_if.pub_warn("Failed to update Framerate setting to: " + str(framerate) + " : " + str(e))
 
+                                # ## Force updates for remaining settings
+                                # cur_settings = self.getSettings()
+                                # for setting_name in cur_settings.keys():
+                                        
+                                #         setting = cur_settings[setting_name]
+                                #         setting_str = str(setting)
+                                #         try:
+                                #             if setting_name != "resolution" and setting_name != "framerate":
+                                #                 nepi_sdk.sleep(1)
 
+                                #                 [setting_name, setting_type, data] = nepi_settings.get_data_from_setting(setting)
+                                #                 ret = self.driver.setCameraControl(setting_name,data)
+                                #                 if ret[0]:
+                                #                     self.msg_if.pub_warn("Updated setting: " + setting_name + " : "  + str(data) )
+                                #                 else:
+                                #                     self.msg_if.pub_warn("Failed to update setting: " + setting_name + " : "  + setting_str  + " : "  + str(data) + " : " + ret[1])
+                                #         except Exception as e:
+                                #             self.msg_if.pub_warn("Failed to update setting: " + setting_name + " : "  + setting_str  + " : "  + str(data) + " : " + str(e))
                         except Exception as e:
                             self.msg_if.pub_info("Resoluton setting: " + data + " could not be parsed to float " + str(e))                            
                         break     
@@ -481,12 +501,15 @@ class V4l2CamNode:
 
         #need_data = True
         # Get and Process Data if Needed
+        msg = ''
         if need_data == False:
           return False, "Waiting for Timer", None, None, None  # Return None data
         else:
             self.cl_img_last_time = current_time
 
             encoding = "bgr8"
+
+
             self.img_lock.acquire()
             # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
             ret, msg = self.driver.startImageAcquisition()
@@ -496,6 +519,7 @@ class V4l2CamNode:
             self.color_image_acquisition_running = True
             timestamp = None
             start = time.time()
+
             cv2_img, timestamp, ret, msg = self.driver.getImage()
             stop = time.time()
             #print('GI: ', stop - start)

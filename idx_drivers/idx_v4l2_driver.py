@@ -395,15 +395,10 @@ class V4l2CamDriver(object):
     status, available_framerates = self.getCurrentResolutionAvailableFramerates()
     if status is False:
       return False, "Failed to query current available framerates"
-    
-    framerate_valid = False
-    for r in available_framerates:
-      if max_fps == r:
-        framerate_valid = True
-        break
-
-    if not framerate_valid:
-      return False, "Invalid framerate requested"
+    # print(available_framerates)
+    # print(max_fps)
+    if max_fps < min(available_framerates):
+      max_fps = min(available_framerates)
     
     status, curr_fps = self.getFramerate()
     if status is False:
