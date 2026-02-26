@@ -55,15 +55,46 @@ class V4L2CamDiscovery:
     self.msg_if = MsgIF(log_name = self.class_name)
     self.msg_if.pub_info("Starting Node Initialization Processes")
 
+
+    ########################
+    # Update discovery options
+    success = self.updateDiscoveryOptions()
+    if success == False:
+        nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
+        return
+    
+
+    ########################
+
+    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
+    nepi_sdk.on_shutdown(self.cleanup_actions)
+    # Now start the node
+    self.msg_if.pub_info("Initialization Complete")
+    nepi_sdk.spin()
+
+  #**********************
+  # Discovery functions
+
+
+  def updateDriverDictCb(self,timer):
+    updated = self.updateDiscoveryOptions()
+    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+
+
+
+
+  def updateDiscoveryOptions(self):
     ########################
     # Get discovery options
+    success = False
     try:
       self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
       self.msg_if.pub_warn("Initial Driver Dict: " + str(self.drv_dict))
+      success = True
     except Exception as e:
       self.msg_if.pub_warn("Failed to load drv_dict " + str(e))#
-      nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
-      return
+      return success
     
     if 'DISCOVERY_DICT' not in self.drv_dict.keys():
       self.msg_if.pub_warn("Failed to load discovery dict ")#
@@ -79,18 +110,7 @@ class V4L2CamDiscovery:
       self.launch_delay_sec = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['launch_delay_sec']['value']
     else:
       self.launch_delay_sec = self.NODE_LAUNCH_DELAY_SEC
-    
-
-    ########################
-
-    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
-    nepi_sdk.on_shutdown(self.cleanup_actions)
-    # Now start the node
-    self.msg_if.pub_info("Initialization Complete")
-    nepi_sdk.spin()
-
-  #**********************
-  # Discovery functions
+    return success
 
   def detectAndManageDevices(self, timer): # Extra arg since this is a Timer callback
     if self.check_for_devices == False:

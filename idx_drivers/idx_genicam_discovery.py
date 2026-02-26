@@ -70,19 +70,11 @@ class GenicamCamDiscovery:
 
 
     ########################
-    # Get discovery options
-    try:
-      self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
-      self.msg_if.pub_info("Initial Driver Dict: " + str(self.drv_dict))
-    except Exception as e:
-      self.msg_if.pub_warn("Failed to load options " + str(e))#
-      nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
-      return
-
-    if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
-      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
-    else:
-      self.retry = True
+    # Update discovery options
+    success = self.updateDiscoveryOptions()
+    if success == False:
+        nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
+        return
     ########################
 
     self.genicam_harvester = Harvester()
@@ -92,13 +84,41 @@ class GenicamCamDiscovery:
 
 
     nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
     nepi_sdk.on_shutdown(self.cleanup_actions)
-
+    # Now start the node
     self.msg_if.pub_info("Initialization Complete")
     nepi_sdk.spin()
 
   #**********************
   # Discovery functions
+
+
+  def updateDriverDictCb(self,timer):
+    updated = self.updateDiscoveryOptions()
+    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+
+
+
+  def updateDiscoveryOptions(self):
+    ########################
+    # Get discovery options
+    success = False
+    try:
+      self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
+      self.msg_if.pub_info("Initial Driver Dict: " + str(self.drv_dict))
+      success = True
+    except Exception as e:
+      self.msg_if.pub_warn("Failed to load options " + str(e))#
+      return success
+
+    if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
+      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
+    else:
+      self.retry = True
+    return success
+
+
 
   def detectAndManageDevices(self, timer):
     if self.check_for_devices == False:

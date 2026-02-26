@@ -67,28 +67,57 @@ class ZedCamDiscovery:
     self.msg_if.pub_info("Starting Node Initialization Processes")
 
     ########################
+    # Update discovery options
+    success = self.updateDiscoveryOptions()
+    if success == False:
+        nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
+        return
+    
+
+    ########################
+
+    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
+    nepi_sdk.on_shutdown(self.cleanup_actions)
+    # Now start the node
+    self.msg_if.pub_info("Initialization Complete")
+    nepi_sdk.spin()
+
+  #**********************
+  # Discovery functions
+
+
+  def updateDriverDictCb(self,timer):
+    updated = self.updateDiscoveryOptions()
+    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+
+
+  def updateDiscoveryOptions(self):
+    ########################
     # Get discovery options
+    success = False
     try:
       self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
       self.msg_if.pub_warn("Initial Driver Dict: " + str(self.drv_dict))
       resolution = self.DEFAULT_RES
-      if 'resolution' in self.drv_dict['DISCOVERY_DICT']['OPTIONS']:
-        resolution = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['resolution']['value']
-        if resolution in self.RES_OPTIONS:
-          self.resolution = resolution
-      if 'framerate' in self.drv_dict['DISCOVERY_DICT']['OPTIONS']:
-        fr_str = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['framerate']['value']
-        fr_val=int(fr_str)
-        if fr_val < 1:
-          fr_val = 1
-        if fr_val > self.MAX_FRAMERATE:
-          fr_val = self.MAX_FRAMERATE
-        self.fr_val = fr_val
-
+      success = True
     except Exception as e:
       self.msg_if.pub_warn("Failed to load options " + str(e))#
-      nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
-      return None
+      return success
+    
+    if 'resolution' in self.drv_dict['DISCOVERY_DICT']['OPTIONS']:
+      resolution = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['resolution']['value']
+      if resolution in self.RES_OPTIONS:
+        self.resolution = resolution
+    if 'framerate' in self.drv_dict['DISCOVERY_DICT']['OPTIONS']:
+      fr_str = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['framerate']['value']
+      fr_val=int(fr_str)
+      if fr_val < 1:
+        fr_val = 1
+      if fr_val > self.MAX_FRAMERATE:
+        fr_val = self.MAX_FRAMERATE
+      self.fr_val = fr_val
+    
     if 'data_products' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
       data_products = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['data_products']['value'].split(',')
     else:
@@ -98,17 +127,8 @@ class ZedCamDiscovery:
       self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
     else:
       self.retry = True
-    ########################
-
-    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
-    nepi_sdk.on_shutdown(self.cleanup_actions)
-
-    self.msg_if.pub_info("Initialization Complete")
-    nepi_sdk.spin()
-
-  #**********************
-  # Discovery functions
-
+    return success
+  
 
   def detectAndManageDevices(self, timer): # Extra arg since this is a Timer callback
     if self.check_for_devices == False:
