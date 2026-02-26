@@ -392,24 +392,24 @@ class V4l2CamNode:
                                     try:
                                         framerate = float(framerate)
                                         ret = self.driver.setFramerate(framerate)
-                                        if ret[0]:
-                                            self.msg_if.pub_warn("Updated framerate: " + str(framerate) )
-                                        else:
-                                            self.msg_if.pub_warn("Failed to update framerate: " + str(framerate) + " : " + ret[1])
+                                        # if ret[0]:
+                                        #     self.msg_if.pub_warn("Updated framerate: " + str(framerate) )
+                                        # else:
+                                        #     self.msg_if.pub_warn("Failed to update framerate: " + str(framerate) + " : " + ret[1])
                                     except Exception as e:
                                         self.msg_if.pub_warn("Failed to update Framerate setting to: " + str(framerate) + " : " + str(e))
 
-                                if 'brightness' in self.cap_settings.keys():
-                                    nepi_sdk.sleep(1)
-                                    try:
-                                        brightness = int(brightness)
-                                        ret = self.driver.setCameraControl('brightness', brightness)
-                                        if ret[0]:
-                                            self.msg_if.pub_warn("Updated brightness: " + str(brightness) )
-                                        else:
-                                            self.msg_if.pub_warn("Failed to update brightness: " + str(brightness) + " : " + ret[1])
-                                    except Exception as e:
-                                        self.msg_if.pub_warn("Failed to update Framerate setting to: " + str(brightness) + " : " + str(e))
+                                # if 'brightness' in self.cap_settings.keys():
+                                #     nepi_sdk.sleep(1)
+                                #     try:
+                                #         brightness = int(brightness)
+                                #         ret = self.driver.setCameraControl('brightness', brightness)
+                                #         # if ret[0]:
+                                #         #     self.msg_if.pub_warn("Updated brightness: " + str(brightness) )
+                                #         # else:
+                                #         #     self.msg_if.pub_warn("Failed to update brightness: " + str(brightness) + " : " + ret[1])
+                                #     except Exception as e:
+                                #         self.msg_if.pub_warn("Failed to update Framerate setting to: " + str(brightness) + " : " + str(e))
 
              
 
