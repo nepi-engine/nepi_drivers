@@ -62,6 +62,7 @@ class V4L2CamDiscovery:
     if success == False:
         nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
         return
+    self.msg_if.pub_warn("Initial Driver Dict: " + str(self.drv_dict))
     
 
     ########################
@@ -80,7 +81,7 @@ class V4L2CamDiscovery:
   def updateDriverDictCb(self,timer):
     updated = self.updateDiscoveryOptions()
     nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
-
+  
 
 
 
@@ -88,18 +89,14 @@ class V4L2CamDiscovery:
     ########################
     # Get discovery options
     success = False
-    try:
-      self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
-      self.msg_if.pub_warn("Initial Driver Dict: " + str(self.drv_dict))
-      success = True
-    except Exception as e:
-      self.msg_if.pub_warn("Failed to load drv_dict " + str(e))#
-      return success
-    
+    self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
+    if len(list(self.drv_dict.keys())) == 0:
+      self.msg_if.pub_warn("Failed to load Driver dict " + str(e))#
+      return success    
     if 'DISCOVERY_DICT' not in self.drv_dict.keys():
-      self.msg_if.pub_warn("Failed to load discovery dict ")#
-      nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Discovery Dict")
-      return
+      self.msg_if.pub_warn("Discovery dict missing in Drvier dict discovery dict ")#
+      return success
+    success = True
 
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
       self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
@@ -112,7 +109,10 @@ class V4L2CamDiscovery:
       self.launch_delay_sec = self.NODE_LAUNCH_DELAY_SEC
     return success
 
+
+
   def detectAndManageDevices(self, timer): # Extra arg since this is a Timer callback
+    check_delay_sec = self.CHECK_INTERVAL_S
     if self.check_for_devices == False:
       self.msg_if.pub_warn("Stopping device discovery process") 
       return
@@ -201,6 +201,7 @@ class V4L2CamDiscovery:
               success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
               if success:
                 self.msg_if.pub_info("Started new node for path: " + path_str)
+                check_delay_sec = self.launch_delay_sec
               else:
                 pass
                 #self.msg_if.pub_info("Failed to start new node for path: " + path_str)
@@ -221,10 +222,8 @@ class V4L2CamDiscovery:
         if launch_id in self.dont_retry_list:
           self.dont_retry_list.remove(launch_id)
 
-    launch_delay_sec = self.CHECK_INTERVAL_S
-    if success == True:
-      launch_delay_sec = self.launch_delay_sec
-    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+        
+    nepi_sdk.start_timer_process(check_delay_sec, self.detectAndManageDevices, oneshot = True)
 
   def startDeviceNode(self, dtype, path_str, bus):
     success = False 

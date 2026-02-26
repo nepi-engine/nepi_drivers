@@ -72,6 +72,7 @@ class ZedCamDiscovery:
     if success == False:
         nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
         return
+    self.msg_if.pub_warn("Initial Driver Dict: " + str(self.drv_dict))
     
 
     ########################
@@ -90,20 +91,25 @@ class ZedCamDiscovery:
   def updateDriverDictCb(self,timer):
     updated = self.updateDiscoveryOptions()
     nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+  
+
 
 
   def updateDiscoveryOptions(self):
     ########################
     # Get discovery options
     success = False
-    try:
-      self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
-      self.msg_if.pub_warn("Initial Driver Dict: " + str(self.drv_dict))
-      resolution = self.DEFAULT_RES
-      success = True
-    except Exception as e:
-      self.msg_if.pub_warn("Failed to load options " + str(e))#
+    self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
+    if len(list(self.drv_dict.keys())) == 0:
+      self.msg_if.pub_warn("Failed to load Driver dict " + str(e))#
+      return success    
+    if 'DISCOVERY_DICT' not in self.drv_dict.keys():
+      self.msg_if.pub_warn("Discovery dict missing in Drvier dict discovery dict ")#
       return success
+    success = True
+    
+    self.msg_if.pub_warn("Initial Driver Dict: " + str(self.drv_dict))
+    success = True
     
     if 'resolution' in self.drv_dict['DISCOVERY_DICT']['OPTIONS']:
       resolution = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['resolution']['value']
