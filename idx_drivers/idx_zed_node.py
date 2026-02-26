@@ -13,6 +13,7 @@ import threading
 import cv2
 import open3d as o3d
 import numpy as np
+import math
 
 
 
@@ -60,24 +61,41 @@ class ZedCamNode(object):
 
 
 
-    CAP_SETTINGS = nepi_settings.NONE_CAP_SETTINGS
-    # CAP_SETTINGS = dict(
-    #   pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","15"]},
-    #   depth_confidence = {"type":"Int","name":"depth_confidence","options":["0","100"]},
-    #   depth_texture_conf = {"type":"Int","name":"depth_texture_conf","options":["0","100"]},
-    #   point_cloud_freq = {"type":"Int","name":"point_cloud_freq","options":["0.1","100"]},
-    #   brightness = {"type":"Int","name":"brightness","options":["0","8"]},
-    #   contrast ={"type":"Int","name":"contrast","options":["0","8"]},
-    #   hue = {"type":"Int","name":"hue","options":["0","11"]},
-    #   saturation ={"type":"Int","name":"saturation","options":["0","8"]},
-    #   sharpness ={"type":"Int","name":"sharpness","options":["0","8"]},
-    #   gamma ={"type":"Int","name":"gamma","options":["1","9"]},
-    #   auto_exposure_gain = {"type":"Bool","name":"auto_exposure_gain"},
-    #   gain = {"type":"Int","name":"gain","options":["0","100"]},
-    #   exposure = {"type":"Int","name":"exposure","options":["0","100"]},
-    #   auto_whitebalance = {"type":"Bool","name":"auto_whitebalance"},
-    #   whitebalance_temperature = {"type":"Int","name":"whitebalance_temperature","options":["1","100"]}
-    # )
+    #CAP_SETTINGS = nepi_settings.NONE_CAP_SETTINGS
+    CAP_SETTINGS = dict(
+      #pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","15"]},
+      #depth_confidence = {"type":"Int","name":"depth_confidence","options":["0","100"]},
+      #depth_texture_conf = {"type":"Int","name":"depth_texture_conf","options":["0","100"]},
+      point_cloud_freq = {"type":"Int","name":"point_cloud_freq","options":["1","10"]},
+      brightness = {"type":"Int","name":"brightness","options":["0","8"]},
+      contrast ={"type":"Int","name":"contrast","options":["0","8"]},
+      hue = {"type":"Int","name":"hue","options":["0","11"]},
+      saturation ={"type":"Int","name":"saturation","options":["0","8"]},
+      sharpness ={"type":"Int","name":"sharpness","options":["0","8"]},
+      gamma ={"type":"Int","name":"gamma","options":["1","9"]},
+      auto_exposure_gain = {"type":"Bool","name":"auto_exposure_gain"},
+      gain = {"type":"Int","name":"gain","options":["0","100"]},
+      exposure = {"type":"Int","name":"exposure","options":["0","100"]},
+      auto_whitebalance = {"type":"Bool","name":"auto_whitebalance"},
+      whitebalance_temperature = {"type":"Int","name":"whitebalance_temperature","options":["2800","6500"]}
+    )
+
+
+    CAP_ZED_DICT = dict(
+      brightness = sl.VIDEO_SETTINGS.BRIGHTNESS,
+      contrast = sl.VIDEO_SETTINGS.CONTRAST,
+      hue = sl.VIDEO_SETTINGS.HUE,
+      saturation = sl.VIDEO_SETTINGS.SATURATION,
+      sharpness = sl.VIDEO_SETTINGS.SHARPNESS,
+      gamma = sl.VIDEO_SETTINGS.GAMMA,
+      gain = sl.VIDEO_SETTINGS.GAIN,
+      exposure = sl.VIDEO_SETTINGS.EXPOSURE,
+      auto_exposure_gain = sl.VIDEO_SETTINGS.AEC_AGC_ROI,
+      whitebalance_temperature = sl.VIDEO_SETTINGS.WHITEBALANCE_TEMPERATURE,
+      auto_whitebalance = sl.VIDEO_SETTINGS.WHITEBALANCE_AUTO
+
+
+    )
 
     FACTORY_SETTINGS_OVERRIDES = dict( )
     
@@ -165,12 +183,17 @@ class ZedCamNode(object):
     data_products = []
 
     max_framerate = 100
+    max_pointcloud_framerate = 1
 
     runtime_parameters = sl.RuntimeParameters()
+    tracking_parameters = sl.PositionalTrackingParameters()
+    zed_pose = sl.Pose()
 
+    cap_settings = CAP_SETTINGS
 
     navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
  
+    nav_published = False
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"         
     drv_dict = dict()                          
@@ -218,7 +241,7 @@ class ZedCamNode(object):
 
         # Create a InitParameters object and set configuration parameters
         init_params = sl.InitParameters()
-
+        init_params.sensors_required = True 
         res_dict = {
             'HD2K': sl.RESOLUTION.HD2K,
             'HD1080': sl.RESOLUTION.HD1080,
@@ -233,6 +256,9 @@ class ZedCamNode(object):
 
         init_params.camera_resolution = resolution #sl.RESOLUTION.AUTO # Use HD720 opr HD1200 video mode, depending on camera type.
         init_params.camera_fps = self.framerate #30  # Set fps at 30
+        # Use a right-handed Y-up coordinate system
+        init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP
+        init_params.coordinate_units = sl.UNIT.METER  # Set units in meters
 
         # Open the camera
         err = self.zed.open(init_params)
@@ -261,7 +287,7 @@ class ZedCamNode(object):
         self.current_fps = self.framerate # Should be updateded when settings read
 
         # Initialize settings
-        self.cap_settings = self.getCapSettings()
+        # self.cap_settings = self.getCapSettings()
         self.factory_settings = self.getFactorySettings()
             
 
@@ -292,7 +318,7 @@ class ZedCamNode(object):
                                     stopDepthMapAcquisition = self.stopDepthMap,
                                     getPointcloud = self.getPointcloud, 
                                     stopPointcloudAcquisition = self.stopPointcloud,                                  
-                                    getNavPoseCb = None, #self.getNavPoseDict, 
+                                    getNavPoseCb = self.getNavPoseDict, 
                                     navpose_update_rate = 10 
                                     )
         self.msg_if.pub_info("... IDX interface running")
@@ -342,7 +368,8 @@ class ZedCamNode(object):
     #**********************
     # Sensor setting functions
     def getCapSettings(self):
-      return self.CAP_SETTINGS
+      setting = getSettings()
+      return self.cap_settings
 
     def getFactorySettings(self):
       settings = self.getSettings()
@@ -356,32 +383,78 @@ class ZedCamNode(object):
 
 
     def getSettings(self):
-      settings = nepi_settings.NONE_SETTINGS
-      # settings = dict()
-      # config_dict = ???????????
-      # if config_dict is not None:
-      #   for setting_name in self.cap_settings.keys():
-      #     cap_setting = self.cap_settings[setting_name]
-      #     setting = dict()
-      #     setting["name"] = cap_setting['name']
-      #     setting["type"] = cap_setting['type']
-      #     if setting_name in config_dict.keys():
-      #       setting["value"] = str(config_dict[setting_name])
-      #       settings[setting_name] = setting
+      #settings = nepi_settings.NONE_SETTINGS
+      purge_settings = []
+      settings = dict()
+      camera_settings = sl.VIDEO_SETTINGS
+      for setting_name in self.cap_settings.keys():
+        cap_setting = self.cap_settings[setting_name]
+        setting = dict()
+        setting["name"] = cap_setting['name']
+        setting["type"] = cap_setting['type']
+        if setting_name in self.CAP_ZED_DICT.keys():
+
+          try:
+            zed_name = setting_name.upper()
+            zed_setting = self.CAP_ZED_DICT[setting_name]
+            value = self.zed.get_camera_settings(zed_setting)[1]
+            if zed_name == "WHITEBALANCE_AUTO":
+              value = value == 1
+            elif zed_name == "AEC_AGC_ROI":
+              value = value == 1 
+            
+            setting["value"] = str(value)
+            settings[setting_name] = setting
+
+          except Exception as e:
+              purge_settings.append(setting_name)
+              self.msg_if.pub_warn("Failed to get setting: " + str(zed_name) + " : " + str(e))
+        elif setting_name == "point_cloud_freq":
+            value = self.max_pointcloud_framerate
+            setting["value"] = str(value)
+            settings[setting_name] = setting
+      for setting_name in purge_settings:
+         del self.cap_settings[setting_name]
+
+      #self.msg_if.pub_warn("got settings: " + str(settings))
+
+      # Get the pose of the left eye of the camera with reference to the world frame
+
+
+
       return settings
 
     def settingUpdateFunction(self,setting):
       success = False
+      msg = ""
       setting_str = str(setting)
       [s_name, s_type, data] = nepi_settings.get_data_from_setting(setting)
       if data is not None:
         setting_name = setting['name']
         setting_data = data
-        config_dict = dict() #????????self.zed_dynamic_reconfig_client.get_configuration()
-        if setting_name in config_dict.keys():
-          #self.zed_dynamic_reconfig_client.update_configuration({setting_name:setting_data})
-          success = True
-          msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
+
+        if setting_name in self.CAP_ZED_DICT.keys():
+          zed_name = setting_name.upper()
+          zed_setting = self.CAP_ZED_DICT[setting_name]  
+          if zed_name == "WHITEBALANCE_AUTO":
+              if data == True:
+                data = 1
+              elif data == False:
+                 data = 0
+          elif zed_name == "AEC_AGC_ROI":
+              if data == True:
+                data = 1
+              elif data == False:
+                 data = 0        
+          try:
+            self.zed.set_camera_settings(zed_setting, data)
+            success = True
+            msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
+
+          except Exception as e:
+            self.msg_if.pub_warn("Failed to set setting: " + str(zed_name) + " : " + str(e))
+        elif setting_name == "point_cloud_freq":
+          success = self.setPointcloudFramerate(data)
         else:
           msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                   
       else:
@@ -394,39 +467,85 @@ class ZedCamNode(object):
 
 
     def getNavPoseDict(self):
-      return self.navpose_dict
+        navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
+        navpose_dict['has_orientation'] = True
+        navpose_dict['time_oreantation'] = nepi_utils.get_time()
 
-    def getOrientationDict(self):
-      return self.orientation_dict
+        rpy = nepi_nav.convert_quat2rpy(self.getOrientation())
+        navpose_dict['roll_deg'] = rpy[0]
+        navpose_dict['pitch_deg'] = rpy[1]
+        navpose_dict['yaw_deg'] = rpy[2]
 
-        
-    # ### Callback to publish RBX odom topic
-    # def odom_topic_callback(self,odom_msg):
-    #     # Convert quaternion to roll,pitch,yaw
-    #     pose = odom_msg.pose.pose.orientation
-    #     xyzw = list([pose.x,pose.y,pose.z,pose.w])
-    #     rpy = nepi_nav.convert_quat2rpy(xyzw)
 
-    #     # Convert position body to position ENU
-    #     body = odom_msg.pose.pose.position
-    #     xyz_body_o = list([body.x, body.y, body.z])
-    #     xyz = nepi_nav.convert_point_body2enu(xyz_body_o,rpy[2])
+        navpose_dict['has_position'] = True
+        navpose_dict['time_position'] = nepi_utils.get_time()
+        # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
+        xyz = self.getPosition()
+        navpose_dict['x_m'] = xyz[0]
+        navpose_dict['y_m'] = xyz[1]
+        navpose_dict['z_m'] = xyz[2]
 
-    #     timestamp = nepi_sdk.sec_from_msg_stamp(odom_msg.header.stamp)
+        # if self.nav_published == False:
+        #    self.msg_if.pub_warn("nav navpose_dict befor: " + str(navpose_dict))
 
-    #     self.navpose_dict['has_orientation']
-    #     self.navpose_dict['time_oreantation'] = timestamp
-    #     # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
-    #     self.navpose_dict['roll_deg'] = rpy[0]
-    #     self.navpose_dict['pitch_deg'] = rpy[1]
-    #     self.navpose_dict['yaw_deg'] = rpy[2]
+        #navpose_dict = nepi_nav.convert_navpose_ned2edu(navpose_dict)
+        # self.msg_if.pub_warn("roll: " + str(navpose_dict['roll_deg']) + " | pitch: " + str(navpose_dict['pitch_deg']) + " | yaw: " + str(navpose_dict['yaw_deg']))
 
-    #     self.navpose_dict['has_position']
-    #     self.navpose_dict['time_position'] = timestamp
-    #     # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
-    #     self.navpose_dict['x_m'] = xyz[0]
-    #     self.navpose_dict['y_m'] = xyz[1]
-    #     self.navpose_dict['z_m'] = xyz[2]
+
+        if self.nav_published == False:
+           self.nav_published = True
+           self.msg_if.pub_warn("nav navpose_dict after: " + str(navpose_dict))
+        return navpose_dict
+    
+    def getOrientation(self):
+      orientation_pose = sl.Pose()
+      if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+
+        # if self.zed.get_sensors_data(sensors_data, sl.TIME_REFERENCE.IMAGE) == sl.ERROR_CODE.SUCCESS:
+        #   imu_pose = sensors_data.get_imu_data().get_pose()
+        #   orientation_quaternion = imu_pose.get_orientation().get() # [Ox, Oy, Oz, Ow]
+
+        #   return orientation_quaternion
+
+          if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+            # Get camera pose
+            self.zed.get_position(orientation_pose, sl.REFERENCE_FRAME.WORLD)
+
+            # Get orientation as a quaternion
+            orientation = orientation_pose.get_orientation()
+            # You can use the quaternion values (orientation.get()[0], etc.)
+            
+            # Get orientation directly as Euler angles (roll, pitch, yaw)
+            # Angles are in radians by default. Use get_roll_pitch_yaw() to get them in a list/vector.
+            roll_pitch_yaw = orientation_pose.get_euler_angles() 
+            roll_deg = round(math.degrees(roll_pitch_yaw[2])*-1, 3)
+            pitch_deg = round(math.degrees(roll_pitch_yaw[0])*-1)
+            yaw_deg = round(math.degrees(roll_pitch_yaw[1])*-1)
+
+            rpy = [roll_deg, pitch_deg, yaw_deg]
+            self.msg_if.pub_warn("roll deg: " + str(roll_deg) + " | pitch deg: " + str(pitch_deg) + " | yaw deg: " + str(yaw_deg))
+            return rpy
+    
+    def getPosition(self):
+      self.msg_if.pub_warn("get pos called")
+
+      err = self.zed.enable_positional_tracking(self.tracking_parameters)
+      position_pose = sl.Pose()
+
+      if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+      # Get the pose of the left eye of the camera with reference to the world frame
+        self.zed.get_position(position_pose, sl.REFERENCE_FRAME.WORLD)
+
+        translation = position_pose.get_translation(sl.Translation())
+
+        tx = round(translation.get()[0], 3)
+        ty = round(translation.get()[1], 3)
+        tz = round(translation.get()[2], 3)
+
+        position = [tx, ty, tz]
+        self.msg_if.pub_warn("x: " + str(tx) + " | y: " + str(ty) + " | z: " + str(tz))
+
+        return position
 
 
     #**********************
@@ -447,6 +566,18 @@ class ZedCamNode(object):
             rate = 100
         self.max_framerate = rate
         #print('Set FR Mode: ' +  str(self.current_controls["max_framerate"]))
+        status = True
+        err_str = ""
+        return status, err_str
+    
+    def setPointcloudFramerate(self, rate):
+        if rate is None:
+            return False, 'Got None Max Framerate'
+        if rate < 1:
+            rate = 1
+        if rate > 10:
+            rate = 10
+        self.max_pointcloud_framerate = rate
         status = True
         err_str = ""
         return status, err_str
@@ -590,7 +721,8 @@ class ZedCamNode(object):
         
         need_data = False
         if last_time != None and self.idx_if is not None:
-          fr_delay = float(1) / self.max_framerate
+          max_framerate = min(self.max_framerate, self.max_pointcloud_framerate)
+          fr_delay = float(1) / max_framerate
           timer = current_time - last_time
           if timer > fr_delay:
             need_data = True
