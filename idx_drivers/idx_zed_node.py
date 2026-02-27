@@ -14,6 +14,7 @@ import cv2
 import open3d as o3d
 import numpy as np
 import math
+import copy
 
 
 
@@ -186,7 +187,6 @@ class ZedCamNode(object):
     max_pointcloud_framerate = 1
 
     runtime_parameters = sl.RuntimeParameters()
-    tracking_parameters = sl.PositionalTrackingParameters()
     zed_pose = sl.Pose()
 
     cap_settings = CAP_SETTINGS
@@ -260,6 +260,8 @@ class ZedCamNode(object):
         init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP
         init_params.coordinate_units = sl.UNIT.METER  # Set units in meters
 
+
+
         # Open the camera
         err = self.zed.open(init_params)
         if err != sl.ERROR_CODE.SUCCESS:
@@ -268,7 +270,11 @@ class ZedCamNode(object):
 
         self.msg_if.pub_info("Zed Camera Connected!")
 
-
+        self.tracking_parameters = sl.PositionalTrackingParameters()
+        err = self.zed.enable_positional_tracking(self.tracking_parameters)
+        if err != sl.ERROR_CODE.SUCCESS:
+            self.msg_if.pub_warn("Positional Tracking enable failed : " + str(err))
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Not Able to Connect to Zed Camera")
 
 
        # Initialize controls
@@ -467,85 +473,88 @@ class ZedCamNode(object):
 
 
     def getNavPoseDict(self):
-        navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
+        
+        success = False
+        navpose_dict = copy.deepcopy(nepi_nav.BLANK_NAVPOSE_DICT)
         navpose_dict['has_orientation'] = True
         navpose_dict['time_oreantation'] = nepi_utils.get_time()
 
-        rpy = nepi_nav.convert_quat2rpy(self.getOrientation())
-        navpose_dict['roll_deg'] = rpy[0]
-        navpose_dict['pitch_deg'] = rpy[1]
-        navpose_dict['yaw_deg'] = rpy[2]
+        rpy = self.getOrientation()
+        if rpy is not None:
+              
+            navpose_dict['roll_deg'] = rpy[0]
+            navpose_dict['pitch_deg'] = rpy[1]
+            navpose_dict['yaw_deg'] = rpy[2]
 
 
-        navpose_dict['has_position'] = True
-        navpose_dict['time_position'] = nepi_utils.get_time()
-        # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
-        xyz = self.getPosition()
-        navpose_dict['x_m'] = xyz[0]
-        navpose_dict['y_m'] = xyz[1]
-        navpose_dict['z_m'] = xyz[2]
 
-        # if self.nav_published == False:
-        #    self.msg_if.pub_warn("nav navpose_dict befor: " + str(navpose_dict))
+            # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
+            xyz = self.getPosition()
+            self.msg_if.pub_warn("p called")
+            if xyz is not None:
+              navpose_dict['x_m'] = xyz[0]
+              navpose_dict['y_m'] = xyz[1]
+              navpose_dict['z_m'] = xyz[2]
+              navpose_dict['has_position'] = True
+              navpose_dict['time_position'] = nepi_utils.get_time()
 
-        #navpose_dict = nepi_nav.convert_navpose_ned2edu(navpose_dict)
-        # self.msg_if.pub_warn("roll: " + str(navpose_dict['roll_deg']) + " | pitch: " + str(navpose_dict['pitch_deg']) + " | yaw: " + str(navpose_dict['yaw_deg']))
+              success = True
+
+              # if self.nav_published == False:
+              #    self.msg_if.pub_warn("nav navpose_dict befor: " + str(navpose_dict))
+
+              #navpose_dict = nepi_nav.convert_navpose_ned2edu(navpose_dict)
+              # self.msg_if.pub_warn("roll: " + str(navpose_dict['roll_deg']) + " | pitch: " + str(navpose_dict['pitch_deg']) + " | yaw: " + str(navpose_dict['yaw_deg']))
 
 
-        if self.nav_published == False:
-           self.nav_published = True
-           self.msg_if.pub_warn("nav navpose_dict after: " + str(navpose_dict))
+              if self.nav_published == False:
+                self.nav_published = True
+                self.msg_if.pub_warn("nav navpose_dict after: " + str(navpose_dict))
+
+        if success == False:
+           navpose_dict = None
         return navpose_dict
     
     def getOrientation(self):
-      orientation_pose = sl.Pose()
-      if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+        rpy = None
+        # return rpy
+        orientation_pose = sl.Pose()
+        if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+            if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+              # Get camera pose
+              self.zed.get_position(orientation_pose, sl.REFERENCE_FRAME.WORLD)
 
-        # if self.zed.get_sensors_data(sensors_data, sl.TIME_REFERENCE.IMAGE) == sl.ERROR_CODE.SUCCESS:
-        #   imu_pose = sensors_data.get_imu_data().get_pose()
-        #   orientation_quaternion = imu_pose.get_orientation().get() # [Ox, Oy, Oz, Ow]
+              # Get orientation as a quaternion
+              orientation = orientation_pose.get_orientation()
+              # You can use the quaternion values (orientation.get()[0], etc.)
+              
+              # Get orientation directly as Euler angles (roll, pitch, yaw)
+              # Angles are in radians by default. Use get_roll_pitch_yaw() to get them in a list/vector.
+              roll_pitch_yaw = orientation_pose.get_euler_angles() 
+              roll_deg = round(math.degrees(roll_pitch_yaw[2])*-1, 3)
+              pitch_deg = round(math.degrees(roll_pitch_yaw[0])*-1)
+              yaw_deg = round(math.degrees(roll_pitch_yaw[1])*-1)
 
-        #   return orientation_quaternion
-
-          if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
-            # Get camera pose
-            self.zed.get_position(orientation_pose, sl.REFERENCE_FRAME.WORLD)
-
-            # Get orientation as a quaternion
-            orientation = orientation_pose.get_orientation()
-            # You can use the quaternion values (orientation.get()[0], etc.)
-            
-            # Get orientation directly as Euler angles (roll, pitch, yaw)
-            # Angles are in radians by default. Use get_roll_pitch_yaw() to get them in a list/vector.
-            roll_pitch_yaw = orientation_pose.get_euler_angles() 
-            roll_deg = round(math.degrees(roll_pitch_yaw[2])*-1, 3)
-            pitch_deg = round(math.degrees(roll_pitch_yaw[0])*-1)
-            yaw_deg = round(math.degrees(roll_pitch_yaw[1])*-1)
-
-            rpy = [roll_deg, pitch_deg, yaw_deg]
-            self.msg_if.pub_warn("roll deg: " + str(roll_deg) + " | pitch deg: " + str(pitch_deg) + " | yaw deg: " + str(yaw_deg))
-            return rpy
+              rpy = [roll_deg, pitch_deg, yaw_deg]
+              #self.msg_if.pub_warn("roll deg: " + str(roll_deg) + " | pitch deg: " + str(pitch_deg) + " | yaw deg: " + str(yaw_deg))
+        return rpy
     
     def getPosition(self):
-      self.msg_if.pub_warn("get pos called")
-
-      err = self.zed.enable_positional_tracking(self.tracking_parameters)
+      position = None
       position_pose = sl.Pose()
 
       if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
-      # Get the pose of the left eye of the camera with reference to the world frame
-        self.zed.get_position(position_pose, sl.REFERENCE_FRAME.WORLD)
-
-        translation = position_pose.get_translation(sl.Translation())
-
-        tx = round(translation.get()[0], 3)
-        ty = round(translation.get()[1], 3)
-        tz = round(translation.get()[2], 3)
+        # Get the pose of the left eye of the camera with reference to the world frame
+        # Get the pose of the camera relative to the world frame
+        state = self.zed.get_position(position_pose, sl.REFERENCE_FRAME.WORLD)
+        # Display translation and timestamp
+        py_translation = sl.Translation()
+        tx = round(position_pose.get_translation(py_translation).get()[0], 3)
+        ty = round(position_pose.get_translation(py_translation).get()[1], 3)
+        tz = round(position_pose.get_translation(py_translation).get()[2], 3)
 
         position = [tx, ty, tz]
-        self.msg_if.pub_warn("x: " + str(tx) + " | y: " + str(ty) + " | z: " + str(tz))
-
-        return position
+      return position
 
 
     #**********************
