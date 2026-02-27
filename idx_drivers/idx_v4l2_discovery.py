@@ -224,7 +224,7 @@ class V4L2CamDiscovery:
               
               # Only start one device per check 
               if success == False:
-                self.msg_if.pub_info("Found new device on path: " + path_str)
+                #self.msg_if.pub_info("Found new device on path: " + path_str)
                 # Restart Device
                 success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
                 if success == True:
