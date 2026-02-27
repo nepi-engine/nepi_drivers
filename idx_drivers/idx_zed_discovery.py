@@ -72,33 +72,33 @@ class ZedCamDiscovery:
     if success == False:
         nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
         return
-    self.msg_if.pub_warn("Initial Driver Dict: " + str(self.drv_dict))
     
-
     ########################
-
+    # Start node processes
     nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
     nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
     nepi_sdk.on_shutdown(self.cleanup_actions)
+
+    ########################
     # Now start the node
     self.msg_if.pub_info("Initialization Complete")
     nepi_sdk.spin()
 
+
+
   #**********************
   # Discovery functions
-
+  #**********************
 
   def updateDriverDictCb(self,timer):
     updated = self.updateDiscoveryOptions()
-    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
-  
-
-
+    nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
 
   def updateDiscoveryOptions(self):
     ########################
     # Get discovery options
     success = False
+    last_drv_dict = copy.deepcopy(self.drv_dict)
     self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
     if len(list(self.drv_dict.keys())) == 0:
       self.msg_if.pub_warn("Failed to load Driver dict " + str(e))#
@@ -106,9 +106,8 @@ class ZedCamDiscovery:
     if 'DISCOVERY_DICT' not in self.drv_dict.keys():
       self.msg_if.pub_warn("Discovery dict missing in Drvier dict discovery dict ")#
       return success
-    success = True
-    
-    self.msg_if.pub_warn("Initial Driver Dict: " + str(self.drv_dict))
+    if last_drv_dict != self.drv_dict:
+      self.msg_if.pub_warn("Updated Driver Dict: " + str(self.drv_dict))
     success = True
     
     if 'resolution' in self.drv_dict['DISCOVERY_DICT']['OPTIONS']:

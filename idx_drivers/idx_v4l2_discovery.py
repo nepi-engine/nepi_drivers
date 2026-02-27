@@ -65,27 +65,27 @@ class V4L2CamDiscovery:
         nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
         return
     
-    
-
     ########################
-
+    # Start node processes
     nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
     nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
     nepi_sdk.on_shutdown(self.cleanup_actions)
+
+    ########################
     # Now start the node
     self.msg_if.pub_info("Initialization Complete")
     nepi_sdk.spin()
 
+
+
+
   #**********************
   # Discovery functions
-
+  #**********************
 
   def updateDriverDictCb(self,timer):
     updated = self.updateDiscoveryOptions()
     nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
-  
-
-
 
   def updateDiscoveryOptions(self):
     ########################
