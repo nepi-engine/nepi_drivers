@@ -258,7 +258,7 @@ class ZedCamNode(object):
         init_params.camera_fps = self.framerate #30  # Set fps at 30
         # Use a right-handed Y-up coordinate system
         init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP
-        init_params.coordinate_units = sl.UNIT.METER  # Set units in meters
+        init_params.coordinate_units = sl.UNIT.MILLIMETER  # Set units in meters
 
 
 
@@ -495,9 +495,9 @@ class ZedCamNode(object):
             xyz = self.getPosition()
             self.msg_if.pub_warn("p called")
             if xyz is not None:
-              navpose_dict['x_m'] = xyz[0]
-              navpose_dict['y_m'] = xyz[1]
-              navpose_dict['z_m'] = xyz[2]
+              navpose_dict['x_m'] = xyz[0] * 1000
+              navpose_dict['y_m'] = xyz[1] * 1000
+              navpose_dict['z_m'] = xyz[2] * 1000
               navpose_dict['has_position'] = True
               navpose_dict['time_position'] = nepi_utils.get_time()
 
