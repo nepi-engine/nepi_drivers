@@ -120,8 +120,9 @@ class ZedCamNode(object):
     ZED_HEIGHT_DEG_OVERRIDES = { 'zed':  70, 'zedm': 70, 'zed2': 70, 'zedx': 80} 
 
     zed = None
-
     zed_type = 'zed'
+    runtime_parameters = None
+    zed_pose = None
 
     # Create shared class variables and thread locks 
     
@@ -186,9 +187,6 @@ class ZedCamNode(object):
     max_framerate = 100
     max_pointcloud_framerate = 1
 
-    runtime_parameters = sl.RuntimeParameters()
-    zed_pose = sl.Pose()
-
     cap_settings = CAP_SETTINGS
 
     navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
@@ -249,6 +247,8 @@ class ZedCamNode(object):
             'VGA': sl.RESOLUTION.VGA
         }
 
+
+
         if self.resolution in res_dict.keys():
            resolution = res_dict[self.resolution]
         else:
@@ -275,6 +275,9 @@ class ZedCamNode(object):
         if err != sl.ERROR_CODE.SUCCESS:
             self.msg_if.pub_warn("Positional Tracking enable failed : " + str(err))
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Not Able to Connect to Zed Camera")
+
+        self.runtime_parameters = sl.RuntimeParameters()
+        self.zed_pose = sl.Pose()
 
 
        # Initialize controls
