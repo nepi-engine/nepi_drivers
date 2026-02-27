@@ -9,6 +9,7 @@
 import os
 import subprocess
 import time
+import copy
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
@@ -32,6 +33,7 @@ class V4L2CamDiscovery:
   excludedDevices = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X']     
 
   CHECK_INTERVAL_S = 2.0
+
 
   launch_delay_sec = NODE_LAUNCH_DELAY_SEC
 
@@ -62,7 +64,7 @@ class V4L2CamDiscovery:
     if success == False:
         nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
         return
-    self.msg_if.pub_warn("Initial Driver Dict: " + str(self.drv_dict))
+    
     
 
     ########################
@@ -80,7 +82,7 @@ class V4L2CamDiscovery:
 
   def updateDriverDictCb(self,timer):
     updated = self.updateDiscoveryOptions()
-    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
   
 
 
@@ -89,6 +91,7 @@ class V4L2CamDiscovery:
     ########################
     # Get discovery options
     success = False
+    last_drv_dict = copy.deepcopy(self.drv_dict)
     self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
     if len(list(self.drv_dict.keys())) == 0:
       self.msg_if.pub_warn("Failed to load Driver dict " + str(e))#
@@ -96,27 +99,36 @@ class V4L2CamDiscovery:
     if 'DISCOVERY_DICT' not in self.drv_dict.keys():
       self.msg_if.pub_warn("Discovery dict missing in Drvier dict discovery dict ")#
       return success
+    if last_drv_dict != self.drv_dict:
+      self.msg_if.pub_warn("Updated Driver Dict: " + str(self.drv_dict))
     success = True
+
 
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
       self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
     else:
       self.retry = True
 
+
+    launch_delay_sec = self.NODE_LAUNCH_DELAY_SEC
     if 'launch_delay_sec' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
-      self.launch_delay_sec = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['launch_delay_sec']['value']
-    else:
-      self.launch_delay_sec = self.NODE_LAUNCH_DELAY_SEC
+      delay_str = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['launch_delay_sec']['value']
+      try:
+        delay_sec = float(delay_str)
+        launch_delay_sec = delay_sec
+      except:
+        pass
+    self.launch_delay_sec = launch_delay_sec
+      
     return success
 
 
 
   def detectAndManageDevices(self, timer): # Extra arg since this is a Timer callback
-    check_delay_sec = self.CHECK_INTERVAL_S
+    success = False
     if self.check_for_devices == False:
       self.msg_if.pub_warn("Stopping device discovery process") 
       return
-    success = False
     # First grab the current list of known V4L2 devices
     sub_process = subprocess.Popen(['v4l2-ctl', '--list-devices'],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -165,22 +177,27 @@ class V4L2CamDiscovery:
             active_paths.append(path_str) # To check later that the device list has no entries for paths that have disappeared
             known_device = False
             for device in self.deviceList:
+              ####################
+              ## Check on known devices using this path
+              ####################
               if device['device_path'] == path_str:
                 known_device = True
+                ####################
+                # Check if device type has changed
                 if device['device_type'] != device_type:
                   # Uh oh -- device has switched on us!
                   # Kill previous and start new?
                   self.msg_if.pub_warn("detected V4L2 device type change (" + device['device_type'] + "-->" + 
                                 device_type + ") for device at " + path_str)
                   self.stopAndPurgeDeviceNode(device['node_namespace'])
-
                   # Remove from dont_retry_list
                   launch_id = path_str
                   if launch_id in self.dont_retry_list:
                     self.dont_retry_list.remove(launch_id)
 
-                break
-            
+              ####################
+              # Check if running devices still running
+              ####################
               elif not self.deviceNodeIsRunning(device['node_namespace']):
                   self.stopAndPurgeDeviceNode(device['node_namespace'])
                 
@@ -191,22 +208,34 @@ class V4L2CamDiscovery:
                   else:
                     self.msg_if.pub_warn("node " + device['node_name'] + " is not running. RESTARTING")
 
-                  time.sleep(1)
+                    # Only start one device per check 
+                    if success == False:
+                      # Restart Device
+                      success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
+                      if success == True:
+                        self.msg_if.pub_warn("Started new node on: " + path_str)
 
-                  success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
-              break
-        
+
+            ####################
+            ## Start device on this path if not known
+            ####################        
             if known_device == False:
-              #self.msg_if.pub_info("Found new V4L2 device on path: " + path_str)
-              success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
-              if success:
-                self.msg_if.pub_info("Started new node for path: " + path_str)
-                check_delay_sec = self.launch_delay_sec
+              
+              # Only start one device per check 
+              if success == False:
+                self.msg_if.pub_info("Found new device on path: " + path_str)
+                # Restart Device
+                success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
+                if success == True:
+                  self.msg_if.pub_warn("Started new node on: " + path_str)
+                
               else:
                 pass
                 #self.msg_if.pub_info("Failed to start new node for path: " + path_str)
-
-    # Check that device path still active
+            
+    ######################
+    # Check that device paths are still active
+    ######################
     #self.msg_if.pub_warn("Active paths " + str(active_paths))
     purge_list = []
     for device in self.deviceList:
@@ -220,10 +249,17 @@ class V4L2CamDiscovery:
         # Remove from dont_retry_list
         launch_id = path_str
         if launch_id in self.dont_retry_list:
-          self.dont_retry_list.remove(launch_id)
+          self.dont_retry_list.remove(launch_id)      
 
-        
-    nepi_sdk.start_timer_process(check_delay_sec, self.detectAndManageDevices, oneshot = True)
+    #########################
+    # Setup next check process
+    if success == True:
+      self.msg_if.pub_warn("Delaying next check for " + str(self.launch_delay_sec) + " seconds")
+      nepi_sdk.sleep(self.launch_delay_sec)
+
+    nepi_sdk.start_timer_process(self.CHECK_INTERVAL_S, self.detectAndManageDevices, oneshot = True)
+
+
 
   def startDeviceNode(self, dtype, path_str, bus):
     success = False 
@@ -307,7 +343,6 @@ class V4L2CamDiscovery:
                 self.dont_retry_list.append(launch_id)
               else:
                 self.msg_if.pub_info(" Will attemp relaunch for node: " + node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
-
     return success
 
   def stopAndPurgeDeviceNode(self, node_namespace = 'All'):
