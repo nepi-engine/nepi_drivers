@@ -324,7 +324,7 @@ class ZedCamNode(object):
                                     stopDepthMapAcquisition = self.stopDepthMap,
                                     getPointcloud = self.getPointcloud, 
                                     stopPointcloudAcquisition = self.stopPointcloud,                                  
-                                    getNavPoseCb = self.getNavPoseDict, 
+                                    getNavPoseCb = None, #self.getNavPoseDict, 
                                     navpose_update_rate = 10 
                                     )
         self.msg_if.pub_info("... IDX interface running")

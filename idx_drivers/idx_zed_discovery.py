@@ -10,6 +10,7 @@ import os
 import rospy
 import subprocess
 import time
+import copy
 
 
 from nepi_sdk import nepi_sdk
@@ -25,33 +26,33 @@ FILE_TYPE = 'DISCOVERY'
 
 class ZedCamDiscovery:
 
+  RES_OPTIONS = ['HD2K','HD1080','HD720','VGA']
+  DEFAULT_RES = 'HD720'
+  MAX_FRAMERATE = 15
+
   NODE_LOAD_TIME_SEC = 10
+
+  CHECK_INTERVAL_S = 3.0
+
+  INCLUDE_DEVICES = ['ZED 2','ZED 2i','ZED-M','ZED-X'] 
+  EXCLUDE_DEVICES = []         
+
+  settings_if = None
+
   launch_time_dict = dict()
   retry = True
   dont_retry_list = []
-
-  MAX_FRAMERATE = 15
-  
-  settings_if = None
-
-  CHECK_INTERVAL_S = 3.0
-  DEVICE_DICT = dict()
-  ################################################
-  DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"                                   
-  deviceList = []       
-
-       
-  RES_OPTIONS = ['HD2K','HD1080','HD720','VGA']
-  DEFAULT_RES = 'HD720'
-
-
-  includeDevices = ['ZED 2','ZED 2i','ZED-M']
-  excludedDevices = []         
-
-  retry = True
   failed_node_list = []
 
   check_for_devices = True
+
+  drv_dict = dict()                        
+
+  device_dict = dict()
+  deviceList = []      
+
+  ################################################
+  DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
 
   def __init__(self):
     ####  NODE Initialization ####
@@ -161,7 +162,7 @@ class ZedCamDiscovery:
       # Honor the inclusion list
       if line.startswith('/dev/video'):
         path_str = line
-        if device_type in self.includeDevices:
+        if device_type in self.INCLUDE_DEVICES:
           # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
           is_video_cap_device = False
           sub_process = subprocess.Popen(['v4l2-ctl', '-d', path_str, '--all'],
@@ -185,8 +186,8 @@ class ZedCamDiscovery:
             active_paths.append(path_str) # To check later that the device list has no entries for paths that have disappeared
             known_device = False
             # Check if this device is already known and launched
-            for path in self.DEVICE_DICT.keys():
-              device = self.DEVICE_DICT[path]
+            for path in self.device_dict.keys():
+              device = self.device_dict[path]
               if device['device_path'] == path_str:
                 known_device = True
                 # if device['device_type'] != device_type:
@@ -230,11 +231,11 @@ class ZedCamDiscovery:
     # Check that device path still active
     #self.msg_if.pub_warn("Active paths " + str(active_paths))
     purge_list = []
-    for path_str in self.DEVICE_DICT.keys():
+    for path_str in self.device_dict.keys():
       if path_str not in active_paths:
         purge_list.append(path_str)
     for path_str in purge_list:
-        device_dict = self.DEVICE_DICT[path_str]
+        device_dict = self.device_dict[path_str]
         node_name = device_dict['node_namespace']
         self.msg_if.pub_info("Device path: " + path_str + " no longer present. Stopping node " + node_name)
         self.stopAndPurgeDeviceNode(node_name)  
@@ -263,12 +264,12 @@ class ZedCamDiscovery:
     ### Start Node Luanch Process
     # First, get a unique name
     if dtype is not None:
-      if dtype in self.includeDevices:
+      if dtype in self.INCLUDE_DEVICES:
         root_name = dtype.replace('-','').replace(' ','').lower() 
 
         same_type_count = 0
-        for path in self.DEVICE_DICT.keys():
-          device = self.DEVICE_DICT[path]
+        for path in self.device_dict.keys():
+          device = self.device_dict[path]
           if device['device_type'] == dtype:
             same_type_count += 1
 
@@ -284,8 +285,8 @@ class ZedCamDiscovery:
 
 
         device_exists = False
-        for path in self.DEVICE_DICT.keys():
-          device = self.DEVICE_DICT[path]
+        for path in self.device_dict.keys():
+          device = self.device_dict[path]
           if device['node_name'] == node_name:
             device_exists = True
 
@@ -295,7 +296,7 @@ class ZedCamDiscovery:
           # Now start the node via rosrun
           # rosrun nepi_drivers_idx zed_camera_node.py __name:=usb_cam_1 _path_str:=/dev/video0
           self.msg_if.pub_info("Launching node " + node_name)
-          if dtype in self.includeDevices:
+          if dtype in self.INCLUDE_DEVICES:
 
             # Try and load saved node params if file exists
             nepi_sdk.load_node_config(device_node_name, node_name)
@@ -308,12 +309,12 @@ class ZedCamDiscovery:
 
             file_name = self.drv_dict['NODE_DICT']['file_name']
             #Try and launch node
-            self.DEVICE_DICT[path_str] = {'device_class': root_name, 'device_path': path_str, 'device_type': dtype, 
+            self.device_dict[path_str] = {'device_class': root_name, 'device_path': path_str, 'device_type': dtype, 
                                       'node_name': node_name, 'node_namespace': node_namespace}
             [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, node_name)
             if success:
-              self.DEVICE_DICT[path_str]['node_subprocess'] = sub_process
-              self.DEVICE_DICT[path_str]['zed_type'] = root_name
+              self.device_dict[path_str]['node_subprocess'] = sub_process
+              self.device_dict[path_str]['zed_type'] = root_name
               self.msg_if.pub_info(msg)
 
             # Process luanch results
@@ -335,8 +336,8 @@ class ZedCamDiscovery:
     success = False
     self.msg_if.pub_info("stopping " + node_namespace)
     purge_paths = []
-    for i, path_str in enumerate(self.DEVICE_DICT.keys()):
-      device = self.DEVICE_DICT[path_str]
+    for i, path_str in enumerate(self.device_dict.keys()):
+      device = self.device_dict[path_str]
       if device['node_namespace'] == node_namespace or node_namespace == 'All':
         node_name = device['node_namespace'].split("/")[-1]
         sub_process = device['node_subprocess']
@@ -344,12 +345,12 @@ class ZedCamDiscovery:
         # And remove it from the list
         purge_paths.append(path_str)
     for path_str in purge_paths:
-      del self.DEVICE_DICT[path_str]
+      del self.device_dict[path_str]
 
   
   def deviceNodeIsRunning(self, node_namespace):
-    for i, path_str in enumerate(self.DEVICE_DICT.keys()):
-      device = self.DEVICE_DICT[path_str]
+    for i, path_str in enumerate(self.device_dict.keys()):
+      device = self.device_dict[path_str]
       if device['node_namespace'] == node_namespace:
         if device['node_subprocess'].poll() is not None:
           return False

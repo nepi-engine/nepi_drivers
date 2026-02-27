@@ -12,6 +12,7 @@ import os
 #os.environ["ROS_NAMESPACE"] = NEPI_BASE_NAMESPACE[0:-1]
 import subprocess
 import time
+import copy
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
@@ -30,30 +31,30 @@ FILE_TYPE = 'DISCOVERY'
 
 class GenicamCamDiscovery:
 
+  CHECK_INTERVAL_S = 3.0
+
   NODE_LOAD_TIME_SEC = 10
+
+  DEFAULT_GENTL_PRODUCER_USB =  '/opt/baumer/gentl_producers/libbgapi2_usb.cti.2.14.1'
+  DEFAULT_GENTL_PRODUCER_GIGE = '/opt/baumer/gentl_producers/libbgapi2_gige.cti.2.14.1'
+
   launch_time_dict = dict()
   retry = True
   dont_retry_list = []
   test_val = 2
    
-  includeDevices = []
-  excludedDevices = []     
+  INCLUDE_DEVICES = []
+  EXCLUDE_DEVICES = []     
 
   settings_if = None
 
-  CHECK_INTERVAL_S = 3.0
-
-
-  DEFAULT_GENTL_PRODUCER_USB =  '/opt/baumer/gentl_producers/libbgapi2_usb.cti.2.14.1'
-  DEFAULT_GENTL_PRODUCER_GIGE = '/opt/baumer/gentl_producers/libbgapi2_gige.cti.2.14.1'
-
-
-   ################################################
-  DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
-  drv_dict = dict()
-  deviceList = []          
-
   check_for_devices = True
+
+  drv_dict = dict()                        
+  deviceList = []      
+
+  ################################################
+  DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
 
   def __init__(self):
     ####  NODE Initialization ####

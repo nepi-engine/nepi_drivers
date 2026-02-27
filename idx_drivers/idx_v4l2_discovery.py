@@ -25,25 +25,26 @@ class V4L2CamDiscovery:
 
   NODE_LOAD_TIME_SEC = 10
   NODE_LAUNCH_DELAY_SEC = 2
-  launch_time_dict = dict()
-  retry = True
-  dont_retry_list = []
-
-  includeDevices = []
-  excludedDevices = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X']     
 
   CHECK_INTERVAL_S = 2.0
 
+  INCLUDE_DEVICES = []
+  EXCLUDE_DEVICES = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X']  
+
+  launch_time_dict = dict()
+  retry = True
+  dont_retry_list = []
 
   launch_delay_sec = NODE_LAUNCH_DELAY_SEC
 
   check_for_devices = True
 
+  drv_dict = dict()                        
+  deviceList = []      
+
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
-  drv_dict = dict()                        
-  deviceList = []         
-  
+
   def __init__(self):
     ####  NODE Initialization ####
     nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
@@ -152,7 +153,7 @@ class V4L2CamDiscovery:
       if line.startswith('/dev/video'):
         path_str = line
         # Check if this device is already known and launched  
-        if device_type not in self.excludedDevices:  
+        if device_type not in self.EXCLUDE_DEVICES:  
           # self.msg_if.pub_warn("Found device type: " + device_type + " on path " + path_str) 
           # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
           is_video_cap_device = False
@@ -278,7 +279,7 @@ class V4L2CamDiscovery:
     # Try and Connect
     # First, get a unique name
     if dtype is not None:
-      if dtype not in self.excludedDevices:
+      if dtype not in self.EXCLUDE_DEVICES:
         root_name = dtype.replace(' ','_').lower()
 
         same_type_count = 0
@@ -306,7 +307,7 @@ class V4L2CamDiscovery:
           # Now start the node via rosrun
           # rosrun nepi_drivers_idx v4l2_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
           self.msg_if.pub_info("" + "Launching node " + node_name)
-          if dtype not in self.excludedDevices:
+          if dtype not in self.EXCLUDE_DEVICES:
 
 
             # Try and load saved node params if file exists
