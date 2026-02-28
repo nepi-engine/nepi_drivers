@@ -51,6 +51,8 @@ class ZedCamDiscovery:
   device_dict = dict()
   deviceList = []      
 
+  navpose_enabled = False
+  navpose_pub_rate = 10
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
 
@@ -130,9 +132,19 @@ class ZedCamDiscovery:
       data_products = ['color_image','depth_map','pointcloud']
     self.data_products = data_products
     if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
-      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
+      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value'] == 'True'
     else:
       self.retry = True
+
+    if 'navpose_enabled' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
+      self.navpose_enabled = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['navpose_enabled']['value'] == 'True'
+
+    if 'navpose_pub_rate' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
+      try:
+        navpose_pub_rate_str = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['navpose_pub_rate']['value']
+        self.navpose_pub_rate = int(navpose_pub_rate_str)
+      except:
+          pass
     return success
   
 
@@ -303,7 +315,13 @@ class ZedCamDiscovery:
             
             #Setup required param server drv_dict for discovery node
             dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
-            self.drv_dict['DEVICE_DICT']={'zed_type': root_name, 'resolution': self.resolution, 'framerate': self.fr_val, 'data_products': self.data_products}
+            self.drv_dict['DEVICE_DICT']={'zed_type': root_name,
+                                          'resolution': self.resolution, 
+                                          'framerate': self.fr_val, 
+                                          'data_products': self.data_products,
+                                          'navpose_enabled': self.navpose_enabled, 
+                                          'navpose_pub_rate': self.navpose_pub_rate
+                                          }
             nepi_sdk.set_param(dict_param_name,self.drv_dict)
             
 

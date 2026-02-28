@@ -189,7 +189,9 @@ class ZedCamNode(object):
 
     cap_settings = CAP_SETTINGS
 
-    navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
+    navpose_enabled = False
+    navpose_pub_rate = 10
+    navpose_dict = copy.deepcopy(nepi_nav.BLANK_NAVPOSE_DICT)
  
     nav_published = False
     ################################################
@@ -227,11 +229,16 @@ class ZedCamNode(object):
           self.msg_if.pub_info("Failed to restore zed cal files")
 
         # Connect to Zed node
-        self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
-        self.resolution = self.drv_dict['DEVICE_DICT']['resolution']
-        self.framerate = 15 # self.drv_dict['DEVICE_DICT']['framerate']
-        self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
-        self.msg_if.pub_warn("Got discovery data products: " + str(self.data_products))
+        try:
+          self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
+          self.resolution = self.drv_dict['DEVICE_DICT']['resolution']
+          self.framerate = self.drv_dict['DEVICE_DICT']['framerate']
+          self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
+          self.navpose_enabled = self.drv_dict['DEVICE_DICT']['navpose_enabled']
+          self.navpose_pub_rate = self.drv_dict['DEVICE_DICT']['navpose_pub_rate']
+          self.msg_if.pub_warn("Got discovery data products: " + str(self.data_products))
+        except:
+           pass
 
 
         # Create a Camera object
@@ -280,6 +287,12 @@ class ZedCamNode(object):
         self.zed_pose = sl.Pose()
 
 
+        #############################
+        if self.navpose_enabled == True:
+            getNavPoseCb = self.getNavPoseDict
+        else:
+            getNavPoseCb = None
+
        # Initialize controls
         self.factory_controls = self.FACTORY_CONTROLS
         # Apply OVERRIDES
@@ -298,7 +311,8 @@ class ZedCamNode(object):
         # Initialize settings
         # self.cap_settings = self.getCapSettings()
         self.factory_settings = self.getFactorySettings()
-            
+          
+
 
         # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
         self.msg_if.pub_info("Launching NEPI IDX () interface...")
@@ -327,8 +341,8 @@ class ZedCamNode(object):
                                     stopDepthMapAcquisition = self.stopDepthMap,
                                     getPointcloud = self.getPointcloud, 
                                     stopPointcloudAcquisition = self.stopPointcloud,                                  
-                                    getNavPoseCb = None, #self.getNavPoseDict, 
-                                    navpose_update_rate = 10 
+                                    getNavPoseCb = getNavPoseCb, 
+                                    navpose_update_rate = self.navpose_pub_rate
                                     )
         self.msg_if.pub_info("... IDX interface running")
 
@@ -377,7 +391,7 @@ class ZedCamNode(object):
     #**********************
     # Sensor setting functions
     def getCapSettings(self):
-      setting = getSettings()
+      setting = self.getSettings()
       return self.cap_settings
 
     def getFactorySettings(self):
@@ -493,7 +507,6 @@ class ZedCamNode(object):
 
             # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
             xyz = self.getPosition()
-            self.msg_if.pub_warn("p called")
             if xyz is not None:
               navpose_dict['x_m'] = xyz[0] * 1000
               navpose_dict['y_m'] = xyz[1] * 1000

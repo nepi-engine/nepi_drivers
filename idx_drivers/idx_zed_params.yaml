@@ -39,4 +39,13 @@ driver:
       auto_restart:
         type: Bool
         default: 'True'
+      navpose_enabled:
+        type: Bool
+        default: 'False'
+      navpose_pub_rate:
+        type: Int
+        options:
+          - '1'
+          - '20'
+        default: '10'
 
