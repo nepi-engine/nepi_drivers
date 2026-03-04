@@ -135,6 +135,7 @@ class SidusSS109SerialDiscovery:
 
     ### Purge Unresponsive Connections
     #self.logger.log_warn("Entering Check On Devices loop with active device keys: " + str(self.active_devices_dict.keys()))###
+
     path_purge_list = []
     for path_str in self.active_devices_dict.keys():
         success = self.checkOnDevice(path_str)
@@ -146,6 +147,8 @@ class SidusSS109SerialDiscovery:
       del  self.active_devices_dict[path_str]
       if path_str in self.active_paths_list:
         self.active_paths_list.remove(path_str)
+        self.logger.log_warn("path_str to be removed: " + str(path_str))
+
 
     ### Checking for devices on available paths
     for path_str in self.path_list:
@@ -160,8 +163,6 @@ class SidusSS109SerialDiscovery:
           self.logger.log_warn("Found device for path: " + path_str )
           success = self.launchDeviceNode(path_str)
           self.logger.log_warn("Got Launch success: " + str(success) )
-          if success:
-            self.active_paths_list.append(path_str)
     return self.active_paths_list
   ################################################
 

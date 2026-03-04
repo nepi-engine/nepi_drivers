@@ -230,7 +230,7 @@ class SidusSS109SerialPTXNode:
                                         getSoftLimitsCb = None, #self.getSoftLimits, # 109 does not return response
                                         setSoftLimitsCb = self.setSoftLimits,
                                         getSpeedRatioCb = self.getSpeedRatio,
-                                        setSpeedRatioCb = None, #self.setSpeedRatio,
+                                        setSpeedRatioCb = self.setSpeedRatio,
                                         getPositionCb = self.getPosition,
                                         gotoPositionCb = self.gotoPosition,
                                         gotoPanPositionCb = self.gotoPanPosition,
@@ -240,7 +240,9 @@ class SidusSS109SerialPTXNode:
                                         setHomePositionHereCb = self.setHomePositionHere,
                                         getNavPoseCb = self.getNavPoseDict,
                                         navpose_update_rate = self.MAX_POSITION_UPDATE_RATE,
-                                        deviceResetCb = self.resetDevice
+                                        deviceResetCb = self.resetDevice,
+                                        calibrateCenterCB = self.calibrateCenter 
+
                                         )
             self.msg_if.pub_info(" ... PTX interface running")
 
@@ -464,10 +466,96 @@ class SidusSS109SerialPTXNode:
             self.home_pan_deg = pan_deg * self.PAN_DEG_DIR
             self.home_tilt_deg = tilt_deg * self.TILT_DEG_DIR 
 
-
-
     def resetDevice(self):
         self.driver_resetDevice()
+
+
+   #######################
+   ###Calibration Functions
+
+    def zeroPrefix(self, count_val):
+        data_str = str(count_val)
+        zero_prefix_len = 4-len(data_str)
+        for z in range(zero_prefix_len):
+            data_str = ('0' + data_str)
+        return data_str
+
+    def Reset(self):
+        #move motor to limit
+
+        #gets position
+        ser_msg = (self.pan_str + self.addr_str + 'MRS0000R')
+        [success,response] = self.send_msg(ser_msg)
+        if success:
+            pan_max_limit = int(response[5:9])
+            self.msg_if.pub_warn('Reset complete')
+        return pan_max_limit
+
+    def calibrateTilt(self):
+        self.msg_if.pub_warn('Calibrating Tilt')
+
+        tilt_limit_max = self.LIMITS_DICT['max_tilt_hardstop_deg']
+        tilt_limit_min = self.LIMITS_DICT['min_tilt_hardstop_deg']
+        ser_msg = (self.tilt_str + self.addr_str + 'MLF9999W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        ser_msg = (self.tilt_str + self.addr_str + 'MLB0000W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        ser_msg = (self.tilt_str + self.addr_str + 'MMB0000W')
+        self.send_msg(ser_msg)
+        time.sleep(10)
+        ser_msg = (self.tilt_str + self.addr_str + 'MMF0000W')
+        self.send_msg(ser_msg)
+        time.sleep(10)
+        ser_msg = (self.tilt_str + self.addr_str + 'MML5000W')
+        self.send_msg(ser_msg)
+        time.sleep(5)
+        ser_msg = (self.tilt_str + self.addr_str + 'MLB' + str((tilt_limit_min/.0879 +5000)) + 'W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        ser_msg = (self.tilt_str + self.addr_str + 'MLF' + str((tilt_limit_max/.0879 +5000)) + 'W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        self.msg_if.pub_warn('Tilt Calibration Complete')
+
+    def calibratePan(self):
+        self.msg_if.pub_warn('Calibrating Pan')
+
+        pan_limit_max = self.LIMITS_DICT['max_pan_hardstop_deg']
+        pan_limit_min = self.LIMITS_DICT['min_pan_hardstop_deg']
+        ser_msg = (self.pan_str + self.addr_str + 'MLF9999W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        ser_msg = (self.pan_str + self.addr_str + 'MLB0000W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        ser_msg = (self.pan_str + self.addr_str + 'MMB0000W')
+        self.send_msg(ser_msg)
+        time.sleep(10)
+        ser_msg = (self.pan_str + self.addr_str + 'MMF0000W')
+        self.send_msg(ser_msg)
+        time.sleep(10)
+        ser_msg = (self.pan_str + self.addr_str + 'MML5000W')
+        self.send_msg(ser_msg)
+        time.sleep(5)
+        ser_msg = (self.pan_str + self.addr_str + 'MLB' + str((pan_limit_min/.0879 +5000)) + 'W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        ser_msg = (self.pan_str + self.addr_str + 'MLF' + str((pan_limit_max/.0879 +5000)) + 'W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        self.msg_if.pub_warn('Pan Calibration Complete')
+
+
+ 
+    def calibrateCenter(self):
+        self.calibrateTilt()
+        time.sleep(5)
+        self.calibratePan()
+        self.setHomePositionHere()
+        self.msg_if.pub_warn('Position Set as Home')
+
 
 
    #######################
@@ -597,6 +685,8 @@ class SidusSS109SerialPTXNode:
         return success
 
     def driver_setSpeedRatio(self,speedRatio, axis_str = '!'):
+        pan_success = False
+        tilt_success = False
         method_name = sys._getframe().f_code.co_name
         self.serial_lock = True
         speed_count = None
@@ -608,9 +698,16 @@ class SidusSS109SerialPTXNode:
             return False
         if speed_count is not None:
             data_str = self.create_speed_str(speed_count)
-            ser_msg= (axis_str  + self.addr_str + 'MSP' + data_str + 'W')
+            ser_msg= (self.tilt_str  + self.addr_str + 'MSP' + data_str + 'W')
             [success,response] = self.send_msg(ser_msg)
-            return success
+            tilt_success = success
+
+            data_str = self.create_speed_str(speed_count)
+            ser_msg= (self.pan_str  + self.addr_str + 'MSP' + data_str + 'W')
+            [success,response] = self.send_msg(ser_msg)
+            pan_success = success
+            speed_success = pan_success and tilt_success == True
+            return speed_success
         else:
             return False
 
@@ -1019,7 +1116,7 @@ class SidusSS109SerialPTXNode:
         data_str = str(count_val)
         zero_suffix_len = self.data_len-len(data_str)
         for z in range(zero_suffix_len):
-            data_str = (data_str + '0')
+            data_str = ('0' + data_str)
         return data_str
 
 
