@@ -43,12 +43,11 @@ class OnvifCamNode:
 
     DEFAULT_CURRENT_FPS = 20 # Will be update later with actual
     
-    device_info_dict = dict(node_name = "",
-       device_name = "",
-       identifier = "",
-       serial_number = "",
-       hw_version = "",
-       sw_version = "")
+    device_info_dict = dict(device_name = "",
+                            path = "",
+                            serial_number = "",
+                            hw_version = "",
+                            sw_version = "")
 
 
     idx_if = None
@@ -77,15 +76,23 @@ class OnvifCamNode:
         ##############################  
         # Initialize Class Variables
         
+
+
         # Get required drv driver dict info
         try:
-            self.drv_dict = nepi_sdk.get_param('~drv_dict') # Crash if not provide
+            self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
+            #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
+            self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
+            self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
+            self.driver_path = self.drv_dict['path']
+            self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
+            self.driver_module = self.driver_file.split('.')[0]
+            self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
         except Exception as e:
-            nepi_sdk.signal_shutdown("Failed to read drv_dict from param server for node " + self.node_name + " with exception: " + str(e))
-        self.driver_path = self.drv_dict['path']
-        self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
-        self.driver_module = self.driver_file.split('.')[0]
-        self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
+            self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
+            return       
+      
 
         # Require the camera connection parameters to have been set
         if not nepi_sdk.has_param('~credentials/username'):
@@ -156,13 +163,8 @@ class OnvifCamNode:
 
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
             self.msg_if.pub_info("Launching NEPI IDX () interface...")
-            self.device_info_dict["node_name"] = self.node_name
-            if self.node_name.find("_") != -1:
-                split_name = self.node_name.rsplit('_', 1)
-                self.device_info_dict["device_name"] = split_name[0]
-                self.device_info_dict["identifier"] = split_name[1]
-            else:
-                self.device_info_dict["device_name"] = self.node_name
+            self.device_info_dict["device_name"] = self.device_name
+            self.device_info_dict["path"] = self.device_path
             self.idx_if = IDXDeviceIF(device_info = self.device_info_dict,
                                     data_source_description = 'camera',
                                     data_ref_description = 'camera_lense',

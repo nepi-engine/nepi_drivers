@@ -132,17 +132,15 @@ class IqrPanTiltDiscovery:
     node_launch_name = 'iqr_pan_tilt_'
     self.logger.log_warn("Entering launch device function for path: " + str(path_str) )###
     file_name = self.drv_dict['NODE_DICT']['file_name']
-    device_node_name = self.node_launch_name
-    node_name = nepi_system.get_node_name(device_node_name)
+    device_name = self.node_launch_name
+    node_name = nepi_system.get_device_alias(device_name)
     self.logger.log_warn(" launching node: " + node_name)
 
 
-    # Try and load saved node params if file exists
-    nepi_sdk.load_node_config(device_node_name, node_name)
 
     #Setup required param server drv_dict for discovery node
     dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
-    self.drv_dict['DEVICE_DICT'] = dict()
+    self.drv_dict['DEVICE_DICT']={'device_name': device_name}
     self.source_path = '/dev/' + os.readlink(path_str)
     self.drv_dict['DEVICE_DICT']['device_path'] = self.source_path
     self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str

@@ -119,6 +119,12 @@ class MicrostrainNode(object):
     driver_node_process = None
     imu_sub = None
 
+    device_info_dict = dict(device_name = "",
+                            path = "",
+                            serial_number = "",
+                            hw_version = "",
+                            sw_version = "")
+
     def __init__(self, device_dict = None):
 
         ####  NODE Initialization ####
@@ -149,7 +155,13 @@ class MicrostrainNode(object):
             nepi_sdk.signal_shutdown(self.node_name + ": Driver Dict not provided")
             return
 
+
+        # Get required drv driver dict info
         try:
+            self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
+            #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
+            self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
+            self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
             port = self.device_dict['port']
             self.msg_if.pub_info("Using port: " + str(port))
 
@@ -170,11 +182,11 @@ class MicrostrainNode(object):
             param_file = self.device_dict['param_file']
             self.msg_if.pub_info("Using param_file: " + str(param_file))
         except Exception as e:
-            self.msg_if.pub_info("Driver Dict missing entries: " + str(e) )
-            nepi_sdk.signal_shutdown(self.node_name + ": Shutting Down - Driver Dict missing entries")
+            self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
             return
 
-        
+      
 
         
 
@@ -222,12 +234,8 @@ class MicrostrainNode(object):
 
         #############################
         # Wait for Driver Node to Start and Get device info
-        self.device_info_dict = dict(node_name = self.node_name,
-                            device_name = "3DM-GV7-AHRS",
-                            identifier = "ttyTHS0",
-                            serial_number = "",
-                            hw_version = "",
-                            sw_version = "")
+        self.device_info_dict["device_name"] = self.device_name
+        self.device_info_dict["path"] = self.device_path
 
 
         ############################

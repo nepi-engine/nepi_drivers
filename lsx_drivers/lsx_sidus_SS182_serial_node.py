@@ -74,9 +74,8 @@ class SidusSS182SerialNode(object):
   blink_enabled = False
   )
 
-  device_info_dict = dict(node_name = "",
-                        device_name = "",
-                        identifier = "",
+  device_info_dict = dict(device_name = "",
+                        path = "",
                         serial_number = "",
                         hw_version = "",
                         sw_version = "")
@@ -137,9 +136,12 @@ class SidusSS182SerialNode(object):
   # Initialize Class Variables
 
     # Get required drv driver dict info
-    self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
-    #self.msg_if.pub_warn("Got Drivers_Dict from param server: " + str(self.drv_dict))
+
     try:
+        self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
+        #self.msg_if.pub_warn("Got Drivers_Dict from param server: " + str(self.drv_dict))
+        self.device_name = self.drv_dict['DRIVER_DICT']['device_name']
+        self.device_name = self.drv_dict['DRIVER_DICT']['device_path']
         self.port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
         self.baud_str = self.drv_dict['DEVICE_DICT']['baud_str'] 
         self.baud_int = int(self.baud_str)
@@ -177,22 +179,8 @@ class SidusSS182SerialNode(object):
         # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
         self.msg_if.pub_info("Launching NEPI LSX () interface...")
         self.msg_if.pub_info("0")
-        self.msg_if.pub_info("node name: " + str(self.node_name))
-
-        self.device_info_dict["node_name"] = self.node_name
-        self.msg_if.pub_info("1")
-
-        if self.node_name.find("_") != -1:
-            self.msg_if.pub_info("2")
-
-            split_name = self.node_name.rsplit('_', 1)
-            self.device_info_dict["device_name"] = split_name[0]
-            self.device_info_dict["identifier"] = split_name[1]
-        else:
-            self.msg_if.pub_info("3")
-
-            self.device_info_dict["device_name"] = self.node_name
-            self.device_info_dict["identifier"] = ""
+        self.device_info_dict["device_name"] = self.device_name
+        self.device_info_dict["path"] = self.device_path
         self.device_info_dict["serial_number"] = self.serial_num
         self.device_info_dict["hw_version"] = self.hw_version
         self.device_info_dict["sw_version"] = self.sw_version
@@ -352,9 +340,9 @@ class SidusSS182SerialNode(object):
     success=self.update_status_values()
     # Create LSX status message
     status_msg= DeviceLSXStatus()
+    status_msg.device_node_name = self.node_name
     status_msg.device_name = self.device_info_dict["device_name"]
-    status_msg.user_name = self.device_info_dict["device_name"]
-    status_msg.identifier = self.device_info_dict["identifier"]
+    status_msg.device_path= self.device_info_dict["path"]
     status_msg.serial_num = self.device_info_dict["serial_number"]
     status_msg.hw_version = self.device_info_dict["hw_version"]
     status_msg.sw_version = self.device_info_dict["sw_version"]

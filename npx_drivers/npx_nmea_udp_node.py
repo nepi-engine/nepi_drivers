@@ -48,6 +48,12 @@ class NMEAUDPNode(object):
     navpose_update_rate = 20
     driver_navpose_dict =  copy.deepcopy(nepi_nav.BLANK_NAVPOSE_DICT)
 
+    device_info_dict = dict(device_name = "",
+                            path = "",
+                            serial_number = "",
+                            hw_version = "",
+                            sw_version = "")
+
     def __init__(self, drv_dict=None):
         # Initialize ROS/NEPI node
         nepi_sdk.init_node(name=DEFAULT_NODE_NAME)
@@ -60,25 +66,26 @@ class NMEAUDPNode(object):
         self.msg_if.pub_info("Starting Node Initialization Processes")
         self.msg_if.pub_info("Gathering driver settings")
 
-        # 1) KEEP param-loaded drv_dict; don't overwrite it with None later
-        if drv_dict is None:
-            drv_dict = nepi_sdk.get_param('~drv_dict', {})
-        self.drv_dict = drv_dict
+         # Get required drv driver dict info
+        try:
+            self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
+            #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
+            self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
+            self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
 
-        if not self.drv_dict:
-            self.msg_if.pub_info("Driver Dict not provided")
-            nepi_sdk.signal_shutdown(self.node_name + ": Driver Dict not provided")
+            dev = self.drv_dict.get('DEVICE_DICT', {}) or {}
+            self.host = str(dev.get('tcp_host', '127.0.0.1'))
+            self.port = int(dev.get('tcp_port', 50000))
+            self.param_file = dev.get('param_file', '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_nmea_udp_params.yaml')
+
+            save_data = self.drv_dict.get('SAVE_DATA', {}) or {}
+            self.debug = bool(save_data.get('debug', False) or self.drv_dict.get('debug', False))
+            self.heading_min_speed = float(self.drv_dict.get('heading_min_speed_knots', 0.5))
+
+        except Exception as e:
+            self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
             return
-
-        # 2) Read connection fields from DEVICE_DICT (as discovery writes them)
-        dev = self.drv_dict.get('DEVICE_DICT', {}) or {}
-        self.host = str(dev.get('tcp_host', '127.0.0.1'))
-        self.port = int(dev.get('tcp_port', 50000))
-        self.param_file = dev.get('param_file', '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_nmea_udp_params.yaml')
-
-        save_data = self.drv_dict.get('SAVE_DATA', {}) or {}
-        self.debug = bool(save_data.get('debug', False) or self.drv_dict.get('debug', False))
-        self.heading_min_speed = float(self.drv_dict.get('heading_min_speed_knots', 0.5))
 
         self.msg_if.pub_info(f"Using host: {self.host}")
         self.msg_if.pub_info(f"Using port: {self.port}")
@@ -106,12 +113,8 @@ class NMEAUDPNode(object):
         self._rx_thread.start()
 
         # 6) Register NPXDeviceIF so the rest of NEPI can query navpose
-        self.device_info_dict = dict(
-            node_name=self.node_name,
-            device_name="nmea-udp",
-            identifier="udp",
-            serial_number="", hw_version="", sw_version=""
-        )
+        self.device_info_dict["device_name"] = self.device_name
+        self.device_info_dict["path"] = self.device_path
         self.npx_if = NPXDeviceIF(
             device_info=self.device_info_dict,
             data_source_description="sensor",

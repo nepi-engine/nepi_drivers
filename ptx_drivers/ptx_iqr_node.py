@@ -111,9 +111,8 @@ class IqrPanTiltNode:
     PT_DIRECTION_POSITIVE = 1
     PT_DIRECTION_NEGATIVE = -1
 
-    device_info_dict = dict(node_name = "",
-                            device_name = "",
-                            identifier = "",
+    device_info_dict = dict(device_name = "",
+                            path = "",
                             serial_number = "",
                             hw_version = "",
                             sw_version = "")
@@ -184,6 +183,8 @@ class IqrPanTiltNode:
         self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
         #self.msg_if.pub_warn("Got Drivers_Dict from param server: " + str(self.drv_dict))
         try:
+            self.driver_name = self.drv_dict['DRIVER_DICT']['driver_name']
+            self.driver_name = self.drv_dict['DRIVER_DICT']['path']
             self.port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
             self.baud_str = self.drv_dict['DEVICE_DICT']['baud_str'] 
             self.baud_int = int(self.baud_str)
@@ -219,14 +220,8 @@ class IqrPanTiltNode:
             # Launch the PTX interface --  this takes care of initializing all the ptx settings from config. file, subscribing and advertising topics and services, etc.
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
             self.msg_if.pub_info("Launching NEPI PTX () interface...")
-            self.device_info_dict["node_name"] = self.node_name
-            if self.node_name.find("_") != -1:
-                split_name = self.node_name.rsplit('_', 1)
-                self.device_info_dict["device_name"] = split_name[0]
-                self.device_info_dict["identifier"] = split_name[1]
-            else:
-                self.device_info_dict["device_name"] = self.node_name
-                self.device_info_dict["identifier"] = ""
+            self.device_info_dict["device_name"] = self.driver_name
+            self.device_info_dict["path"] = self.driver_path
 
             self.device_info_dict["serial_number"] = self.serial_num
             self.device_info_dict["hw_version"] = self.hw_version

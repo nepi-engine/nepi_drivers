@@ -126,12 +126,12 @@ class ZedCamNode(object):
 
     # Create shared class variables and thread locks 
     
-    device_info_dict = dict(node_name = "",
-                            device_name = "",
-                            identifier = "",
+    device_info_dict = dict(device_name = "",
+                            path = "",
                             serial_number = "",
                             hw_version = "",
                             sw_version = "")
+    
     color_img_acquire = False
     color_img_msg = None
     color_img_last_stamp = None
@@ -216,7 +216,21 @@ class ZedCamNode(object):
         # Initialize Class Variables
 
         # Get required drv driver dict info
-        self.drv_dict = nepi_sdk.get_param('~drv_dict',TEST_DRV_DICT) 
+        try:
+            self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
+            #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
+            self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
+            self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
+            self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
+            self.resolution = self.drv_dict['DEVICE_DICT']['resolution']
+            self.framerate = self.drv_dict['DEVICE_DICT']['framerate']
+            self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
+            self.navpose_enabled = self.drv_dict['DEVICE_DICT']['navpose_enabled']
+            self.navpose_pub_rate = self.drv_dict['DEVICE_DICT']['navpose_pub_rate']
+        except Exception as e:
+            self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
+            return
 
         ################################################
         # Try to restore camera calibration files from
@@ -228,17 +242,7 @@ class ZedCamNode(object):
         else:
           self.msg_if.pub_info("Failed to restore zed cal files")
 
-        # Connect to Zed node
-        try:
-          self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
-          self.resolution = self.drv_dict['DEVICE_DICT']['resolution']
-          self.framerate = self.drv_dict['DEVICE_DICT']['framerate']
-          self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
-          self.navpose_enabled = self.drv_dict['DEVICE_DICT']['navpose_enabled']
-          self.navpose_pub_rate = self.drv_dict['DEVICE_DICT']['navpose_pub_rate']
-          self.msg_if.pub_warn("Got discovery data products: " + str(self.data_products))
-        except:
-           pass
+    
 
 
         # Create a Camera object
@@ -316,13 +320,8 @@ class ZedCamNode(object):
 
         # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
         self.msg_if.pub_info("Launching NEPI IDX () interface...")
-        self.device_info_dict["node_name"] = self.node_name
-        if self.node_name.find("_") != -1:
-            split_name = self.node_name.rsplit('_', 1)
-            self.device_info_dict["device_name"] = split_name[0]
-            self.device_info_dict["identifier"] = split_name[1]
-        else:
-            self.device_info_dict["device_name"] = self.node_name
+        self.device_info_dict["device_name"] = self.device_name
+        self.device_info_dict["path"] = self.device_path
         self.idx_if = IDXDeviceIF(device_info = self.device_info_dict,
                                     data_products =  self.data_products,
                                     data_source_description = self.data_source_description,

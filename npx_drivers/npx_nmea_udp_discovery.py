@@ -144,28 +144,23 @@ class NMEAUDPDiscovery:
 
         # Form node_name in the same style you already use in logs
         try:
-            device_node_name = self.node_launch_name + "_" + str(launch_key).split(':')[0].replace('.','').replace('-','_')
+            device_name = self.node_launch_name + "_" + str(launch_key).split(':')[0].replace('.','').replace('-','_')
         except:
-            device_node_name = self.node_launch_name + "_" + str(launch_key).replace(':','_').replace('.','').replace('-','_')
-        node_name = nepi_system.get_node_name(device_node_name)
+            device_name = self.node_launch_name + "_" + str(launch_key).replace(':','_').replace('.','').replace('-','_')
+        node_name = nepi_system.get_device_alias(device_name)
         self.logger.log_warn(" launching node: " + node_name)
 
-
-
-        # Try and load saved node params if file exists
-        nepi_sdk.load_node_config(device_node_name, node_name)
         
         #Setup required param server drv_dict for discovery node
         dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
 
         # Ensure DEVICE_DICT and SAVE_DATA blocks exist (avoid NoneType in SaveDataIF)
-        self.drv_dict.setdefault('DEVICE_DICT', {})
-        self.drv_dict['DEVICE_DICT'].update({
-            'tcp_host': host,
-            'tcp_port': int(port),
-            'param_file': PARAM_FILE_PATH
-        })
-
+        self.drv_dict['DEVICE_DICT']={'device_name': device_name,
+                                        'device_path': host + ':' + port,
+                                        'tcp_host': host,
+                                        'tcp_port': int(port),
+                                        'param_file': PARAM_FILE_PATH
+                                    }
         # Minimal SAVE_DATA section so SaveDataIF init never sees None
         self.drv_dict.setdefault('SAVE_DATA', {})
         self.drv_dict['SAVE_DATA']['save_rate_dict'] = self.drv_dict['SAVE_DATA'].get('save_rate_dict', {})

@@ -63,6 +63,7 @@ class V4L2CamDiscovery:
     # Update discovery options
     success = self.updateDiscoveryOptions()
     if success == False:
+        self.msg_if.pub_warn("Shutting down because failed to get Driver Dict")
         nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
         return
     
@@ -287,14 +288,14 @@ class V4L2CamDiscovery:
           if device['device_type'] == dtype:
             same_type_count += 1
 
-        device_node_name = self.short_name(root_name)
+        device_name = self.short_name(root_name)
         if bus is not None:
           id = bus
         else:
           id = str(same_type_count)
-        device_node_name += '_' + id
+        device_name += '_' + id
 
-        node_name = nepi_system.get_node_name(device_node_name)
+        node_name = nepi_system.get_device_alias(device_name)
         node_namespace = os.path.join(self.base_namespace, node_name)
 
         device_exists = False
@@ -310,12 +311,12 @@ class V4L2CamDiscovery:
           if dtype not in self.EXCLUDE_DEVICES:
 
 
-            # Try and load saved node params if file exists
-            nepi_sdk.load_node_config(device_node_name, node_name)
 
 
             #Setup required param server drv_dict for discovery node
-            self.drv_dict['DEVICE_DICT'] = {'device_path': path_str}
+            self.drv_dict['DEVICE_DICT']={'device_name': device_name,
+                                          'device_path': path_str
+                                          }   
             dict_param_name = os.path.join(self.base_namespace,node_name + "/drv_dict")
             nepi_sdk.set_param(dict_param_name,self.drv_dict)
 

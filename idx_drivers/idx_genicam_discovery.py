@@ -225,9 +225,9 @@ class GenicamCamDiscovery:
       if device['device_type'] == model:
         node_needs_serial_number = True
         break
-    device_node_name = root_name if not node_needs_serial_number else unique_root_name
+    device_name = root_name if not node_needs_serial_number else unique_root_name
 
-    node_name = nepi_system.get_node_name(device_node_name)
+    node_name = nepi_system.get_device_alias(device_name)
     self.logger.log_warn(" launching node: " + node_name)
     node_namespace = os.path.join(self.base_namespace, node_name)
 
@@ -256,13 +256,15 @@ class GenicamCamDiscovery:
     # NOTE: have to make serial_number look like a string by prefixing with "sn", otherwise ROS
     #       treats it as an int param and it causes an overflow. Better way to handle this?
 
-    # Try and load saved node params if file exists
-    nepi_sdk.load_node_config(device_node_name, node_name)
+
     
     #Setup required param server drv_dict for discovery node
     dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
-    self.drv_dict['DEVICE_DICT']={'model': model}
-    self.drv_dict['DEVICE_DICT']['serial_number'] = serial_number
+    self.drv_dict['DEVICE_DICT']={'device_name': device_name,
+                                'device_path': '',
+                                'model': model,
+                                'serial_number': serial_number
+                                } 
     nepi_sdk.set_param(dict_param_name,self.drv_dict)
 
 

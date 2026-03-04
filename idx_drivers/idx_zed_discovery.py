@@ -285,14 +285,14 @@ class ZedCamDiscovery:
           if device['device_type'] == dtype:
             same_type_count += 1
 
-        device_node_name = self.short_name(root_name)
+        device_name = self.short_name(root_name)
         if bus is not None:
           id = bus
         else:
           id = str(same_type_count)
-        device_node_name += '_' + id
+        device_name += '_' + id
 
-        node_name = nepi_system.get_node_name(device_node_name)
+        node_name = nepi_system.get_device_alias(device_name)
         node_namespace = os.path.join(self.base_namespace, node_name)
 
 
@@ -310,12 +310,13 @@ class ZedCamDiscovery:
           self.msg_if.pub_info("Launching node " + node_name)
           if dtype in self.INCLUDE_DEVICES:
 
-            # Try and load saved node params if file exists
-            nepi_sdk.load_node_config(device_node_name, node_name)
+
             
             #Setup required param server drv_dict for discovery node
             dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
-            self.drv_dict['DEVICE_DICT']={'zed_type': root_name,
+            self.drv_dict['DEVICE_DICT']={'device_name': device_name,
+                                          'device_path': path_str,
+                                          'zed_type': root_name,
                                           'resolution': self.resolution, 
                                           'framerate': self.fr_val, 
                                           'data_products': self.data_products,

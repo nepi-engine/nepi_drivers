@@ -51,12 +51,11 @@ class AfTowerLightNode(object):
   color_options = ['GREEN','YELLOW','RED']
   kelvin_limits = [1000,5000]
 
-  device_info_dict = dict(node_name = "",
-                        device_name = "",
-                        identifier = "",
-                        serial_number = "",
-                        hw_version = "",
-                        sw_version = "")
+  device_info_dict = dict(device_name = "",
+                          path = "",
+                          serial_number = "",
+                          hw_version = "",
+                          sw_version = "")
   
   # Initialize some parameters
   serial_num = "Unknown"
@@ -108,13 +107,23 @@ class AfTowerLightNode(object):
       ##############################  
       # Initialize Class Variables
 
+
       # Get required drv driver dict info
-      self.drv_dict = nepi_sdk.get_param('~drv_dict',{}) 
-      #self.msg_if.pub_warn("AFTOWER_NODE: " + str(self.drv_dict))
-      self.ser_port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
-      ser_baud_str = self.drv_dict['DEVICE_DICT']['baud_rate_str'] 
-      self.ser_baud_int = int(ser_baud_str)
-      self.msg_if.pub_info("Connecting to Device on port " + self.ser_port_str + " with baud " + ser_baud_str)
+      try:
+          self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
+          #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
+          self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
+          self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
+          self.ser_port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
+          ser_baud_str = self.drv_dict['DEVICE_DICT']['baud_rate_str'] 
+          self.ser_baud_int = int(ser_baud_str)
+          self.msg_if.pub_info("Connecting to Device on port " + self.ser_port_str + " with baud " + ser_baud_str)
+      except Exception as e:
+          self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
+          nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
+          return  
+
+
       ################################################
       ### Try and connect to device
       self.connected = self.connect()
@@ -136,14 +145,8 @@ class AfTowerLightNode(object):
 
       # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
       self.msg_if.pub_info("Launching NEPI LSX () interface...")
-      self.device_info_dict["node_name"] = self.node_name
-      if self.node_name.find("_") != -1:
-          split_name = self.node_name.rsplit('_', 1)
-          self.device_info_dict["device_name"] = split_name[0]
-          self.device_info_dict["identifier"] = split_name[1]
-      else:
-          self.device_info_dict["device_name"] = self.node_name
-          self.device_info_dict["identifier"] = ""
+      self.device_info_dict["device_name"] = self.device_name
+      self.device_info_dict["path"] = self.device_path
       self.device_info_dict["serial_number"] = self.serial_num
       self.device_info_dict["hw_version"] = self.hw_version
       self.device_info_dict["sw_version"] = self.sw_version
@@ -227,9 +230,9 @@ class AfTowerLightNode(object):
     success=self.update_status_values()
     # Create LSX status message
     status_msg= DeviceLSXStatus()
+    status_msg.device_node_name = self.node_name
     status_msg.device_name = self.device_info_dict["device_name"]
-    status_msg.user_name = self.device_info_dict["device_name"]
-    status_msg.identifier = self.device_info_dict["identifier"]
+    status_msg.device_path= self.device_info_dict["path"]
     status_msg.serial_num = self.device_info_dict["serial_number"]
     status_msg.hw_version = self.device_info_dict["hw_version"]
     status_msg.sw_version = self.device_info_dict["sw_version"]
