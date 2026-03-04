@@ -498,118 +498,71 @@ class SidusSS109SerialPTXNode:
             self.msg_if.pub_warn('Reset complete')
         return pan_max_limit
 
-    def getTruePanMaxLimit(self):
-        #move motor to limit
-        pan_max_limit = 0
-        ser_msg = (self.pan_str + self.addr_str + 'MMF0000W')
+    def calibrateTilt(self):
+        self.msg_if.pub_warn('Calibrating Tilt')
+
+        tilt_limit_max = self.LIMITS_DICT['max_tilt_hardstop_deg']
+        tilt_limit_min = self.LIMITS_DICT['min_tilt_hardstop_deg']
+        ser_msg = (self.tilt_str + self.addr_str + 'MLF9999W')
         self.send_msg(ser_msg)
-        time.sleep(15)
+        time.sleep(1)
+        ser_msg = (self.tilt_str + self.addr_str + 'MLB0000W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        ser_msg = (self.tilt_str + self.addr_str + 'MMB0000W')
+        self.send_msg(ser_msg)
+        time.sleep(10)
+        ser_msg = (self.tilt_str + self.addr_str + 'MMF0000W')
+        self.send_msg(ser_msg)
+        time.sleep(10)
+        ser_msg = (self.tilt_str + self.addr_str + 'MML5000W')
+        self.send_msg(ser_msg)
+        time.sleep(5)
+        ser_msg = (self.tilt_str + self.addr_str + 'MLB' + str((tilt_limit_min/.0879 +5000)) + 'W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        ser_msg = (self.tilt_str + self.addr_str + 'MLF' + str((tilt_limit_max/.0879 +5000)) + 'W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        self.msg_if.pub_warn('Tilt Calibration Complete')
 
-        #gets position
-        ser_msg = (self.pan_str + self.addr_str + 'MRL0000R')
-        [success,response] = self.send_msg(ser_msg)
-        if success:
-            pan_max_limit = int(response[5:9])
-            self.msg_if.pub_warn('Got True Max: ' + str(pan_max_limit))
-        return pan_max_limit
+    def calibratePan(self):
+        self.msg_if.pub_warn('Calibrating Pan')
 
-    # def getTrueTiltMaxLimit(self):
-    #     tilt_max_limit = 0
-    #     #move motor to limit
-    #     ser_msg = (self.tilt_str + self.addr_str + 'MMF0000W')
-    #     self.send_msg(ser_msg)
-    #     time.sleep(15)
-
-    #     #gets position 
-    #     ser_msg =  (self.tilt_str + self.addr_str + 'MRL0000R')
-    #     [success,response] = self.send_msg(ser_msg)
-    #     if success:
-    #         tilt_max_limit = int(response[5:9])
-    #         self.msg_if.pub_warn('Got True TilT Max: ' + str(tilt_max_limit))
-    #     return tilt_max_limit
-
-    def getTruePanMinLimit(self):
-        #move motor to limit
+        pan_limit_max = self.LIMITS_DICT['max_pan_hardstop_deg']
+        pan_limit_min = self.LIMITS_DICT['min_pan_hardstop_deg']
+        ser_msg = (self.pan_str + self.addr_str + 'MLF9999W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        ser_msg = (self.pan_str + self.addr_str + 'MLB0000W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
         ser_msg = (self.pan_str + self.addr_str + 'MMB0000W')
         self.send_msg(ser_msg)
-        time.sleep(15)
-
-        #gets position 
-        ser_msg =  (self.pan_str + self.addr_str + 'MRL0000R')
-        [success,response] = self.send_msg(ser_msg)
-        if success:
-            pan_min_limit = int(response[5:9])
-            self.msg_if.pub_warn('Got True Pan Min: ' + str(pan_min_limit))
-        return pan_min_limit
-
-    # def getTrueTiltMinLimit(self):
-    #     #move motor to limit
-    #     ser_msg = (self.tilt_str + self.addr_str + 'MMB0000W')
-    #     self.send_msg(ser_msg)
-    #     time.sleep(15)
-
-    #     #gets position 
-    #     ser_msg =  (self.tilt_str + self.addr_str + 'MRL0000R')
-    #     [success,response] = self.send_msg(ser_msg)
-    #     if success:
-    #         tilt_min_limit = int(response[5:9])
-    #         self.msg_if.pub_warn('Got True Tilt Min: ' + str(tilt_min_limit))
-
-    #     return tilt_min_limit
-
-    # def getTruePanCenter(self):
-    #     pan_max = self.getTruePanMaxLimit()
-    #     time.sleep(30)
-    #     pan_min = self.getTruePanMinLimit()
-    #     time.sleep(30)
-    #     pan_center = pan_max - pan_min
-    #     data_str = self.zeroPrefix(pan_center)
-    #     #moves to center position
-    #     ser_msg = (self.pan_str + self.addr_str + 'MML' + data_str + 'W')
-    #     self.send_msg(ser_msg)
-    #     time.sleep(5)
-
-    #     return pan_center
-
-    # def getTrueTiltCenter(self):
-    #     tilt_max = self.getTrueTiltMaxLimit()
-    #     time.sleep(30)
-    #     tilt_min = self.getTrueTiltMinLimit()
-    #     tilt_center = tilt_max - tilt_min
-    #     data_str = self.zeroPrefix(tilt_center)
-    #     #moves to center position
-    #     ser_msg =  (self.tilt_str + self.addr_str + 'MML' + data_str + 'W')
-    #     self.send_msg(ser_msg)
-    #     time.sleep(5)
-
-    #     return tilt_center 
-
-    def setTruePanZeroDeg(self):
-    #     pan_center = self.getTruePanCenter()
-    #     success = False
-    #     data_str = self.zeroPrefix(pan_center)
-    #     #sets current pan position as zero deg
-        ser_msg = (self.pan_str + self.addr_str + 'MPR' + data_str + 'W')
+        time.sleep(10)
+        ser_msg = (self.pan_str + self.addr_str + 'MMF0000W')
         self.send_msg(ser_msg)
-        if success:
-            self.msg_if.pub_warn('Current Pan Position Set as Zero Deg')
+        time.sleep(10)
+        ser_msg = (self.pan_str + self.addr_str + 'MML5000W')
+        self.send_msg(ser_msg)
+        time.sleep(5)
+        ser_msg = (self.pan_str + self.addr_str + 'MLB' + str((pan_limit_min/.0879 +5000)) + 'W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        ser_msg = (self.pan_str + self.addr_str + 'MLF' + str((pan_limit_max/.0879 +5000)) + 'W')
+        self.send_msg(ser_msg)
+        time.sleep(1)
+        self.msg_if.pub_warn('Pan Calibration Complete')
 
-    # def setTrueTiltZeroDeg(self):
-    #     tilt_center = self.getTrueTiltCenter()
-    #     success = False
-    #     data_str = self.zeroPrefix(tilt_center)
-    #     #sets current tilt position as zero deg
-    #     self.send_msg((self.tilt_str + self.addr_str + 'MPR' + data_str + 'W'))
-    #     if success:
-    #         self.msg_if.pub_warn('Current Tilt Position Set as Zero Deg')
 
+ 
     def calibrateCenter(self):
-        #self.getTruePanMaxLimit()
-        #time.sleep(20)
-        #self.getTruePanMinLimit()
-        self.setTruePanZeroDeg()
-        # time.sleep(10)
-        # self.setTrueTiltZeroDeg()
+        self.calibrateTilt()
+        time.sleep(5)
+        self.calibratePan()
+        self.setHomePositionHere()
+        self.msg_if.pub_warn('Position Set as Home')
+
 
 
    #######################
