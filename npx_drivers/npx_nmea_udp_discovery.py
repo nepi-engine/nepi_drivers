@@ -5,7 +5,6 @@
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
 
-# Numurus / NEPI — NMEA UDP Discovery (TCP) — matches MicroStrain discovery structure
 import os
 import time
 import socket
@@ -15,6 +14,11 @@ import datetime
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_system
+
+from nepi_sdk.nepi_sdk import logger as Logger
+log_name = "microstrain_imu"
+logger = Logger(log_name = log_name)
+
 
 PKG_NAME = 'NPX_NMEA_UDP'
 FILE_TYPE = 'DISCOVERY'
@@ -148,7 +152,8 @@ class NMEAUDPDiscovery:
         except:
             device_name = self.node_launch_name + "_" + str(launch_key).replace(':','_').replace('.','').replace('-','_')
         node_name = nepi_system.get_device_alias(device_name)
-        self.logger.log_warn(" launching node: " + node_name)
+        self.logger.log_warn("Launching node: " + node_name)
+
 
         
         #Setup required param server drv_dict for discovery node
@@ -156,7 +161,7 @@ class NMEAUDPDiscovery:
 
         # Ensure DEVICE_DICT and SAVE_DATA blocks exist (avoid NoneType in SaveDataIF)
         self.drv_dict['DEVICE_DICT']={'device_name': device_name,
-                                        'device_path': host + ':' + port,
+                                        'device_path': host + ':' + str(port),
                                         'tcp_host': host,
                                         'tcp_port': int(port),
                                         'param_file': PARAM_FILE_PATH
@@ -167,38 +172,38 @@ class NMEAUDPDiscovery:
         self.drv_dict['SAVE_DATA']['save_data_enable'] = bool(self.drv_dict['SAVE_DATA'].get('save_data_enable', False))
         nepi_sdk.set_param(dict_param_name, self.drv_dict)
 
-        # Start internal NMEA simulator if requested (before launching client node so it can connect)
-        try:
-            if self._sim_cfg and self._sim_cfg.get('simulate'):
-                self._start_sim_server(
-                    host=self._sim_cfg['host'],
-                    port=self._sim_cfg['port'],
-                    lat=self._sim_cfg['lat'],
-                    lon=self._sim_cfg['lon'],
-                    alt_m=self._sim_cfg['alt_m'],
-                    heading_deg=self._sim_cfg['heading_deg'],
-                    rate_hz=self._sim_cfg['rate_hz'],
-                    sog_kts=self._sim_cfg['sog_kts'],
-                    cog_deg=self._sim_cfg['cog_deg'],
-                )
-        except Exception as e:
-            self.logger.log_warn(f"Failed to start internal NMEA sim: {e}")
+        # # Start internal NMEA simulator if requested (before launching client node so it can connect)
+        # try:
+        #     if self._sim_cfg and self._sim_cfg.get('simulate'):
+        #         self._start_sim_server(
+        #             host=self._sim_cfg['host'],
+        #             port=self._sim_cfg['port'],
+        #             lat=self._sim_cfg['lat'],
+        #             lon=self._sim_cfg['lon'],
+        #             alt_m=self._sim_cfg['alt_m'],
+        #             heading_deg=self._sim_cfg['heading_deg'],
+        #             rate_hz=self._sim_cfg['rate_hz'],
+        #             sog_kts=self._sim_cfg['sog_kts'],
+        #             cog_deg=self._sim_cfg['cog_deg'],
+        #         )
+        # except Exception as e:
+        #     self.logger.log_warn("Failed to start internal NMEA sim: " + str(e))
 
         # Launch the node
         ok, msg, subp = nepi_drvs.launchDriverNode(file_name, node_name)
         self.launch_time_dict[launch_key] = nepi_sdk.get_time()
 
         if ok:
-            self.logger.log_warn(f"Launched node: {node_name}")
+            self.logger.log_warn("Launched node :"  + str(node_name))
             self.active_devices_dict[launch_key] = {'node_name': node_name, 'sub_process': subp}
             success = True
         else:
-            self.logger.log_warn(f"Failed to launch node: {node_name} with msg: {msg}")
+            self.logger.log_warn("Failed to launch node :"  + str(node_name) + " with msg :"  + str(msg))
             if not self.retry:
-                self.logger.log_warn(f"Will not try relaunch for node: {node_name}")
+                self.logger.log_warn("Will not try relaunch for node :"  + str(node_name))
                 self.dont_retry_list.append(launch_key)
             else:
-                self.logger.log_warn(f"Will attempt relaunch for node: {node_name} in {self.NODE_LOAD_TIME_SEC} secs")
+                self.logger.log_warn("Will attempt relaunch for node: " + node_name + " in " + str(self.NODE_LOAD_TIME_SEC) + " secs")
 
         return success
 
@@ -230,7 +235,7 @@ class NMEAUDPDiscovery:
         )
         self.sim_threads[key] = {'thread': t, 'stop': stop_evt}
         t.start()
-        self.logger.log_warn(f"Started internal NMEA sim on {key}")
+        self.logger.log_warn("Started internal NMEA sim on :" + str(key))
 
     def _stop_sim_server(self, key):
         info = self.sim_threads.get(key)
@@ -248,7 +253,7 @@ class NMEAUDPDiscovery:
         except Exception:
             pass
         self.sim_threads.pop(key, None)
-        self.logger.log_warn(f"Stopped internal NMEA sim on {key}")
+        self.logger.log_warn("Stopped internal NMEA sim on :" + str(key))
 
     def _sim_loop(self, host, port, stop_evt, lat, lon, alt_m, heading_deg, rate_hz, sog_kts, cog_deg):
         srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
