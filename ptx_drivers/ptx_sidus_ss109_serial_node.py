@@ -184,8 +184,8 @@ class SidusSS109SerialPTXNode:
             # Launch the PTX interface --  this takes care of initializing all the ptx settings from config. file, subscribing and advertising topics and services, etc.
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
             self.msg_if.pub_info("Launching NEPI PTX () interface...")
-            self.device_info_dict["device_name"] = self.driver_name
-            self.device_info_dict["path"] = self.driver_path
+            self.device_info_dict["device_name"] = self.device_name
+            self.device_info_dict["path"] = self.device_path
 
             #Factory Control Values 
             self.FACTORY_CONTROLS = {
