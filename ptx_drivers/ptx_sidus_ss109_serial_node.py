@@ -144,6 +144,8 @@ class SidusSS109SerialPTXNode:
         self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
         #self.msg_if.pub_warn("Got Drivers_Dict from param server: " + str(self.drv_dict))
         try:
+            self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
+            self.device_path = self.drv_dict['DEVICE_DICT']['device_path']            
             self.port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
             self.baud_str = self.drv_dict['DEVICE_DICT']['baud_str'] 
             self.baud_int = int(self.baud_str)
