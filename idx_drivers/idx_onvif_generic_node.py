@@ -416,7 +416,7 @@ class OnvifCamNode:
 
         need_data = False
         if last_time != None and self.idx_if is not None:
-          fr_delay = self.max_framerate
+          fr_delay = 1.0/self.max_framerate
           timer = current_time - last_time
           if timer > fr_delay:
             need_data = True
