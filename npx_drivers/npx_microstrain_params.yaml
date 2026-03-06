@@ -28,9 +28,6 @@ driver:
           - '921600'
         default: '115200'
         value: '115200'
-      auto_restart:
-        type: Bool
-        default: 'True'
       
 
 

@@ -953,7 +953,7 @@ class SidusSS109SerialPTXNode:
         return success
 
 
-    def send_msg(self,ser_msg, wait_on_busy = True, verbose = True):
+    def send_msg(self,ser_msg, wait_on_busy = True, verbose = False):
         caller_method = inspect.currentframe().f_back.f_code.co_name
         success = False
         response = "-999"

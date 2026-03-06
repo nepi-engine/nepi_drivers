@@ -36,9 +36,6 @@ driver:
           - 'color_image,depth_map'
           - 'color_image,depth_map,pointcloud'
         default: 'color_image,depth_map'
-      auto_restart:
-        type: Bool
-        default: 'True'
       navpose_enabled:
         type: Bool
         default: 'False'

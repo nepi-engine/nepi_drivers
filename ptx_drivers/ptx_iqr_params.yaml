@@ -14,8 +14,5 @@ driver:
     file_name: ptx_iqr_discovery.py
     class_name: IqrPanTiltDiscovery
     process: CALL
-    OPTIONS:
-      auto_restart:
-        type: Bool
-        default: 'True'
+
 

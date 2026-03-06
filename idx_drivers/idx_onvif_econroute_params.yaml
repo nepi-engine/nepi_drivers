@@ -15,9 +15,6 @@ driver:
     class_name: None
     process: None
     OPTIONS:
-      auto_restart:
-        type: Bool
-        default: 'True'
       data_products:
         type: Discrete
         options:

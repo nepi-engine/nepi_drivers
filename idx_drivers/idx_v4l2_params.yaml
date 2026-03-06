@@ -15,9 +15,6 @@ driver:
     class_name: V4L2CamDiscovery
     process: LAUNCH
     OPTIONS:
-      auto_restart:
-        type: Bool
-        default: 'True'
       launch_delay_sec:
         type: Int
         options:

@@ -29,6 +29,8 @@ class IqrPanTiltDiscovery:
   active_devices_dict = dict()
   node_launch_name = "iqr_pan_tilt"
 
+  dont_retry_list = []
+
   includeDevices = ['iqr_pan_tilt']
   excludedDevices = ['ttyACM']
 
@@ -52,7 +54,7 @@ class IqrPanTiltDiscovery:
  
   ##########  DRV Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
-  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict):
+  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict, retry_enabled = True):
     self.drv_dict = drv_dict
     #self.logger.log_warn("Got drv_dict : " + str(self.drv_dict))
     #self.logger.log_warn("Got available paths list : " + str(available_paths_list))
@@ -62,11 +64,13 @@ class IqrPanTiltDiscovery:
     
     ##################################
     # Get required data from drv_dict
-    if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
-      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
-    else:
-      self.retry = True
+
     ###################################
+
+    # Retry behavior
+    self.retry = retry_enabled
+    if self.retry == True:
+        self.dont_retry_list = []
 
     ### Purge Unresponsive Connections
     path_purge_list = []
@@ -84,7 +88,7 @@ class IqrPanTiltDiscovery:
     for path_str in self.available_paths_list:
       if path_str not in self.active_paths_list and path_str not in self.excludedDevices:
         found_device = self.checkForDevice(path_str)
-        if found_device == True:
+        if found_device == True and path_str not in self.dont_retry_list:
           self.logger.log_info("Found device on path: " + path_str)
           success = self.launchDeviceNode(path_str)
           if success == True:
@@ -115,6 +119,7 @@ class IqrPanTiltDiscovery:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
+        self.dont_retry_list.append(path_str)
         success = nepi_drvs.killDriverNode(node_name,sub_process)
 
         # Remove from dont_retry_list
@@ -158,9 +163,7 @@ class IqrPanTiltDiscovery:
       self.logger.log_info("Failed to lauch node: " + node_name + " with msg: " + msg)
       if self.retry == False:
         self.logger.log_info("Will not try relaunch for node: " + node_name)
-        self.dont_retry_list.append(launch_id)
-      else:
-        self.logger.log_info("Will attemp relaunch for node: " + node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+        self.dont_retry_list.append(path_str)
     return success
 
   def killAllDevices(self,active_paths_list):
@@ -173,6 +176,9 @@ class IqrPanTiltDiscovery:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
+        if self.retry == False:
+          self.logger.log_warn("Will not try relaunch for node: " + node_name)
+          self.dont_retry_list.append(path_str)        
         success = nepi_drvs.killDriverNode(node_name,sub_process)
         if path_str in active_paths_list:
           active_paths_list.remove(path_str)

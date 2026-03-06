@@ -35,6 +35,8 @@ class NMEAUDPDiscovery:
     active_devices_dict = dict()
     node_launch_name = "nmea"
 
+    dont_retry_list = []
+
     # simulator tracking
     sim_threads = {}   # key: "host:port" -> {'thread': t, 'stop': threading.Event()}
     _sim_cfg = None
@@ -49,7 +51,7 @@ class NMEAUDPDiscovery:
 
     ################################################
     # Nex Standard Discovery Function
-    def discoveryFunction(self, available_paths_list, active_paths_list, base_namespace, drv_dict):
+    def discoveryFunction(self, available_paths_list, active_paths_list, base_namespace, drv_dict, retry_enabled = True):
         """
         For TCP NMEA we don't 'discover' hardware. We:
           - Pull host/port/options from drv_dict
@@ -67,7 +69,9 @@ class NMEAUDPDiscovery:
         port = int(opts.get('tcp_port', {}).get('value', 50000))
 
         # Retry behavior
-        self.retry = bool(opts.get('retry', {}).get('value', True) if 'retry' in opts else opts.get('auto_restart', {}).get('value', True))
+        self.retry = retry_enabled
+        if self.retry == True:
+            self.dont_retry_list = []
 
         # Internal simulator configuration (optional)
         simulate = bool(opts.get('simulate_nmea', {}).get('value', False))
@@ -99,6 +103,7 @@ class NMEAUDPDiscovery:
                 purge.append(key)
         for key in purge:
             entry = self.active_devices_dict[key]
+            self.dont_retry_list.append(launch_key)
             nepi_drvs.killDriverNode(entry['node_name'], entry['sub_process'])
             if key in self.active_paths_list:
                 self.active_paths_list.remove(key)
@@ -107,7 +112,7 @@ class NMEAUDPDiscovery:
             self._stop_sim_server(key)
 
         # If not already active, attempt to “find” (always true for TCP) and launch
-        if launch_key not in self.active_paths_list:
+        if launch_key not in self.active_paths_list and launch_key not in self.dont_retry_list:
             found = self.checkForDevice(launch_key)  # always True for configured TCP
             if found:
                 if self.launchDeviceNode(launch_key, host, port):
@@ -190,10 +195,9 @@ class NMEAUDPDiscovery:
         #     self.logger.log_warn("Failed to start internal NMEA sim: " + str(e))
 
         # Launch the node
-        ok, msg, subp = nepi_drvs.launchDriverNode(file_name, node_name)
-        self.launch_time_dict[launch_key] = nepi_sdk.get_time()
-
-        if ok:
+        success, msg, subp = nepi_drvs.launchDriverNode(file_name, node_name)
+        if success == True:
+            self.launch_time_dict[launch_key] = nepi_sdk.get_time()
             self.logger.log_warn("Launched node :"  + str(node_name))
             self.active_devices_dict[launch_key] = {'node_name': node_name, 'sub_process': subp}
             success = True
@@ -204,7 +208,6 @@ class NMEAUDPDiscovery:
                 self.dont_retry_list.append(launch_key)
             else:
                 self.logger.log_warn("Will attempt relaunch for node: " + node_name + " in " + str(self.NODE_LOAD_TIME_SEC) + " secs")
-
         return success
 
     def killAllDevices(self, active_paths_list):

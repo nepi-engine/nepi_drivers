@@ -35,6 +35,8 @@ class AfTowerLightDiscovery:
   active_devices_dict = dict()
   node_launch_name = "af_tower_light"
 
+  dont_retry_list = []
+
   includeDevices = ['29987']
   excludedDevices = []
   ################################################          
@@ -49,7 +51,7 @@ class AfTowerLightDiscovery:
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
-  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict):
+  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict, retry_enabled = True):
     self.drv_dict = drv_dict
     #self.logger.log_warn("Got drv_dict : " + str(self.drv_dict))
     self.available_paths_list = available_paths_list
@@ -66,10 +68,10 @@ class AfTowerLightDiscovery:
       self.logger.log_warn("Failed to load options " + str(e))#
       return None
 
-    if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
-      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
-    else:
-      self.retry = True
+    # Retry behavior
+    self.retry = retry_enabled
+    if self.retry == True:
+        self.dont_retry_list = []
     ########################
 
     # Create path search options
@@ -90,7 +92,7 @@ class AfTowerLightDiscovery:
 
     ### Checking for devices on available paths
     for path_str in self.path_list:
-      if path_str not in self.active_paths_list:
+      if path_str not in self.active_paths_list and path_str not in self.dont_retry_list:
         found = self.checkForDevice(path_str)
         if found:
           success = self.launchDeviceNode(path_str)
@@ -127,15 +129,12 @@ class AfTowerLightDiscovery:
     if active == False:
       self.logger.log_info("No longer detecting device on : " + path_str)
       if path_str in self.active_devices_dict.keys():
+        launch_id = path_str
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
+        self.dont_retry_list.append(path_str)
         success = nepi_drvs.killDriverNode(node_name,sub_process)
-
-        # Remove from dont_retry_list
-        launch_id = path_str
-        if launch_id in self.dont_retry_list:
-          self.dont_retry_list.remove(launch_id)
 
     return active
 
@@ -170,12 +169,9 @@ class AfTowerLightDiscovery:
     nepi_sdk.set_param(dict_param_name,self.drv_dict)
     [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, node_name, device_path = path_str)
     if success == True:
-      self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
-
-    # Process luanch results
-    self.launch_time_dict[launch_id] = nepi_sdk.get_time()
-    if success:
+      self.launch_time_dict[launch_id] = nepi_sdk.get_time()
       self.logger.log_warn("Launched node: " + node_name)
+      self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
     else:
       self.logger.log_warn("Failed to lauch node: " + node_name + " with msg: " + msg)
       if self.retry == False:
@@ -185,6 +181,44 @@ class AfTowerLightDiscovery:
         self.logger.log_warn("Will attemp relaunch for node: " + node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
     return success
 
+
+
+  def killAllDevices(self,active_paths_list):
+    #self.logger.log_warn("Entering Kill All Devices function for path: " + str(path_str))###
+    path_purge_list = []
+    for key in self.active_devices_dict.keys():
+      path_purge_list.append(key)
+    self.logger.log_warn("Killing Devices: " + str(path_purge_list))
+    for path_str in path_purge_list:
+        path_entry = self.active_devices_dict[path_str]
+        node_name = path_entry['node_name']
+        sub_process = path_entry['sub_process']
+        if self.retry == False:
+          self.logger.log_warn("Will not try relaunch for node: " + node_name)
+          self.dont_retry_list.append(path_str)
+        success = nepi_drvs.killDriverNode(node_name,sub_process)
+
+    for path_str in path_purge_list:
+        try:
+          del  self.active_devices_dict[path_str]
+        except Exception as e:
+          self.logger.log_warn("Failed to remove driver from active paths dict: " + str(e))
+
+        try:
+          self.logger.log_warn("Removing path from active paths list: " + str(path_str))
+          self.active_paths_list.remove(path_str)
+          active_paths_list.remove(path_str)
+          self.logger.log_warn("Updated active paths list: " + str(active_paths_list))
+        except Exception as e:
+          self.logger.log_warn("Failed to remove driver from active paths list: " + str(e))
+
+
+        try:
+          self.logger.log_warn("Removing path from class active paths list: " + str(path_str))
+          self.active_paths_list.remove(path_str)
+        except Exception as e:
+          #self.logger.log_warn("Failed to remove driver from class active paths list: " + str(e))
+          pass
 
 if __name__ == '__main__':
     AfTowerLightDiscovery()

@@ -45,6 +45,8 @@ class SidusSS182SerialDiscovery:
   baud_int = 9600
   addr_str = "001"
 
+  dont_retry_list = []
+
   includeDevices = []
   excludedDevices = ['ttyACM']
 
@@ -60,7 +62,7 @@ class SidusSS182SerialDiscovery:
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
-  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace,drv_dict):
+  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace,drv_dict, retry_enabled = True):
     self.logger.log_debug("Entering discovery function with drv_dict: " + str(drv_dict))###
     self.drv_dict = drv_dict
     self.available_paths_list = available_paths_list
@@ -120,7 +122,10 @@ class SidusSS182SerialDiscovery:
     
 
     ########################
-
+    # Retry behavior
+    self.retry = retry_enabled
+    if self.retry == True:
+        self.dont_retry_list = []
 
     # Create path search options
     self.path_list = nepi_serial.get_serial_ports_list()
@@ -149,7 +154,7 @@ class SidusSS182SerialDiscovery:
         self.logger.log_debug("In path_list: " + str(self.active_paths_list))
 
         found = self.checkForDevice("/dev/ttyUSB0")    #(path_str)
-        if found:
+        if found and path_str not in self.dont_retry_list:
           success = self.launchDeviceNode(path_str)
           if success:
             self.active_paths_list.append(path_str)
@@ -216,6 +221,7 @@ class SidusSS182SerialDiscovery:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
+        self.dont_retry_list.append(path_str)
         success = nepi_drvs.killDriverNode(node_name,sub_process)
     return active
 
@@ -241,3 +247,47 @@ class SidusSS182SerialDiscovery:
     if success:
       self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
       self.active_paths_list.append(path_str)
+    else:
+      self.logger.log_info("Failed to lauch node: " + node_name + " with msg: " + msg)
+      if self.retry == False:
+        self.logger.log_info("Will not try relaunch for node: " + node_name)
+        self.dont_retry_list.append(path_str)
+
+
+  def killAllDevices(self,active_paths_list):
+    #self.logger.log_warn("Entering Kill All Devices function for path: " + str(path_str))###
+    path_purge_list = []
+    for key in self.active_devices_dict.keys():
+      path_purge_list.append(key)
+    self.logger.log_warn("Killing Devices: " + str(path_purge_list))
+    for path_str in path_purge_list:
+        path_entry = self.active_devices_dict[path_str]
+        node_name = path_entry['node_name']
+        sub_process = path_entry['sub_process']
+        success = nepi_drvs.killDriverNode(node_name,sub_process)
+
+    for path_str in path_purge_list:
+        try:
+          del  self.active_devices_dict[path_str]
+        except Exception as e:
+          self.logger.log_warn("Failed to remove driver from active paths dict: " + str(e))
+
+        try:
+          self.logger.log_warn("Removing path from active paths list: " + str(path_str))
+          self.active_paths_list.remove(path_str)
+          active_paths_list.remove(path_str)
+          self.logger.log_warn("Updated active paths list: " + str(active_paths_list))
+        except Exception as e:
+          self.logger.log_warn("Failed to remove driver from active paths list: " + str(e))
+
+
+        try:
+          self.logger.log_warn("Removing path from class active paths list: " + str(path_str))
+          self.active_paths_list.remove(path_str)
+        except Exception as e:
+          #self.logger.log_warn("Failed to remove driver from class active paths list: " + str(e))
+          pass
+
+
+    nepi_sdk.sleep(1)
+    return active_paths_list

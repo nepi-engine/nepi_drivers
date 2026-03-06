@@ -42,6 +42,7 @@ class V4L2CamDiscovery:
   drv_dict = dict()                        
   deviceList = []      
 
+
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
 
@@ -92,6 +93,8 @@ class V4L2CamDiscovery:
   def updateDiscoveryOptions(self):
     ########################
     # Get discovery options
+
+    
     success = False
     last_drv_dict = copy.deepcopy(self.drv_dict)
     self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
@@ -106,10 +109,12 @@ class V4L2CamDiscovery:
     success = True
 
 
-    if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
-      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
+    if 'retry_enabled' in self.drv_dict.keys():
+      self.retry = self.drv_dict['retry_enabled']
     else:
       self.retry = True
+    if self.retry == True:
+      self.dont_retry_list = []
 
 
     launch_delay_sec = self.NODE_LAUNCH_DELAY_SEC
@@ -179,6 +184,7 @@ class V4L2CamDiscovery:
             active_paths.append(path_str) # To check later that the device list has no entries for paths that have disappeared
             known_device = False
             for device in self.deviceList:
+              node_namespace = device['node_namespace']
               ####################
               ## Check on known devices using this path
               ####################
@@ -191,7 +197,7 @@ class V4L2CamDiscovery:
                   # Kill previous and start new?
                   self.msg_if.pub_warn("detected V4L2 device type change (" + device['device_type'] + "-->" + 
                                 device_type + ") for device at " + path_str)
-                  self.stopAndPurgeDeviceNode(device['node_namespace'])
+                  self.stopAndPurgeDeviceNode(node_namespace)
                   # Remove from dont_retry_list
                   launch_id = path_str
                   if launch_id in self.dont_retry_list:
@@ -200,8 +206,8 @@ class V4L2CamDiscovery:
               ####################
               # Check if running devices still running
               ####################
-              elif not self.deviceNodeIsRunning(device['node_namespace']):
-                  self.stopAndPurgeDeviceNode(device['node_namespace'])
+              elif not self.deviceNodeIsRunning(node_namespace) and node_namespace not in self.dont_retry_list:
+                  self.stopAndPurgeDeviceNode(node_namespace)
                 
                   ### DON'T REMOVE FROM dont_retry_list ###
                   launch_id = path_str
@@ -247,11 +253,7 @@ class V4L2CamDiscovery:
     for node_name in purge_list:
         self.msg_if.pub_info("Device path: " + path_str + " no longer present. Stopping node " + device['node_name'])
         self.stopAndPurgeDeviceNode(node_name)  
-
-        # Remove from dont_retry_list
-        launch_id = path_str
-        if launch_id in self.dont_retry_list:
-          self.dont_retry_list.remove(launch_id)      
+     
 
     #########################
     # Setup next check process
@@ -303,7 +305,7 @@ class V4L2CamDiscovery:
           if device['node_name'] == node_name:
             device_exists = True
 
-        if device_exists is False:
+        if device_exists is False and node_name not in self.dont_retry_list:
           self.msg_if.pub_info("Initiating new V4L2 node " + node_namespace)
           # Now start the node via rosrun
           # rosrun nepi_drivers_idx v4l2_camera_node.py __name:=usb_cam_1 _device_path:=/dev/video0
@@ -342,7 +344,7 @@ class V4L2CamDiscovery:
               self.msg_if.pub_info(" Failed to lauch node: " + node_name + " with msg: " + msg)
               if self.retry == False:
                 self.msg_if.pub_info(" Will not try relaunch for node: " + node_name)
-                self.dont_retry_list.append(launch_id)
+                self.dont_retry_list.append(node_name)
               else:
                 self.msg_if.pub_info(" Will attemp relaunch for node: " + node_name + " in " + self.NODE_LOAD_TIME_SEC + " secs")
     return success
@@ -354,10 +356,15 @@ class V4L2CamDiscovery:
       if node_namespace == 'All':
         self.check_for_devices = False
       for i, device in enumerate(self.deviceList):
-        if device['node_namespace'] == node_namespace or node_namespace == 'All':
-          node_name = device['node_namespace'].split("/")[-1]
+        namespace = device['node_namespace']
+        node_name = os.path.basename(namespace)
+        if namespace == node_namespace or node_namespace == 'All':
+
           sub_process = device['node_subprocess']
-          self.msg_if.pub_info("Killing device node: " + node_namespace)
+          self.msg_if.pub_info("Killing device node: " + node_name)
+          if self.retry == False:
+            self.msg_if.pub_info("Adding device node to don't retry list: " + node_name)
+            self.dont_retry_list.append(node_name)
           success = nepi_drvs.killDriverNode(node_name,sub_process)
           if success == False:
             self.msg_if.pub_warn("Unable to kill device node " + node_name)

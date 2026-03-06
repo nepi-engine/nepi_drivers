@@ -43,6 +43,8 @@ class SidusSS109SerialDiscovery:
   baud_int = 9600
   addr_str = "001"
 
+  dont_retry_list = []
+
   includeDevices = []
   excludedDevices = ['ttyACM']
 
@@ -62,7 +64,7 @@ class SidusSS109SerialDiscovery:
 
   ##########  Nex Standard Discovery Function
   ### Function to try and connect to device and also monitor and clean up previously connected devices
-  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace,drv_dict):
+  def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace,drv_dict, retry_enabled = True):
     #self.logger.log_warn("Entering discovery function with available_paths_list: " + str(available_paths_list))###
     #self.logger.log_warn("Entering discovery function with active_paths_list: " + str(active_paths_list))###
     #self.logger.log_warn("Entering discovery function with drv_dict: " + str(drv_dict))###
@@ -126,7 +128,10 @@ class SidusSS109SerialDiscovery:
     
 
     ########################
-
+    # Retry behavior
+    self.retry = retry_enabled
+    if self.retry == True:
+        self.dont_retry_list = []
 
     # Create path search options
     self.path_list = nepi_serial.get_serial_ports_list()
@@ -159,7 +164,7 @@ class SidusSS109SerialDiscovery:
       if valid_path:
         #self.logger.log_warn("Looking for path: " + path_str + " In path_list: " + str(self.active_paths_list))
         found = self.checkForDevice(path_str)
-        if found:
+        if found and path_str not in self.dont_retry_list:
           self.logger.log_warn("Found device for path: " + path_str )
           success = self.launchDeviceNode(path_str)
           self.logger.log_warn("Got Launch success: " + str(success) )
@@ -236,6 +241,7 @@ class SidusSS109SerialDiscovery:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
+        self.dont_retry_list.append(path_str)
         success = nepi_drvs.killDriverNode(node_name,sub_process)
         active = False
     return active
@@ -266,6 +272,11 @@ class SidusSS109SerialDiscovery:
       self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
       self.active_paths_list.append(path_str)
       self.logger.log_warn("Driver Node launched successfully, added to active device dict keys: " + str(self.active_devices_dict.keys()))###
+    else:
+      self.logger.log_info("Failed to lauch node: " + node_name + " with msg: " + msg)
+      if self.retry == False:
+        self.logger.log_info("Will not try relaunch for node: " + node_name)
+        self.dont_retry_list.append(path_str)
     return success
 
 
@@ -279,6 +290,9 @@ class SidusSS109SerialDiscovery:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
+        if self.retry == False:
+          self.logger.log_warn("Will not try relaunch for node: " + node_name)
+          self.dont_retry_list.append(path_str)
         success = nepi_drvs.killDriverNode(node_name,sub_process)
 
     for path_str in path_purge_list:

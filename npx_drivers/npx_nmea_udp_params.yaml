@@ -34,10 +34,7 @@ driver:
         options: ['9600','19200','38400','57600','115200']
         default: '115200'
         value: '115200'
-      auto_restart:
-        type: Bool
-        default: 'True'
-        value: 'True'
+
 
       # Internal simulator (optional). When enabled, the discovery starts a local
       # TCP NMEA server on tcp_host:tcp_port that emits GGA/RMC/VTG/HDG using the

@@ -122,10 +122,14 @@ class GenicamCamDiscovery:
       self.msg_if.pub_warn("Updated Driver Dict: " + str(self.drv_dict))
     success = True
 
-    if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
-      self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
+    if 'retry_enabled' in self.drv_dict.keys():
+      self.retry = self.drv_dict['retry_enabled']
     else:
       self.retry = True
+    if self.retry == True:
+      self.dont_retry_list = []
+
+
     return success
 
 
@@ -186,13 +190,8 @@ class GenicamCamDiscovery:
         if device_is_known:
           active_devices[known_device["node_namespace"]] = True
           break
-      if not device_is_known:
+      if not device_is_known and node_namespace not in self.dont_retry_list:
         self.startDeviceNode(vendor=vendor, model=model, serial_number=sn)
-
-        # Remove from dont_retry_list
-        #launch_id = node_namespace
-        #if launch_id in self.dont_retry_list:
-          #self.dont_retry_list.remove(launch_id) 
 
     # Stop any nodes associated with devices that have disappeared.
     for node_namespace, running in active_devices.items():
@@ -242,7 +241,7 @@ class GenicamCamDiscovery:
       launch_time = self.launch_time_dict[launch_id]
       cur_time = nepi_sdk.get_time()
       launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
-    if launch_check == False:
+    if launch_check == False or node_name in self.dont_retry_list:
       return False  ###
 
     ### Start Node Luanch Process
@@ -292,7 +291,7 @@ class GenicamCamDiscovery:
       self.msg_if.pub_info(" Failed to lauch node: " + node_name + " with msg: " + msg)
       if self.retry == False:
         self.msg_if.pub_info(" Will not try relaunch for node: " + node_name)
-        self.dont_retry_list.append(launch_id)
+        self.dont_retry_list.append(node_name)
       else:
         self.msg_if.pub_info(" Will attemp relaunch for node: " + node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
     return success
@@ -301,10 +300,12 @@ class GenicamCamDiscovery:
       if node_namespace == 'All':
         self.check_for_devices = False
       for i, device in enumerate(self.deviceList):
-        if device['node_namespace'] == node_namespace or node_namespace == 'All':
-          node_name = device['node_namespace'].split("/")[-1]
+        namespace = device['node_namespace']
+        node_name = os.path.basename(namespace)
+        if namespace == node_namespace or node_namespace == 'All':
           sub_process = device['node_subprocess']
-          self.msg_if.pub_info("Killing device node: " + node_namespace)
+          self.msg_if.pub_info("Killing device node: " + node_name)
+          self.dont_retry_list.append(node_name)
           success = nepi_drvs.killDriverNode(node_name,sub_process)
           if success == False:
             self.msg_if.pub_warn("Unable to kill device node " + node_name)

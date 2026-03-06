@@ -44,6 +44,8 @@ class MicrostrainDiscovery:
     baud_int = 115200
     addr_str = "001"
 
+    dont_retry_list = []
+
     includeDevices = []
     excludedDevices = ['ttyACM']
 
@@ -59,7 +61,7 @@ class MicrostrainDiscovery:
         self.logger.log_info("Initialization Complete")
 
     ##########  Nex Standard Discovery Function
-    def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace,drv_dict):
+    def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace,drv_dict, retry_enabled = True):
 
         # Create path search options
         
@@ -99,11 +101,10 @@ class MicrostrainDiscovery:
             self.logger.log_warn("Failed to load options " + str(e))#
             return None
 
-        if 'retry' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
-            self.retry = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['retry']['value']
-        else:
-            self.retry = True
-        #self.logger.log_warn("Got retry" + str(self.retry))
+        # Retry behavior
+        self.retry = retry_enabled
+        if self.retry == True:
+            self.dont_retry_list = []
         ########################
 
 
@@ -112,9 +113,8 @@ class MicrostrainDiscovery:
         path_purge_list = []
         for path_str in self.active_devices_dict:
             success = self.checkOnDevice(path_str)
-            if self.retry == False:
-                if success == False:
-                    path_purge_list.append(path_str) 
+            if success == False:
+                path_purge_list.append(path_str) 
         # Clean up the active_devices_dict
         for path_str in path_purge_list:
             del  self.active_devices_dict[path_str]
@@ -131,7 +131,7 @@ class MicrostrainDiscovery:
                 if path_str.find(exclude) != -1 or path_str in self.active_paths_list:
                     valid_path = False
             #self.logger.log_warn("Got path check valid: " + str(valid_path))
-            if valid_path:
+            if valid_path and path_str not in self.dont_retry_list:
                 #self.logger.log_warn("Looking for path: " + path_str)
                 #self.logger.log_warn("In path_list: " + str(self.active_paths_list))
                 found = self.checkForDevice(path_str)
@@ -278,6 +278,7 @@ class MicrostrainDiscovery:
             path_entry = self.active_devices_dict[path_str]
             node_name = path_entry['node_name']
             sub_process = path_entry['sub_process']
+            self.dont_retry_list.append(path_str)
             success = nepi_drvs.killDriverNode(node_name,sub_process)
             if path_str in active_paths_list:
                 active_paths_list.remove(path_str)
