@@ -601,13 +601,13 @@ class SidusSS109SerialPTXNode:
             ser_msg= (self.both_str + self.addr_str + dir_str + data_str + 'W')
         else:
             return False
-        self.msg_if.pub_warn(method_name + ": Sending Get Soft Stop serial msg: " + ser_msg)
+        #self.msg_if.pub_warn(method_name + ": Sending Get Soft Stop serial msg: " + ser_msg)
         [success,response] = self.send_msg(ser_msg)
 
         if success:
             try:
                 data_str = response[5:(5 + self.data_len)]
-                self.msg_if.pub_warn(method_name + ": Will convert soft limit data str: " + data_str)
+                #self.msg_if.pub_warn(method_name + ": Will convert soft limit data str: " + data_str)
                 pos_count = int(data_str)
                 softLimit = self.pos_count2deg(pos_count)
                 success = True
@@ -644,7 +644,7 @@ class SidusSS109SerialPTXNode:
             ser_msg= (self.both_str + self.addr_str + dir_str + data_str + 'W')
         else:
             return False
-        self.msg_if.pub_warn(method_name + ": Sending Set Soft Stop serial msg: " + ser_msg)
+        #self.msg_if.pub_warn(method_name + ": Sending Set Soft Stop serial msg: " + ser_msg)
         [success,response] = self.send_msg(ser_msg)  
         return success 
 
@@ -674,7 +674,7 @@ class SidusSS109SerialPTXNode:
         if success:
             try:
                 data_str = response[5:(5 + self.data_len)]
-                self.msg_if.pub_warn(method_name + ": Will convert speed str: " + data_str)
+                #self.msg_if.pub_warn(method_name + ": Will convert speed str: " + data_str)
                 speed_count = int(data_str)
                 speedRatio = self.speed_count2ratio(speed_count)
             except Exception as e:
@@ -694,7 +694,7 @@ class SidusSS109SerialPTXNode:
         speed_count = None
         try:
             speed_count = self.ratio2speed_count(speedRatio)
-            self.msg_if.pub_warn(method_name + ": Updating Speed Count Data to: " + str(speed_count))
+            #self.msg_if.pub_warn(method_name + ": Updating Speed Count Data to: " + str(speed_count))
         except Exception as e:
             self.msg_if.pub_warn(method_name + ": Failed to convert message: " + str(speedRatio) + " " + str(e))
             return False
@@ -811,7 +811,7 @@ class SidusSS109SerialPTXNode:
         self.serial_lock = True
         success = self.driver_moveToPanPosition(pan_deg)
         success = self.driver_moveToTiltPosition(tilt_deg)
-        self.msg_if.pub_warn("driver_moveToPosition: " + str(success))
+        #self.msg_if.pub_warn("driver_moveToPosition: " + str(success))
         self.serial_lock = False
         return success
 
@@ -843,8 +843,8 @@ class SidusSS109SerialPTXNode:
         pos_count = self.deg2pos_count(tilt_deg)
         data_str = self.create_pos_str(pos_count)
         ser_msg= (self.tilt_str + self.addr_str + 'MML' + data_str + 'W')
-        self.msg_if.pub_warn("pos_count: " + str(pos_count) + "data_str: " + str(data_str))
-        self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
+        #self.msg_if.pub_warn("pos_count: " + str(pos_count) + "data_str: " + str(data_str))
+        #self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
         [success,response] = self.send_msg(ser_msg)
 
         # if self.SET_SPEED == True:
@@ -869,18 +869,18 @@ class SidusSS109SerialPTXNode:
         data_str = self.create_blank_str()
         if axis_str == self.pan_str:
             ser_msg= (self.pan_str + self.addr_str + 'MST' + data_str + 'W')
-            self.msg_if.pub_warn(method_name + ": Sending Stop Pan serial msg: " + ser_msg)
+            #self.msg_if.pub_warn(method_name + ": Sending Stop Pan serial msg: " + ser_msg)
         elif axis_str == self.tilt_str:
             ser_msg= (self.tilt_str + self.addr_str + 'MST' + data_str + 'W')
-            self.msg_if.pub_warn(method_name + ": Sending Stop Tilt serial msg: " + ser_msg)
+            #self.msg_if.pub_warn(method_name + ": Sending Stop Tilt serial msg: " + ser_msg)
         elif axis_str == self.both_str:
             ser_msg= (self.pan_str + self.addr_str + 'MST' + data_str + 'W')
-            self.msg_if.pub_warn(method_name + ": Sending Stop Pan serial msg: " + ser_msg)
+            #self.msg_if.pub_warn(method_name + ": Sending Stop Pan serial msg: " + ser_msg)
 
             nepi_sdk.sleep(self.serial_send_delay)
 
             ser_msg= (self.tilt_str + self.addr_str + 'MST' + data_str + 'W')
-            self.msg_if.pub_warn(method_name + ": Sending Stop Tilt serial msg: " + ser_msg)
+            #self.msg_if.pub_warn(method_name + ": Sending Stop Tilt serial msg: " + ser_msg)
         else:
             return False
         self.serial_lock = False
@@ -933,7 +933,7 @@ class SidusSS109SerialPTXNode:
                 # Test message
                 data_str = self.create_blank_str()
                 ser_msg= (self.pan_str + self.addr_str + 'MRA' + data_str + 'R')
-                self.msg_if.pub_warn("Sending serial string: " + ser_msg)
+                #self.msg_if.pub_warn("Sending serial string: " + ser_msg)
                 [success,response] = self.send_msg(ser_msg)
 
                 if success:
@@ -1058,7 +1058,7 @@ class SidusSS109SerialPTXNode:
         for add_port in add_ports:
             if add_port not in ports:
                 ports.append(add_port)
-        self.msg_if.pub_warn("Node Port Check: " + str(ports))
+        #self.msg_if.pub_warn("Node Port Check: " + str(ports))
         for p in ports:
             loc = getattr(p, 'device', p)
             if loc == port_str:
