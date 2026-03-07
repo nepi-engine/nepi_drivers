@@ -16,7 +16,7 @@ FILE_TYPE = 'DRIVER'
 
 
 class GenericONVIF_PTZ(object):
-    WSDL_FOLDER = "/opt/nepi/nepi_engine/etc/onvif/wsdl/"
+    WSDL_FOLDER = "/opt/nepi/nepi_engine/etc/wsdl/"
     PT_DIRECTION_POSITIVE = 1
     PT_DIRECTION_NEGATIVE = -1
     PT_DIRECTION_NONE = 0

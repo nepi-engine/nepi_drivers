@@ -196,7 +196,7 @@ class IqrPanTiltNode:
             return
 
         ################################################  
-        self.msg_if.pub_info("Connecting to Device on port " + self.port_str + " with baud " + self.baud_str)
+        self.msg_if.pub_info("Connecting to Device on port " + self.device_path + " with baud " + self.baud_str)
         ### Try and connect to device
         # while self.connected == False and self.connect_attempts < 5:
         #     self.connected = self.connect() 
@@ -633,11 +633,11 @@ class IqrPanTiltNode:
             success = False
             try:
                 # Try to request pt_status
-                #self.msg_if.pub_info("Connection Check requesting info for device on port: " + self.port_str)
+                #self.msg_if.pub_info("Connection Check requesting info for device on port: " + self.device_path)
                 [success,pt_status] = self.driver_getPtStatus()
                 #self.msg_if.pub_info("Heartbeat check got status: " + str(pt_status))
             except Exception as e:
-                self.msg_if.pub_warn("Something went wrong with connecting to serial port at: " + self.port_str + "(" + str(e) + ")" )
+                self.msg_if.pub_warn("Something went wrong with connecting to serial port at: " + self.device_path + "(" + str(e) + ")" )
         if success:
             self.self_check_counter = 0 # reset comms failure count
         else:
@@ -645,7 +645,7 @@ class IqrPanTiltNode:
 
         #self.msg_if.pub_warn("Current failed comms count: " + str(self.self_check_counter))
         if self.self_check_counter > self.self_check_count:  # Crashes node if set above limit??
-            self.msg_if.pub_warn("Shutting down device: " +  self.addr_str + " on port " + self.port_str)
+            self.msg_if.pub_warn("Shutting down device: " +  self.addr_str + " on port " + self.device_path)
             self.msg_if.pub_warn("Too many comm failures")
             nepi_sdk.signal_shutdown("To many comm failures")   
 
@@ -654,26 +654,26 @@ class IqrPanTiltNode:
     def connect(self):
         success = False
         self.connect_attempts += 1
-        port_check = True #self.check_port(self.port_str)
+        port_check = True #self.check_port(self.device_path)
         pt_status = None
         if port_check is True:
             try:
                 # Try and open serial port
-                self.msg_if.pub_info("Opening mod_bus port " + self.port_str + " with baudrate: " + self.baud_str + " with addr: " + self.addr_str)
-                self.modbus_master = ModbusRTUMaster(self.port_str, self.baud_int)
+                self.msg_if.pub_info("Opening mod_bus port " + self.device_path + " with baudrate: " + self.baud_str + " with addr: " + self.addr_str)
+                self.modbus_master = ModbusRTUMaster(self.device_path, self.baud_int)
                 self.msg_if.pub_info("Modbus port opened")
                 success = True
             except Exception as e:
-                self.msg_if.pub_warn("Something went wrong with connecting to serial port at: " + self.port_str + "(" + str(e) + ")" )
+                self.msg_if.pub_warn("Something went wrong with connecting to serial port at: " + self.device_path + "(" + str(e) + ")" )
             if success == True:
                 nepi_sdk.sleep(0.1)
                 success = False
                 # Send Message
-                self.msg_if.pub_info("Connect process requesting info for device on port: " + self.port_str)
+                self.msg_if.pub_info("Connect process requesting info for device on port: " + self.device_path)
 
                 [success,pt_status] = self.driver_getPtStatus()
                 if success:
-                    self.msg_if.pub_info("Connected to device on port: " +  self.port_str)
+                    self.msg_if.pub_info("Connected to device on port: " +  self.device_path)
                     self.msg_if.pub_warn("Got status on connection: " + str(pt_status))
                     self.pt_status = pt_status
                     # Update serial, hardware, and software status values
@@ -684,7 +684,7 @@ class IqrPanTiltNode:
                     success = True
                     # Factory Reset Device
                 else:
-                    self.msg_if.pub_info("Failed to get status from device on port: " +  self.port_str)
+                    self.msg_if.pub_info("Failed to get status from device on port: " +  self.device_path)
     
 
                 self.driver_moveToPosition(0.0, 0.0)
@@ -697,11 +697,11 @@ class IqrPanTiltNode:
 
 
     ### Function for checking if port is available
-    def check_port(self,port_str):
+    def check_port(self,device_path):
         success = False
         ports = serial.tools.list_ports.comports()
         for loc, desc, hwid in sorted(ports):
-            if loc == port_str:
+            if loc == device_path:
                 success = True
         return success
 
