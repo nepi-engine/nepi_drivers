@@ -66,7 +66,7 @@ class OnvifPanTiltNode:
         # Get required drv driver dict info
         try:
             self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
-            #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
+            self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
             self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
             self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
             self.driver_path = self.drv_dict['path']
@@ -144,6 +144,7 @@ class OnvifPanTiltNode:
                 
             if not self.driver.hasAbsolutePositioning():
                 ptx_callback_names["GotoPosition"] = None # Clear the method
+
             
             self.has_absolute_positioning_and_feedback = self.driver.hasAbsolutePositioning() and self.driver.reportsPosition()
             ptx_capabilities_dict['has_absolute_positioning'] = self.has_absolute_positioning_and_feedback
@@ -170,6 +171,10 @@ class OnvifPanTiltNode:
             if not self.has_absolute_positioning_and_feedback:
                 ptx_callback_names["SetHomePosition"] = None    
 
+            ptx_callback_names["StopMoving"] = self.stopMoving
+            ptx_callback_names["MovePan"] = self.movePan
+            ptx_callback_names["MoveTilt"] = self.movePan
+            ptx_callback_names["MoveTilt"] = self.moveTilt
 
             # Now that we've updated the callbacks table, can apply the remappings... this is particularly useful since
             # many ONVIF devices report capabilities that they don't actually have, so need a user-override mechanism. In
@@ -250,17 +255,17 @@ class OnvifPanTiltNode:
                                         settingUpdateFunction=self.settingUpdateFunction,
                                         getSettingsFunction=self.getSettings,
                                         factoryControls = self.FACTORY_CONTROLS,
-                                        defaultSettings = self.default_settings,
+                                        factoryLimits = self.default_settings,
                                         stopMovingCb = ptx_callback_names["StopMoving"],
                                         movePanCb = ptx_callback_names["MovePan"],
                                         moveTiltCb = ptx_callback_names["MoveTilt"],
-                                        setSpeedCb = ptx_callback_names["SetSpeed"],
-                                        getSpeedCb = ptx_callback_names["GetSpeed"],
-                                        getCurrentPositionCb = ptx_callback_names["GetPosition"],
-                                        gotoPositionCb = ptx_callback_names["GotoPosition"],
+                                        setSpeedRatioCb = None, #ptx_callback_names["SetSpeed"],
+                                        getSpeedRatioCb = None, #ptx_callback_names["GetSpeed"],
+                                        getPositionCb = ptx_callback_names["GetPosition"],
+                                        gotoPositionCb = None, #ptx_callback_names["GotoPosition"],
                                         goHomeCb = ptx_callback_names["GoHome"],
-                                        setHomePositionCb = ptx_callback_names["SetHomePosition"],
-                                        setHomePositionHereCb = ptx_callback_names["SetHomePositionHere"],
+                                        setHomePositionCb = None, #ptx_callback_names["SetHomePosition"],
+                                        setHomePositionHereCb = None, #ptx_callback_names["SetHomePositionHere"],
                                         getNavPoseCb = self.getNavPoseDict,
                                         navpose_update_rate = self.MAX_POSITION_UPDATE_RATE)
                                         
@@ -339,12 +344,12 @@ class OnvifPanTiltNode:
 
     def movePan(self, direction, duration):
         if self.ptx_if is not None:
-            driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.driver.PT_DIRECTION_NEGATIVE
+            driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == 1 else self.driver.PT_DIRECTION_NEGATIVE
             self.driver.jog(pan_direction = driver_direction, tilt_direction = self.driver.PT_DIRECTION_NONE, speed_ratio = self.speed_ratio, time_s = duration)
 
     def moveTilt(self, direction, duration):
         if self.ptx_if is not None:
-            driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.driver.PT_DIRECTION_NEGATIVE
+            driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == 1 else self.driver.PT_DIRECTION_NEGATIVE
             self.driver.jog(pan_direction = self.driver.PT_DIRECTION_NONE, tilt_direction = driver_direction, speed_ratio = self.speed_ratio, time_s = duration)
 
     def setSpeed(self, speed_ratio):
