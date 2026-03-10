@@ -274,7 +274,12 @@ class OnvifCamNode:
 
     def getSettings(self):
         settings = dict()
-        controls_dict = self.driver.getCameraControls()
+        try:
+            controls_dict = self.driver.getCameraControls()
+        except Exception as e:
+            self.msg_if.pub_warn("Failed to get camera controls (camera may be disconnected): " + str(e))
+            nepi_sdk.signal_shutdown(self.node_name + ": Camera connection lost, shutting down")
+            return settings
         for setting_name in controls_dict.keys():
             if 'type' in controls_dict[setting_name]:
                 setting = dict()
@@ -299,26 +304,35 @@ class OnvifCamNode:
                     setting['type'] = "String"
                     settings[setting_name] = setting
         # Add Resolution Cap Settting
-        [success,res_dict] = self.driver.getResolution()
-        #self.msg_if.pub_info(str(res_dict))
-        setting = dict()
-        setting['name'] = 'Resolution'
-        setting['type'] = 'Discrete'
-        width = str(res_dict['Width'])
-        height = str(res_dict['Height'])
-        setting_value = (width + ":" + height)
-        setting['value'] = setting_value
-        settings['Resolution'] = setting
+        try:
+            [success,res_dict] = self.driver.getResolution()
+            setting = dict()
+            setting['name'] = 'Resolution'
+            setting['type'] = 'Discrete'
+            width = str(res_dict['Width'])
+            height = str(res_dict['Height'])
+            setting_value = (width + ":" + height)
+            setting['value'] = setting_value
+            settings['Resolution'] = setting
+        except Exception as e:
+            self.msg_if.pub_warn("Failed to get resolution (camera may be disconnected): " + str(e))
+            nepi_sdk.signal_shutdown(self.node_name + ": Camera connection lost, shutting down")
+            return settings
 
         # Add Framerate Cap Setting
-        [success,framerate] = self.driver.getFramerate()
-        setting = dict()
-        setting['name'] = 'Framerate'
-        setting['type'] = 'Int'
-        setting_value = (str(round(framerate,2)))
-        setting['value'] = setting_value
-        settings['Framerate'] = setting
-        self.current_fps = framerate
+        try:
+            [success,framerate] = self.driver.getFramerate()
+            setting = dict()
+            setting['name'] = 'Framerate'
+            setting['type'] = 'Int'
+            setting_value = (str(round(framerate,2)))
+            setting['value'] = setting_value
+            settings['Framerate'] = setting
+            self.current_fps = framerate
+        except Exception as e:
+            self.msg_if.pub_warn("Failed to get framerate (camera may be disconnected): " + str(e))
+            nepi_sdk.signal_shutdown(self.node_name + ": Camera connection lost, shutting down")
+            return settings
         return settings
 
 

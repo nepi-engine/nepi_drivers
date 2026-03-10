@@ -340,17 +340,29 @@ class OnvifPanTiltNode:
     ### PTX IF Functions
 
     def stopMoving(self):
-        self.driver.stopMotion()
+        try:
+            self.driver.stopMotion()
+        except Exception as e:
+            self.msg_if.pub_warn("Failed to stop PTZ motion (device may be disconnected): " + str(e))
+            nepi_sdk.signal_shutdown(self.node_name + ": PTZ device connection lost, shutting down")
 
     def movePan(self, direction, duration):
         if self.ptx_if is not None:
             driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == 1 else self.driver.PT_DIRECTION_NEGATIVE
-            self.driver.jog(pan_direction = driver_direction, tilt_direction = self.driver.PT_DIRECTION_NONE, speed_ratio = self.speed_ratio, time_s = duration)
+            try:
+                self.driver.jog(pan_direction = driver_direction, tilt_direction = self.driver.PT_DIRECTION_NONE, speed_ratio = self.speed_ratio, time_s = duration)
+            except Exception as e:
+                self.msg_if.pub_warn("Failed to pan (device may be disconnected): " + str(e))
+                nepi_sdk.signal_shutdown(self.node_name + ": PTZ device connection lost, shutting down")
 
     def moveTilt(self, direction, duration):
         if self.ptx_if is not None:
             driver_direction = self.driver.PT_DIRECTION_POSITIVE if direction == 1 else self.driver.PT_DIRECTION_NEGATIVE
-            self.driver.jog(pan_direction = self.driver.PT_DIRECTION_NONE, tilt_direction = driver_direction, speed_ratio = self.speed_ratio, time_s = duration)
+            try:
+                self.driver.jog(pan_direction = self.driver.PT_DIRECTION_NONE, tilt_direction = driver_direction, speed_ratio = self.speed_ratio, time_s = duration)
+            except Exception as e:
+                self.msg_if.pub_warn("Failed to tilt (device may be disconnected): " + str(e))
+                nepi_sdk.signal_shutdown(self.node_name + ": PTZ device connection lost, shutting down")
 
     def setSpeed(self, speed_ratio):
         # TODO: Limits checking and driver unit conversion?
@@ -418,7 +430,12 @@ class OnvifPanTiltNode:
 
 
     def getCurrentPosition(self):
-        pan_ratio_onvif, tilt_ratio_onvif = self.driver.getCurrentPosition()
+        try:
+            pan_ratio_onvif, tilt_ratio_onvif = self.driver.getCurrentPosition()
+        except Exception as e:
+            self.msg_if.pub_warn("Failed to get PTZ position (device may be disconnected): " + str(e))
+            nepi_sdk.signal_shutdown(self.node_name + ": PTZ device connection lost, shutting down")
+            return 0.0, 0.0
         if pan_ratio_onvif != -999 and tilt_ratio_onvif != -999:
             self.last_pan_ratio_onvif = pan_ratio_onvif
             self.last_tilt_ratio_onvif = tilt_ratio_onvif
