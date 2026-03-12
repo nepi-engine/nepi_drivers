@@ -129,7 +129,7 @@ class SidusSS182SerialDiscovery:
 
     # Create path search options
     self.path_list = nepi_serial.get_serial_ports_list()
-    #self.logger.log_warn("ports list: " + str(self.path_list))###
+    #self.logger.log_debug("ports list: " + str(self.path_list))###
 
     ### Purge Unresponsive Connections
     path_purge_list = []
@@ -227,17 +227,17 @@ class SidusSS182SerialDiscovery:
 
 
   def launchDeviceNode(self, path_str):
-    self.logger.log_warn("Entering launch device function for path: " + str(path_str) + ' addr: ' + str(self.addr_str))###
+    self.logger.log_debug("Entering launch device function for path: " + str(path_str) + ' addr: ' + str(self.addr_str))###
     file_name = self.drv_dict['NODE_DICT']['file_name']
     device_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
     node_name = nepi_system.get_device_alias(device_name)
-    self.logger.log_warn(" launching node: " + node_name)
+    self.logger.log_debug(" launching node: " + node_name)
     #Setup required param server drv_dict for discovery node
 
     
     #Setup required param server drv_dict for discovery node
     dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
-    self.logger.log_warn(" launching node: " + str(self.drv_dict))
+    self.logger.log_debug(" launching node: " + str(self.drv_dict))
     self.drv_dict['DEVICE_DICT']={'device_name': device_name,
                                   'device_path': path_str}
     self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str
@@ -255,11 +255,11 @@ class SidusSS182SerialDiscovery:
 
 
   def killAllDevices(self,active_paths_list):
-    #self.logger.log_warn("Entering Kill All Devices function for path: " + str(path_str))###
+    #self.logger.log_debug("Entering Kill All Devices function for path: " + str(path_str))###
     path_purge_list = []
     for key in self.active_devices_dict.keys():
       path_purge_list.append(key)
-    self.logger.log_warn("Killing Devices: " + str(path_purge_list))
+    self.logger.log_debug("Killing Devices: " + str(path_purge_list))
     for path_str in path_purge_list:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
@@ -270,22 +270,22 @@ class SidusSS182SerialDiscovery:
         try:
           del  self.active_devices_dict[path_str]
         except Exception as e:
-          self.logger.log_warn("Failed to remove driver from active paths dict: " + str(e))
+          self.logger.log_debug("Failed to remove driver from active paths dict: " + str(e))
 
         try:
-          self.logger.log_warn("Removing path from active paths list: " + str(path_str))
+          self.logger.log_debug("Removing path from active paths list: " + str(path_str))
           self.active_paths_list.remove(path_str)
           active_paths_list.remove(path_str)
-          self.logger.log_warn("Updated active paths list: " + str(active_paths_list))
+          self.logger.log_debug("Updated active paths list: " + str(active_paths_list))
         except Exception as e:
-          self.logger.log_warn("Failed to remove driver from active paths list: " + str(e))
+          self.logger.log_debug("Failed to remove driver from active paths list: " + str(e))
 
 
         try:
-          self.logger.log_warn("Removing path from class active paths list: " + str(path_str))
+          self.logger.log_debug("Removing path from class active paths list: " + str(path_str))
           self.active_paths_list.remove(path_str)
         except Exception as e:
-          #self.logger.log_warn("Failed to remove driver from class active paths list: " + str(e))
+          #self.logger.log_debug("Failed to remove driver from class active paths list: " + str(e))
           pass
 
 

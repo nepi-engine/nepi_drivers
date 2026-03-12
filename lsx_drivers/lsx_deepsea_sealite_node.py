@@ -130,8 +130,8 @@ class SealiteNode(object):
       try:
         self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
         #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
-        self.device_name = self.drv_dict['DRIVER_DICT']['device_name']
-        self.device_path = self.drv_dict['DRIVER_DICT']['device_path']
+        self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
+        self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
         self.port_str = self.drv_dict['DEVICE_DICT']['device_path'] 
         self.baud_str = self.drv_dict['DEVICE_DICT']['baud_str'] 
         self.baud_int = int(self.baud_str)
@@ -162,20 +162,15 @@ class SealiteNode(object):
         self.turnOnOff(False)
 
         # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
-        self.msg_if.pub_info("-2")
 
         self.msg_if.pub_info("Launching NEPI LSX () interface...")
-        self.msg_if.pub_info("-1")
         self.msg_if.pub_info("node name: " + str(self.node_name))
-
-        self.msg_if.pub_info("0")
 
         self.device_info_dict["device_name"] = self.device_name
         self.device_info_dict["path"] = self.device_path
         self.device_info_dict["serial_number"] = self.serial_num
         self.device_info_dict["hw_version"] = self.hw_version
         self.device_info_dict["sw_version"] = self.sw_version
-        self.msg_if.pub_info("3")
 
         self.lsx_if = LSXDeviceIF(
                     device_info = self.device_info_dict, 
@@ -282,6 +277,8 @@ class SealiteNode(object):
     val = '-999'
     ser_msg= ('!' + self.addr_str + ':curv=?')
     response = self.send_msg(ser_msg)
+    if response is None:
+      return val
     response_curv_parts = response.split(',')
     if len(response_curv_parts) == 7:
       self.cur_curv = response_curv_parts
@@ -311,6 +308,8 @@ class SealiteNode(object):
     val = '-999'
     ser_msg= ('!' + self.addr_str + ':CURV=?')
     response = self.send_msg(ser_msg)
+    if response is None:
+      return val
     response_curv_parts = response.split(',')
     if len(response_curv_parts) == 7:
       self.cur_curv = response_curv_parts
@@ -473,6 +472,7 @@ class SealiteNode(object):
     return success 
 
   def setIntensityFunction(self,intensity_ratio):
+    success = False
     level_val = int(100*intensity_ratio) * int(self.on_off_state)
     level_str = str(level_val)
     zero_prefix_len = 3-len(level_str)
@@ -482,7 +482,7 @@ class SealiteNode(object):
     response = self.send_msg(ser_msg)
     if response != None and response != "?":
       success = True
-    return success 
+    return success
 
   def setStrobeEnable(self,strobe_enable_val):
     success = False
@@ -507,20 +507,29 @@ class SealiteNode(object):
     ser_str = (ser_msg + '\r\n')
     b=bytearray()
     b.extend(map(ord, ser_str))
+    sleep_time = 0.01
+    timeout = 2
+    timer = 0
+    while self.serial_busy == True and timer < timeout and not nepi_sdk.is_shutdown():
+      time.sleep(sleep_time)
+      timer += sleep_time
+    if timer >= timeout:
+      self.serial_busy = False
+      self.self_check_counter += 1
+      return
     try:
-      while self.serial_busy == True and not nepi_sdk.is_shutdown():
-        time.sleep(0.01) # Wait for serial port to be available
       self.serial_busy = True
       self.serial_port.write(b)
     except Exception as e:
       self.msg_if.pub_warn("Failed to send message")
     time.sleep(.01)
+    bs = None
     try:
       bs = self.serial_port.readline()
     except Exception as e:
       self.msg_if.pub_warn("Failed to receive message")
     self.serial_busy = False
-    response = bs.decode()
+    response = bs.decode() if bs is not None else ""
     # Check for valid response 
     if response != None and response != "?" and len(response)>4:
       ret_addr = response[0:3]
@@ -609,13 +618,11 @@ class SealiteNode(object):
             response = bs.decode()
             #print("Send response received: " + response[0:-2])
           except Exception as e1:
-            print("Failed to recieve message")
+            self.serial_busy = False
         except Exception as e2:
-          print("Failed to send message")
-      else:
-        print("Serial port write timed out on busy state")
+          self.serial_busy = False
     else:
-      print("serial port not defined, returning empty string")
+      pass  # serial port busy or not defined, return None
     return response
 
   ### Function for checking if port is available
