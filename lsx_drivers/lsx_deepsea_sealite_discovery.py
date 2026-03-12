@@ -47,7 +47,7 @@ class SealiteDiscovery:
   dont_retry_list = []
 
   includeDevices = []
-  excludedDevices = ['ttyACM']
+  excludedDevices = ['ttyACM', 'ttyTCU', 'ttyTHS']
 
   ################################################          
   def __init__(self):
@@ -108,9 +108,10 @@ class SealiteDiscovery:
     path_purge_list = []
     for path_str in self.active_devices_dict:
         success = self.checkOnDevice(path_str)
-        if self.retry == False:
-          if success == False:
-            path_purge_list.append(path_str) 
+        if success == False:
+          path_purge_list.append(path_str)
+          if self.retry == False:
+            self.dont_retry_list.append(path_str)
     # Clean up the active_devices_dict
     for path_str in path_purge_list:
       del  self.active_devices_dict[path_str]
@@ -192,6 +193,10 @@ class SealiteDiscovery:
     active = True
     if path_str not in self.available_paths_list:
       active = False
+    elif path_str in self.active_devices_dict:
+      sub_process = self.active_devices_dict[path_str].get('sub_process')
+      if sub_process is not None and sub_process.poll() is not None:
+        active = False  # node process has exited
     if active == False:
       self.logger.log_info("No longer detecting device on : " + path_str)
       if path_str in self.active_devices_dict.keys():
@@ -218,7 +223,7 @@ class SealiteDiscovery:
     if launch_id in self.launch_time_dict.keys():
       launch_time = self.launch_time_dict[launch_id]
       cur_time = nepi_sdk.get_time()
-      launch_check = (cur_time - launch_time) > str(self.NODE_LOAD_TIME_SEC)
+      launch_check = (cur_time - launch_time) > self.NODE_LOAD_TIME_SEC
     if launch_check == False:
       return False   ###
 
