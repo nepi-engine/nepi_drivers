@@ -210,7 +210,7 @@ class ZedCamDiscovery:
                 known_device = True
               
 
-            if known_device == False and node_name not in self.dont_retry_list:
+            if known_device == False and path_str not in self.dont_retry_list:
               self.msg_if.pub_warn("Starting zed on path" + path_str)
               success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
               if success:
@@ -276,7 +276,7 @@ class ZedCamDiscovery:
           if device['node_name'] == node_name:
             device_exists = True
 
-        if device_exists is False and node_name not in self.dont_retry_list:
+        if device_exists is False and path_str not in self.dont_retry_list:
           self.msg_if.pub_info("Initiating new Zed node " + node_namespace)
 
           # Now start the node via rosrun
@@ -336,7 +336,7 @@ class ZedCamDiscovery:
       if namespace == node_namespace or node_namespace == 'All':
         sub_process = device['node_subprocess']
         self.msg_if.pub_info("Killing device node: " + node_name)
-        self.dont_retry_list.append(node_name)
+        #self.dont_retry_list.append(path_str)
         success = nepi_drvs.killDriverNode(node_name,sub_process)
         # And remove it from the list
         purge_paths.append(path_str)
