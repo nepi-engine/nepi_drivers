@@ -130,11 +130,13 @@ class V4l2CamNode:
                     mjpg = True
                     break
             self.msg_if.pub_info("Launching driver with mjpg mode: " + str(mjpg))
+            self.msg_if.pub_warn("device path: " + str(self.device_path))
+
             try:
                 self.driver = self.driver_class(self.device_path,mjpg=mjpg)
             except Exception as e:
                 # Only log the error every 30 seconds -- don't want to fill up log in the case that the camera simply isn't attached.
-                self.msg_if.pub_warn("Failed to instantiate driver " + str(e) )
+                self.msg_if.pub_warn("Failed to instantiate driver: " + str(e) )
                 sys.exit(-1)
         ################################################
         # Start node initialization
