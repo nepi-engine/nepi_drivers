@@ -118,6 +118,7 @@ class MicrostrainNode(object):
     driver_node_name = DEFAULT_NODE_NAME
     driver_node_process = None
     imu_sub = None
+    odom_sub = None
 
     device_info_dict = dict(device_name = "",
                             path = "",
@@ -242,8 +243,8 @@ class MicrostrainNode(object):
         # Create Subscribers
         #sub_base_namespace = nepi_sdk.create_namespace(self.base_namespace,self.driver_node_name)
         sub_namespace = nepi_sdk.create_namespace(self.base_namespace, "imu/data")
-        self.msg_if.pub_warn("Starting Imu subscriber for namespace: " + sub_namespace) 
-        self.imu_sub = nepi_sdk.create_subscriber(sub_namespace, Imu, self.odomCb, queue_size = 10)
+        self.msg_if.pub_warn("Starting Imu subscriber for namespace: " + sub_namespace)
+        self.imu_sub = nepi_sdk.create_subscriber(sub_namespace, Imu, self.imuCb, queue_size = 10)
 
         sub_namespace = nepi_sdk.create_namespace(self.node_namespace, "shutdown")
         self.msg_if.pub_warn("Starting Shutdown subsriber for namespace: " + sub_namespace) 
@@ -276,20 +277,21 @@ class MicrostrainNode(object):
 
 
 
-    ### Callback to publish RBX odom topic
-    def odomCb(self,imu_msg):
+    ### Callback for IMU orientation data
+    def imuCb(self, imu_msg):
         # Convert quaternion to roll,pitch,yaw
         pose = imu_msg.orientation
-        xyzw = list([pose.x,pose.y,pose.z,pose.w])
+        xyzw = list([pose.x, pose.y, pose.z, pose.w])
         rpy = nepi_nav.convert_quat2rpy(xyzw)
 
         timestamp = nepi_sdk.sec_from_msg_stamp(imu_msg.header.stamp)
 
-        self.driver_navpose_dict['time_oreantation'] = timestamp
+        self.driver_navpose_dict['time_orientation'] = timestamp
         # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
         self.driver_navpose_dict['roll_deg'] = rpy[0]
         self.driver_navpose_dict['pitch_deg'] = rpy[1]
         self.driver_navpose_dict['yaw_deg'] = rpy[2]
+
 
 
     def getNavPoseCb(self):

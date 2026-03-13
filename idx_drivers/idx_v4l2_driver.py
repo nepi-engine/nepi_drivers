@@ -90,6 +90,7 @@ class V4l2CamDriver(object):
 
     nLines = len(out)
     print(nLines)
+    print("out: " + str(out))
     for i in range(0, nLines):
       #Skip menu legend lines which are denoted by 4 tabs
       if out[i].startswith('\t\t\t\t'):
