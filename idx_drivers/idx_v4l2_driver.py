@@ -31,12 +31,13 @@ class V4l2CamDriver(object):
                            stdout=subprocess.PIPE,
                            stderr=subprocess.STDOUT,
                            text=True)
+    print("0")
+
     stdout,_ = p.communicate()
     if p.returncode != 0:
       raise Exception("Failed to list v4l2 devices: " + stdout)
     
     out = stdout.splitlines()
-
     path_validated = False
     tmp_device_type = None
     nLines = len(out)
@@ -61,7 +62,8 @@ class V4l2CamDriver(object):
     if status is False:
       self.connected = False
       raise Exception("Failed to identify video formats: " + msg)
-    
+    print("3")
+
     self.img_acq_lock = threading.Lock()
     self.v4l2_cap = None # Delayed until streaming begins
     self.latest_frame = None
@@ -89,10 +91,11 @@ class V4l2CamDriver(object):
     self.camera_controls = dict()
 
     nLines = len(out)
-    print(nLines)
+
     for i in range(0, nLines):
       #Skip menu legend lines which are denoted by 4 tabs
-      if out[i].startswith('\t\t\t\t'):
+
+      if out[i] == '' or out[i] == 'User Controls' or out[i] == 'Camera Controls' or  out[i].startswith('\t\t\t\t'):
         continue
 
       a = dict()
@@ -136,10 +139,13 @@ class V4l2CamDriver(object):
           while h >= 0:
             h += 1
             ih = i + h
-            if out[ih].startswith('\t\t\t\t') and (ih) <= nLines:
-              legend_value,legend_key = out[i+h].strip().split(':')
-              legend[legend_key.strip()] = int(legend_value)
-            else:
+            try:
+              if (ih < nLines) and out[ih].startswith('\t\t\t\t'):
+                legend_value,legend_key = out[i+h].strip().split(':')
+                legend[legend_key.strip()] = int(legend_value)
+              else:
+                h = -1
+            except Exception as e:
               h = -1
           a['legend'] = legend    # additional data on settings
         a['step'] = 1           # adding to work with updateUVCsetting()
