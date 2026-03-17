@@ -1,0 +1,78 @@
+driver:
+  pkg_name: NPX_HNAV
+  display_name: Sonardyne SPRINT Nav Mini (HNav)
+  description: Sonardyne 8334 SPRINT Nav Mini – binary HNav protocol over TCP
+  type: NPX
+  group_id: None
+  NODE_DICT:
+    file_name: npx_hnav_node.py
+    class_name: HNavNode
+  DRIVER_DICT:
+    file_name: None
+    class_name: None
+  DISCOVERY_DICT:
+    file_name: npx_hnav_discovery.py
+    class_name: HNavDiscovery
+    process: CALL
+    OPTIONS:
+      # -----------------------------------------------------------------------
+      # TCP connection to the SPRINT Nav Mini (or simulator)
+      # -----------------------------------------------------------------------
+      tcp_host:
+        type: String
+        default: '127.0.0.1'
+        value: '127.0.0.1'
+      tcp_port:
+        type: Int
+        default: '16718'
+        value: '16718'
+
+      # -----------------------------------------------------------------------
+      # Built-in HNav simulator
+      #
+      # Set simulate_hnav to True to run a local TCP server that generates
+      # valid HNav packets.  The node will connect to it exactly as it would
+      # to real hardware.  Also change tcp_host to '127.0.0.1' so the node
+      # connects to localhost instead of the real device IP.
+      # -----------------------------------------------------------------------
+      simulate_hnav:
+        type: Bool
+        default: 'False'
+        value: 'False'
+
+      sim_latitude:
+        type: Float
+        default: '47.6205'
+        value: '47.6205'
+      sim_longitude:
+        type: Float
+        default: '-122.3493'
+        value: '-122.3493'
+      sim_depth_m:
+        type: Float
+        default: '10.0'
+        value: '10.0'
+      sim_altitude_m:
+        type: Float
+        default: '5.0'
+        value: '5.0'
+      sim_heading_deg:
+        type: Float
+        default: '0.0'
+        value: '0.0'
+      sim_roll_deg:
+        type: Float
+        default: '0.0'
+        value: '0.0'
+      sim_pitch_deg:
+        type: Float
+        default: '0.0'
+        value: '0.0'
+      sim_speed_ms:
+        type: Float
+        default: '0.5'
+        value: '0.5'
+      sim_rate_hz:
+        type: Int
+        default: '10'
+        value: '10'
