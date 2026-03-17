@@ -4,9 +4,9 @@
 #
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
-# Discovery script for the Sonardyne SPRINT Nav Mini (8334) HNav driver.
+# Discovery script for HNav binary protocol TCP NavPose sensors.
 #
-# The SPRINT Nav Mini streams HNav binary packets over a persistent TCP
+# The device streams HNav binary packets over a persistent TCP
 # connection.  There is no serial port to enumerate; "discovery" here means
 # reading the configured host:port from the driver dictionary and launching
 # the node once per unique endpoint.
@@ -30,7 +30,7 @@ from nepi_sdk import nepi_system
 PKG_NAME = 'NPX_HNAV'
 FILE_TYPE = 'DISCOVERY'
 
-PARAM_FILE_PATH = '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_hnav_params.yaml'
+PARAM_FILE_PATH = '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_hnav_tcu_params.yaml'
 DEFAULT_NODE_FILE = 'npx_hnav_node.py'
 
 # ---------------------------------------------------------------------------
@@ -295,7 +295,6 @@ class HNavDiscovery:
             device_name = f"{self.node_launch_name}_{launch_key.replace(':', '_').replace('.', '')}"
 
         node_name = nepi_system.get_device_alias(device_name)
-        self.logger.log_warn(f"Launching HNav node: {node_name}")
 
         dict_param_name = nepi_sdk.create_namespace(
             self.base_namespace, node_name + "/drv_dict")

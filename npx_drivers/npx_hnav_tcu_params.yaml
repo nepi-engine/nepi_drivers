@@ -1,22 +1,22 @@
 driver:
   pkg_name: NPX_HNAV
-  display_name: Sonardyne SPRINT Nav Mini (HNav)
-  description: Sonardyne 8334 SPRINT Nav Mini – binary HNav protocol over TCP
+  display_name: HNav TCP
+  description: HNav binary protocol NavPose sensor over TCP
   type: NPX
   group_id: None
   NODE_DICT:
-    file_name: npx_hnav_node.py
+    file_name: npx_hnav_tcu_node.py
     class_name: HNavNode
   DRIVER_DICT:
     file_name: None
     class_name: None
   DISCOVERY_DICT:
-    file_name: npx_hnav_discovery.py
+    file_name: npx_hnav_tcu_discovery.py
     class_name: HNavDiscovery
     process: CALL
     OPTIONS:
       # -----------------------------------------------------------------------
-      # TCP connection to the SPRINT Nav Mini (or simulator)
+      # TCP connection to the HNav device (or simulator)
       # -----------------------------------------------------------------------
       tcp_host:
         type: String

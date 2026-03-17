@@ -4,10 +4,7 @@
 #
 # License: 3-clause BSD, see https://opensource.org/licenses/BSD-3-Clause
 #
-# Driver for the Sonardyne SPRINT Nav Mini (8334) via the binary HNav protocol.
-#
-# HNav binary protocol reference:
-#   https://github.com/Sonardyne/sprint-nav-mini-hnav
+# Driver for HNav binary protocol NavPose sensors over TCP.
 #
 # Packet layout (67 bytes total):
 #   Bytes  0-1  : Start bytes 0xAA 0xBF
@@ -39,8 +36,7 @@
 #   Bytes 65-66 : CRC-16 (little-endian)
 #
 # IMPORTANT – Scale constants below are derived from the open-source reference decoder
-# and verified against the published example data.  If Sonardyne updates the ICD,
-# re-check these values against the official Interface Control Document.
+# and verified against the published example data.
 
 import os
 import socket
@@ -156,7 +152,7 @@ class HNavNode(object):
             self.host = str(dev.get('tcp_host', '192.168.2.201'))
             self.port = int(dev.get('tcp_port', 16718))
             self.param_file = dev.get('param_file',
-                '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_hnav_params.yaml')
+                '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_hnav_tcu_params.yaml')
 
             save_data = self.drv_dict.get('SAVE_DATA', {}) or {}
             self.debug = bool(save_data.get('debug', False)
@@ -223,6 +219,7 @@ class HNavNode(object):
             try:
                 with socket.create_connection((self.host, self.port),
                                               timeout=5.0) as s:
+                    self.msg_if.pub_info(f"TCP connected to {self.host}:{self.port}")
                     s.settimeout(5.0)
                     buf = bytearray()
                     while not self._stop_evt.is_set():
