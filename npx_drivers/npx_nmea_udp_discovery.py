@@ -47,6 +47,7 @@ class NMEAUDPDiscovery:
         self.logger = nepi_sdk.logger(log_name=self.log_name)
         time.sleep(0.2)
         self.logger.log_info("Starting Initialization")
+        self._saved_tcp_host = None
         self.logger.log_info("Initialization Complete")
 
     ################################################
@@ -65,7 +66,7 @@ class NMEAUDPDiscovery:
 
         # Load options (host/port, retry). Provide safe defaults.
         opts = (self.drv_dict.get('DISCOVERY_DICT') or {}).get('OPTIONS', {})
-        host = str(opts.get('tcp_host', {}).get('value', '127.0.0.1'))
+        configured_host = str(opts.get('tcp_host', {}).get('value', '127.0.0.1'))
         port = int(opts.get('tcp_port', {}).get('value', 50000))
 
         # Retry behavior
@@ -74,24 +75,41 @@ class NMEAUDPDiscovery:
             self.dont_retry_list = []
 
         # Internal simulator configuration (optional)
-        simulate = bool(opts.get('simulate_nmea', {}).get('value', False))
-        alt_latitude = float(opts.get('alt_latitude', {}).get('value', 47.6205))
-        alt_longitude = float(opts.get('alt_longitude', {}).get('value', -122.3493))
-        alt_altitude = float(opts.get('alt_altitude', {}).get('value', 10.0))
-        alt_heading_deg = float(opts.get('alt_heading_deg', {}).get('value', 0.0))
+        simulate = str(opts.get('simulate_nmea', {}).get('value', 'False')).strip().lower() in ('true', '1', 'yes')
+        if simulate:
+            if self._saved_tcp_host is None:
+                self._saved_tcp_host = configured_host
+                self.logger.log_info(
+                    f"simulate_nmea enabled: saving tcp_host '{configured_host}', connecting to 127.0.0.1")
+            host = '127.0.0.1'
+        else:
+            if self._saved_tcp_host is not None:
+                self.logger.log_info(
+                    f"simulate_nmea disabled: restoring tcp_host to '{self._saved_tcp_host}'")
+                try:
+                    self.drv_dict['DISCOVERY_DICT']['OPTIONS']['tcp_host']['value'] = self._saved_tcp_host
+                except Exception:
+                    pass
+                configured_host = self._saved_tcp_host
+                self._saved_tcp_host = None
+            host = configured_host
+        sim_latitude = float(opts.get('sim_latitude', {}).get('value', 47.6205))
+        sim_longitude = float(opts.get('sim_longitude', {}).get('value', -122.3493))
+        sim_altitude = float(opts.get('sim_altitude', {}).get('value', 10.0))
+        sim_heading_deg = float(opts.get('sim_heading_deg', {}).get('value', 0.0))
         sim_rate = int(opts.get('sim_rate_hz', {}).get('value', 5))
         sim_speed = float(opts.get('sim_speed_kts', {}).get('value', 0.0))
-        course_deg = opts.get('course_deg', {}).get('value', None)
-        if course_deg is not None and course_deg != "None":
+        sim_course_deg = opts.get('sim_course_deg', {}).get('value', None)
+        if sim_course_deg is not None and sim_course_deg != "None":
             try:
-                course_deg = float(course_deg)
+                sim_course_deg = float(sim_course_deg)
             except Exception:
-                course_deg = None
+                sim_course_deg = None
         self._sim_cfg = dict(
             simulate=simulate, host=host, port=port,
-            lat=alt_latitude, lon=alt_longitude, alt_m=alt_altitude,
-            heading_deg=alt_heading_deg, rate_hz=sim_rate,
-            sog_kts=sim_speed, cog_deg=(course_deg if course_deg is not None else alt_heading_deg)
+            lat=sim_latitude, lon=sim_longitude, alt_m=sim_altitude,
+            heading_deg=sim_heading_deg, rate_hz=sim_rate,
+            sog_kts=sim_speed, cog_deg=(sim_course_deg if sim_course_deg is not None else sim_heading_deg)
         )
 
         launch_key = f"{host}:{port}"
@@ -103,18 +121,40 @@ class NMEAUDPDiscovery:
                 purge.append(key)
         for key in purge:
             entry = self.active_devices_dict[key]
-            self.dont_retry_list.append(launch_key)
             nepi_drvs.killDriverNode(entry['node_name'], entry['sub_process'])
             if key in self.active_paths_list:
                 self.active_paths_list.remove(key)
             del self.active_devices_dict[key]
-            # stop any sim server tied to the old key
             self._stop_sim_server(key)
+
+        # If sim is already running, restart it if any config values changed
+        if simulate and launch_key in self.sim_threads:
+            cfg = self._sim_cfg
+            new_cfg = dict(lat=cfg['lat'], lon=cfg['lon'], alt_m=cfg['alt_m'],
+                           heading_deg=cfg['heading_deg'], rate_hz=cfg['rate_hz'],
+                           sog_kts=cfg['sog_kts'], cog_deg=cfg['cog_deg'])
+            if self.sim_threads[launch_key].get('cfg') != new_cfg:
+                self._stop_sim_server(launch_key)
+                time.sleep(0.5)
+                self._start_sim_server(
+                    host=cfg['host'], port=cfg['port'],
+                    lat=cfg['lat'], lon=cfg['lon'], alt_m=cfg['alt_m'],
+                    heading_deg=cfg['heading_deg'], rate_hz=cfg['rate_hz'],
+                    sog_kts=cfg['sog_kts'], cog_deg=cfg['cog_deg'],
+                )
 
         # If not already active, attempt to “find” (always true for TCP) and launch
         if launch_key not in self.active_paths_list and launch_key not in self.dont_retry_list:
             found = self.checkForDevice(launch_key)  # always True for configured TCP
             if found:
+                if simulate:
+                    cfg = self._sim_cfg
+                    self._start_sim_server(
+                        host=cfg['host'], port=cfg['port'],
+                        lat=cfg['lat'], lon=cfg['lon'], alt_m=cfg['alt_m'],
+                        heading_deg=cfg['heading_deg'], rate_hz=cfg['rate_hz'],
+                        sog_kts=cfg['sog_kts'], cog_deg=cfg['cog_deg'],
+                    )
                 if self.launchDeviceNode(launch_key, host, port):
                     self.active_paths_list.append(launch_key)
 
@@ -157,7 +197,6 @@ class NMEAUDPDiscovery:
         except:
             device_name = self.node_launch_name + "_" + str(launch_key).replace(':','_').replace('.','').replace('-','_')
         node_name = nepi_system.get_device_alias(device_name)
-        self.logger.log_warn("Launching node: " + node_name)
 
 
         
@@ -176,23 +215,6 @@ class NMEAUDPDiscovery:
         self.drv_dict['SAVE_DATA']['save_rate_dict'] = self.drv_dict['SAVE_DATA'].get('save_rate_dict', {})
         self.drv_dict['SAVE_DATA']['save_data_enable'] = bool(self.drv_dict['SAVE_DATA'].get('save_data_enable', False))
         nepi_sdk.set_param(dict_param_name, self.drv_dict)
-
-        # # Start internal NMEA simulator if requested (before launching client node so it can connect)
-        # try:
-        #     if self._sim_cfg and self._sim_cfg.get('simulate'):
-        #         self._start_sim_server(
-        #             host=self._sim_cfg['host'],
-        #             port=self._sim_cfg['port'],
-        #             lat=self._sim_cfg['lat'],
-        #             lon=self._sim_cfg['lon'],
-        #             alt_m=self._sim_cfg['alt_m'],
-        #             heading_deg=self._sim_cfg['heading_deg'],
-        #             rate_hz=self._sim_cfg['rate_hz'],
-        #             sog_kts=self._sim_cfg['sog_kts'],
-        #             cog_deg=self._sim_cfg['cog_deg'],
-        #         )
-        # except Exception as e:
-        #     self.logger.log_warn("Failed to start internal NMEA sim: " + str(e))
 
         # Launch the node
         success, msg, subp = nepi_drvs.launchDriverNode(file_name, node_name)
@@ -236,7 +258,7 @@ class NMEAUDPDiscovery:
             args=(host, port, stop_evt, lat, lon, alt_m, heading_deg, rate_hz, sog_kts, cog_deg),
             daemon=True
         )
-        self.sim_threads[key] = {'thread': t, 'stop': stop_evt}
+        self.sim_threads[key] = {'thread': t, 'stop': stop_evt, 'cfg': dict(lat=lat, lon=lon, alt_m=alt_m, heading_deg=heading_deg, rate_hz=rate_hz, sog_kts=sog_kts, cog_deg=cog_deg)}
         t.start()
         self.logger.log_warn("Started internal NMEA sim on :" + str(key))
 

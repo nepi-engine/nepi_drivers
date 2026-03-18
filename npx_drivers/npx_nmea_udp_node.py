@@ -112,6 +112,12 @@ class NMEAUDPNode(object):
         self._rx_thread = threading.Thread(target=self._tcp_loop, daemon=True)
         self._rx_thread.start()
 
+        # Pre-declare capabilities so NPXDeviceIF creates the correct publishers
+        # at init time regardless of whether the device is reachable yet.
+        self.driver_navpose_dict['has_location'] = True
+        self.driver_navpose_dict['has_heading']  = True
+        self.driver_navpose_dict['has_altitude'] = True
+
         # 6) Register NPXDeviceIF so the rest of NEPI can query navpose
         self.device_info_dict["device_name"] = self.device_name
         self.device_info_dict["path"] = self.device_path
@@ -267,7 +273,8 @@ class NMEAUDPNode(object):
             self.msg_if.pub_info(f"HDT: heading_true={cog:.1f}deg")
 
     def getNavPoseCb(self):
-        return self.driver_navpose_dict
+        with self._lock:
+            return copy.deepcopy(self.driver_navpose_dict)
 
     def cleanup_actions(self):
         self.msg_if.pub_warn("Shutdown cleanup actions complete")

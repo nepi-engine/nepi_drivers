@@ -259,6 +259,17 @@ class HNavDiscovery:
             del self.active_devices_dict[key]
             self._stop_sim_server(key)
 
+        # If sim is already running, restart it if any config values changed
+        if simulate and launch_key in self._sim_threads:
+            cfg = self._sim_cfg
+            new_cfg = dict(lat=cfg['lat'], lon=cfg['lon'], depth=cfg['depth'], alt=cfg['alt'],
+                           heading=cfg['heading'], rate_hz=cfg['rate_hz'], speed_ms=cfg['speed_ms'],
+                           roll=cfg['roll'], pitch=cfg['pitch'])
+            if self._sim_threads[launch_key].get('cfg') != new_cfg:
+                self._stop_sim_server(launch_key)
+                time.sleep(0.5)
+                self._start_sim_server(launch_key)
+
         if (launch_key not in self.active_paths_list
                 and launch_key not in self.dont_retry_list):
             if self._check_for_device(launch_key):
@@ -359,7 +370,10 @@ class HNavDiscovery:
                   cfg['roll'], cfg['pitch']),
             daemon=True,
         )
-        self._sim_threads[launch_key] = {'thread': t, 'stop': stop_evt}
+        self._sim_threads[launch_key] = {'thread': t, 'stop': stop_evt, 'cfg': dict(
+            lat=cfg['lat'], lon=cfg['lon'], depth=cfg['depth'], alt=cfg['alt'],
+            heading=cfg['heading'], rate_hz=cfg['rate_hz'], speed_ms=cfg['speed_ms'],
+            roll=cfg['roll'], pitch=cfg['pitch'])}
         t.start()
         self.logger.log_warn(f"Started HNav simulator on {launch_key}")
 
