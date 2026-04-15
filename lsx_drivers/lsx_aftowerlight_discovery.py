@@ -18,9 +18,6 @@ from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_system
 from nepi_sdk import nepi_serial
 
-from nepi_sdk.nepi_sdk import logger as Logger
-log_name = "iqr_pan_tilt"
-logger = Logger(log_name = log_name)
 
 PKG_NAME = 'LSX_AFTOWERLIGHT'
 FILE_TYPE = 'DISCOVERY'

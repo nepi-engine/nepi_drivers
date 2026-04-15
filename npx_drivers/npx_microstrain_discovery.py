@@ -17,9 +17,6 @@ from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_system
 from nepi_sdk import nepi_serial
 
-from nepi_sdk.nepi_sdk import logger as Logger
-log_name = "microstrain_imu"
-logger = Logger(log_name = log_name)
 
 PKG_NAME = 'NPX_MICROSTRAIN_AHAR'
 FILE_TYPE = 'DISCOVERY'
@@ -78,16 +75,14 @@ class MicrostrainDiscovery:
         ########################
         # Get discovery options
 
-
+        self.path_list = nepi_serial.get_serial_ports_list()
         if len(self.INCLUDE_DEVICES) > 0:
-            self.path_list = []
             for include in self.INCLUDE_DEVICES:
                 for dev_path in sorted(glob.glob('/dev/' + include + '*')):
                     real_path = os.path.realpath(dev_path)
                     if real_path not in self.path_list:
                         self.path_list.append(real_path)
-        else:
-            self.path_list = nepi_serial.get_serial_ports_list()
+            
         
 
         try:

@@ -15,10 +15,6 @@ from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_system
 
-from nepi_sdk.nepi_sdk import logger as Logger
-log_name = "microstrain_imu"
-logger = Logger(log_name = log_name)
-
 
 PKG_NAME = 'NPX_NMEA_UDP'
 FILE_TYPE = 'DISCOVERY'
