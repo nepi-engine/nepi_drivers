@@ -81,7 +81,6 @@ class GenicamCamNode:
             self.driver_file = self.drv_dict['DRIVER_DICT']['file_name']
             self.driver_module = self.driver_file.split(".")[0]
             self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
-            self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
             model = self.drv_dict['DEVICE_DICT']['model']
             serial_number = self.drv_dict['DEVICE_DICT']['serial_number']
         except Exception as e:
@@ -153,7 +152,7 @@ class GenicamCamNode:
                                     getFramerate = self.driver.getFramerate,
                                     getColorImage = self.getColorImg, 
                                     stopColorImageAcquisition = self.stopColorImg,
-                                    data_products = self.data_products)
+                                    data_products = ['color_image'])
         self.msg_if.pub_info("... IDX interface running")
         self.logDeviceInfo()
 
@@ -434,7 +433,7 @@ class GenicamCamNode:
     def stopColorImg(self):
         self.img_lock.acquire()
         # Don't stop acquisition if the b/w image is still being requested
-        ret,msg = self.driver.stopColorImageAcquisition()
+        ret,msg = self.driver.stopImageAcquisition()
         self.color_image_acquisition_running = False
         self.cached_2d_color_frame = None
         self.cached_2d_color_frame_timestamp = None

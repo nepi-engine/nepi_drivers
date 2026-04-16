@@ -12,7 +12,6 @@ from copy import deepcopy
 import time
 import threading
 
-from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 
 import numpy as np

@@ -33,10 +33,10 @@ class GenicamCamDiscovery:
 
   CHECK_INTERVAL_S = 3.0
 
-  NODE_LOAD_TIME_SEC = 10
+  NODE_LAUNCH_TIME_SEC = 10
 
-  DEFAULT_GENTL_PRODUCER_USB =  '/opt/baumer/gentl_producers/libbgapi2_usb.cti.2.14.1'
-  DEFAULT_GENTL_PRODUCER_GIGE = '/opt/baumer/gentl_producers/libbgapi2_gige.cti.2.14.1'
+  DEFAULT_GENTL_PRODUCER_USB =  '/opt/baumer/gentl_producers/libbgapi2_usb.cti.2.15'
+  DEFAULT_GENTL_PRODUCER_GIGE = '/opt/baumer/gentl_producers/libbgapi2_gige.cti.2.15'
 
   launch_time_dict = dict()
   retry = True
@@ -141,7 +141,8 @@ class GenicamCamDiscovery:
     #self.msg_if.pub_warn("Starting detection process")
     # Make sure our genicam harvesters context is up to date.
     self.genicam_harvester.update()
-    #self.msg_if.pub_info("str(genicam_harvester.device_info_list))
+    device_info_list = self.genicam_harvester.device_info_list
+    #self.msg_if.pub_info("Found cameres: " + str(device_info_list))
     # Take note of any genicam nodes currently running. If they are not found
     # in the current genicam harvesters context, we must assume that they have
     # been disconnected and stop the corresponding node(s).
@@ -151,7 +152,7 @@ class GenicamCamDiscovery:
     # Iterate through each device in the current context.
        
     
-    for device in self.genicam_harvester.device_info_list:
+    for device in device_info_list:
       #self.msg_if.pub_info(device)
       model = device.model
       sn = device.serial_number
@@ -165,32 +166,34 @@ class GenicamCamDiscovery:
 
         if known_device["device_class"] != "genicam":
           continue
-        try:
-          # The call to communicate() will timeout if the node is still running.
-          # If the node has exited, we log the corresponding stdout and stderr
-          # and allow it to be restarted.
-          stdo, stde = known_device["node_subprocess"].communicate(timeout=0.1)
+        # try:
+        #   # The call to communicate() will timeout if the node is still running.
+        #   # If the node has exited, we log the corresponding stdout and stderr
+        #   # and allow it to be restarted.
+        #   stdo, stde = known_device["node_subprocess"].communicate(timeout=0.1)
           
-          self.stopAndPurgeDeviceNode(node_namespace)
+        #   self.stopAndPurgeDeviceNode(node_namespace)
 
-          ### DON'T REMOVE FROM dont_retry_list ###
-          launch_id = node_namespace
-          if launch_id in self.dont_retry_list:
-            self.msg_if.pub_warn("node " + node_namespace + " is not running. WILL NOT RESTART")
-          else:
-            self.msg_if.pub_warn("node " + node_namespace + " is not running. RESTARTING")
+        #   ### DON'T REMOVE FROM dont_retry_list ###
+        #   launch_id = node_namespace
+        #   if launch_id in self.dont_retry_list:
+        #     self.msg_if.pub_warn("node " + node_namespace + " is not running. WILL NOT RESTART")
+        #   else:
+        #     self.msg_if.pub_warn("node " + node_namespace + " is not running. RESTARTING")
 
 
 
-          continue
-        except subprocess.TimeoutExpired:
-          pass
+        #   continue
+        # except subprocess.TimeoutExpired:
+        #   pass
         device_is_known = (device_is_known or (known_device["model"] == device.model and\
                 known_device["serial_number"] == device.serial_number))
+        #self.msg_if.pub_info("Device known: " + str(device_is_known))
         if device_is_known:
           active_devices[known_device["node_namespace"]] = True
           break
-      if not device_is_known and node_namespace not in self.dont_retry_list:
+      if not device_is_known: 
+        self.msg_if.pub_info("Launching node")
         self.startDeviceNode(vendor=vendor, model=model, serial_number=sn)
 
     # Stop any nodes associated with devices that have disappeared.
@@ -227,11 +230,11 @@ class GenicamCamDiscovery:
     device_name = root_name if not node_needs_serial_number else unique_root_name
 
     node_name = nepi_system.get_device_alias(device_name)
-    self.logger.log_warn(" launching node: " + node_name)
+
     node_namespace = os.path.join(self.base_namespace, node_name)
-
-
-
+    if node_namespace in self.dont_retry_list:
+      return False
+  
 
     launch_id = node_namespace
 
@@ -247,7 +250,7 @@ class GenicamCamDiscovery:
     ### Start Node Luanch Process
     # TODO: fair to assume uniqueness of device serial numbers?
  
-
+    self.msg_if.pub_warn(" launching node: " + node_name)
     self.msg_if.pub_warn("Initiating new Genicam node " + node_namespace)
 
     self.msg_if.pub_warn("Starting node " + node_name + " via rosrun")
