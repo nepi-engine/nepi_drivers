@@ -12,6 +12,12 @@ from copy import deepcopy
 import time
 import threading
 
+import tracemalloc
+tracemalloc.start()
+
+import warnings
+warnings.filterwarnings("ignore")
+
 from nepi_sdk import nepi_utils
 
 import numpy as np
