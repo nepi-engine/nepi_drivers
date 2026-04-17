@@ -308,6 +308,7 @@ class GenicamCamDiscovery:
         if namespace == node_namespace or node_namespace == 'All':
           sub_process = device['node_subprocess']
           self.msg_if.pub_info("Killing device node: " + node_name)
+          self.deviceList.remove(device)
           self.dont_retry_list.append(node_name)
           success = nepi_drvs.killDriverNode(node_name,sub_process)
           if success == False:
@@ -315,7 +316,6 @@ class GenicamCamDiscovery:
           else:
             self.msg_if.pub_warn("Node killed. Removed device from active list " + node_name)
 
-      self.deviceList = []
       self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
 
   def deviceNodeIsRunning(self, node_namespace):
