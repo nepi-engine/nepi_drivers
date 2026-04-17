@@ -417,7 +417,21 @@ class SidusSS109SerialPTXNode:
 
     def setSoftLimits(self, min_pan,max_pan,min_tilt,max_tilt):
         # TODO: Limits checking and driver unit conversion?
-        self.driver_setSoftLimits(min_pan,max_pan,min_tilt,max_tilt)
+        if self.PAN_DEG_DIR == -1:
+            min_pan_adj = max_pan * -1
+            max_pan_adj = min_pan * -1
+        else:
+            min_pan_adj = min_pan
+            max_pan_adj = max_pan
+        if self.TILT_DEG_DIR == -1:
+            min_tilt_adj = max_tilt * -1
+            max_tilt_adj = min_tilt * -1
+        else:
+            min_tilt_adj = min_tilt
+            max_tilt_adj = max_tilt
+
+        if (min_pan_adj < max_pan_adj) and (min_tilt_adj < max_tilt_adj):
+            self.driver_setSoftLimits(min_pan_adj, max_pan_adj, min_tilt_adj, max_tilt_adj)
 
     def getSoftLimits(self):
         # TODO: Driver unit conversion?
