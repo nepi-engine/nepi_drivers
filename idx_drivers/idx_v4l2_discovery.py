@@ -362,6 +362,7 @@ class V4L2CamDiscovery:
 
           sub_process = device['node_subprocess']
           self.msg_if.pub_info("Killing device node: " + node_name)
+          self.deviceList.remove(device)
           if self.retry == False:
             self.msg_if.pub_info("Adding device node to don't retry list: " + node_name)
             self.dont_retry_list.append(node_name)
@@ -371,7 +372,7 @@ class V4L2CamDiscovery:
           else:
             self.msg_if.pub_warn("Node killed. Removed device from active list " + node_name)
 
-      self.deviceList = []
+      
       self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
 
 
