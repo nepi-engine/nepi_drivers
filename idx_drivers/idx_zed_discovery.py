@@ -340,8 +340,8 @@ class ZedCamDiscovery:
         success = nepi_drvs.killDriverNode(node_name,sub_process)
         # And remove it from the list
         purge_paths.append(path_str)
-    for path_str in purge_paths:
-      del self.device_dict[path_str]
+      for path_str in purge_paths:
+        del self.device_dict[path_str]
 
   
   def deviceNodeIsRunning(self, node_namespace):
