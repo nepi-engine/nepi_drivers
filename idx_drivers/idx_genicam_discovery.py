@@ -138,11 +138,10 @@ class GenicamCamDiscovery:
     if self.check_for_devices == False:
       self.msg_if.pub_warn("Stopping device discovery process") 
       return
-    # if len(self.deviceList) > 0:
-    #   #self.msg_if.pub_warn("Stopping device discovery process") 
-    #   nepi_sdk.sleep(self.CHECK_INTERVAL_S,100)
-    #   nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
-    #   return
+    if len(self.deviceList) > 0:
+      # CALLING THIS CAN SHUT DOWN ANY CONNECTED CAMERAS
+      nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+      return
     #self.msg_if.pub_warn("Starting detection process")
     # Make sure our genicam harvesters context is up to date.
     self.genicam_harvester.update()
@@ -212,7 +211,7 @@ class GenicamCamDiscovery:
         if launch_id in self.dont_retry_list:
           self.dont_retry_list.remove(launch_id) 
 
-    nepi_sdk.sleep(self.CHECK_INTERVAL_S,100)
+    #nepi_sdk.sleep(self.CHECK_INTERVAL_S,100)
     nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
 
 

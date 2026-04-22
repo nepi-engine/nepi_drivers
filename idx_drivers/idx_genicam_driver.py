@@ -420,8 +420,8 @@ class GenicamCamDriver(object):
 
     def getImage(self, timeout_s=DEFAULT_CAPTURE_TIMEOUT_S):
         # Command the target device to capture an image.
-        if not self.img_acq_running:
-            self.startImageAcquisition()
+        # if not self.img_acq_running:
+        #     self.startImageAcquisition()
         try:
             buf = self.device.fetch(timeout=timeout_s)
         except genicam.gentl.TimeoutException:
@@ -447,14 +447,16 @@ class GenicamCamDriver(object):
         # Width nodes. This is because those nodes select the range of pixels
         # to return from the sensor, not the pixel pitch.
         frame = cv2.cvtColor(frame, cv2.COLOR_BayerBG2BGR)
-        desired_width = self.resolution["width"]
-        desired_height = self.resolution["height"]
-        if (image.height != desired_height) or (image.width != desired_width):
-            frame = cv2.resize(
-                    src=frame,
-                    dsize=(desired_width, desired_height),
-                    interpolation=cv2.INTER_AREA,
-            )
+        if frame is None:
+            return None, None, False, "Failed to get image of correct size"
+        # desired_width = self.resolution["width"]
+        # desired_height = self.resolution["height"]
+        # if (image.height != desired_height) or (image.width != desired_width):
+        #     frame = cv2.resize(
+        #             src=frame,
+        #             dsize=(desired_width, desired_height),
+        #             interpolation=cv2.INTER_AREA,
+        #     )
 
         # Success. Reset fail counter.
         self.consec_failed_frames = 0

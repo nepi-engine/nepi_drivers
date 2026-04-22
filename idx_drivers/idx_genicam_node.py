@@ -402,6 +402,17 @@ class GenicamCamNode:
         last_time = self.cl_img_last_time
         current_time = nepi_utils.get_time()
 
+        # # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
+        # if self.color_image_acquisition_running == False:
+        #     ret, msg = self.driver.startImageAcquisition()
+        #     if ret is False:
+        #         self.img_lock.release()
+        #         return ret, msg, None, None, None
+        ret, msg = self.driver.startImageAcquisition()
+        if ret is False:
+            self.img_lock.release()
+            return ret, msg, None, None, None
+
         need_data = False
         if last_time != None and self.idx_if is not None:
           fr_delay = float(1) / self.max_framerate
@@ -418,17 +429,16 @@ class GenicamCamNode:
 
             encoding = "bgr8"
             self.img_lock.acquire()
-            # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
-            if self.color_image_acquisition_running == False:
-                ret, msg = self.driver.startImageAcquisition()
-                if ret is False:
-                    self.img_lock.release()
-                    return ret, msg, None, None, None
+
 
             self.color_image_acquisition_running = True
             timestamp = None
             start = time.time()
             cv2_img, timestamp, ret, msg = self.driver.getImage()
+            if cv2_img is None:
+                ret = False
+                msg = "Got None Image"
+                return ret, msg, None, None, None
             stop = time.time()
             #print('GI: ', stop - start)
             if timestamp is None:
