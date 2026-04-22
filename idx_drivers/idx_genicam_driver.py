@@ -37,8 +37,8 @@ FILE_TYPE = 'DRIVER'
 
 
 DEFAULT_GENTL_PATHS = [
-    '/opt/baumer/gentl_producers/libbgapi2_usb.cti.2.14.1',
-    '/opt/baumer/gentl_producers/libbgapi2_gige.cti.2.14.1'
+    '/opt/baumer/gentl_producers/libbgapi2_usb.cti.2.15',
+    '/opt/baumer/gentl_producers/libbgapi2_gige.cti.2.15'
 ]
 
 

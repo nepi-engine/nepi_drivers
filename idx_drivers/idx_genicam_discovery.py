@@ -86,7 +86,7 @@ class GenicamCamDiscovery:
     
     ########################
     # Start node processes
-    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.start_timer_process((5), self.detectAndManageDevices, oneshot = True)
     nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
     nepi_sdk.on_shutdown(self.cleanup_actions)
 
