@@ -420,8 +420,8 @@ class GenicamCamDriver(object):
 
     def getImage(self, timeout_s=DEFAULT_CAPTURE_TIMEOUT_S):
         # Command the target device to capture an image.
-        # if not self.img_acq_running:
-        #     self.startImageAcquisition()
+        if not self.img_acq_running:
+            self.startImageAcquisition()
         try:
             buf = self.device.fetch(timeout=timeout_s)
         except genicam.gentl.TimeoutException:
