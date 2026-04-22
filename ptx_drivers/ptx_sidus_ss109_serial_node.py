@@ -233,6 +233,10 @@ class SidusSS109SerialPTXNode:
                                         setSoftLimitsCb = self.setSoftLimits,
                                         getSpeedRatioCb = self.getSpeedRatio,
                                         setSpeedRatioCb = self.setSpeedRatio,
+                                        getPanSpeedRatioCb = self.getPanSpeedRatio,
+                                        setPanSpeedRatioCb = self.setPanSpeedRatio,
+                                        getTiltSpeedRatioCb = self.getTiltSpeedRatio,
+                                        setTiltSpeedRatioCb = self.setTiltSpeedRatio,
                                         getPositionCb = self.getPosition,
                                         gotoPositionCb = self.gotoPosition,
                                         gotoPanPositionCb = self.gotoPanPosition,
@@ -447,11 +451,22 @@ class SidusSS109SerialPTXNode:
         self.speed_ratio = ratio
         self.driver_setSpeedRatios(ratio)
 
-
     def getSpeedRatio(self):
         # TODO: Driver unit conversion?
         ratio = self.driver_getSpeedRatio()
         return ratio
+
+    def setPanSpeedRatio(self, ratio):
+        self.driver_setSpeedRatio(ratio, axis_str=self.pan_str)
+
+    def setTiltSpeedRatio(self, ratio):
+        self.driver_setSpeedRatio(ratio, axis_str=self.tilt_str)
+
+    def getPanSpeedRatio(self):
+        return self.driver_getSpeedRatio(axis_str=self.pan_str)
+
+    def getTiltSpeedRatio(self):
+        return self.driver_getSpeedRatio(axis_str=self.tilt_str)
           
 
     def getPosition(self):
@@ -714,16 +729,20 @@ class SidusSS109SerialPTXNode:
             return False
         if speed_count is not None:
             data_str = self.create_speed_str(speed_count)
-            ser_msg= (self.tilt_str  + self.addr_str + 'MSP' + data_str + 'W')
-            [success,response] = self.send_msg(ser_msg)
-            tilt_success = success
-
-            data_str = self.create_speed_str(speed_count)
-            ser_msg= (self.pan_str  + self.addr_str + 'MSP' + data_str + 'W')
-            [success,response] = self.send_msg(ser_msg)
-            pan_success = success
-            speed_success = pan_success and tilt_success == True
-            return speed_success
+            if axis_str == self.tilt_str or axis_str == self.both_str:
+                ser_msg= (self.tilt_str  + self.addr_str + 'MSP' + data_str + 'W')
+                [success,response] = self.send_msg(ser_msg)
+                tilt_success = success
+            else:
+                tilt_success = True
+            if axis_str == self.pan_str or axis_str == self.both_str:
+                data_str = self.create_speed_str(speed_count)
+                ser_msg= (self.pan_str  + self.addr_str + 'MSP' + data_str + 'W')
+                [success,response] = self.send_msg(ser_msg)
+                pan_success = success
+            else:
+                pan_success = True
+            return pan_success and tilt_success
         else:
             return False
 
