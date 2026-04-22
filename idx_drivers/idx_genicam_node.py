@@ -158,10 +158,18 @@ class GenicamCamNode:
         self.logDeviceInfo()
 
 
+        #nepi_sdk.start_timer_process(1.0, self.checkAndUpdateCb, oneshot=True)
+
         ## Initiation Complete
         self.msg_if.pub_info("Initialization Complete")
         # Now start the node
         nepi_sdk.spin()
+
+
+    def checkAndUpdateCb(self,timer):
+        self.msg_if.pub_warn("Node Running")
+        nepi_sdk.start_timer_process(5, self.checkAndUpdateCb, oneshot=True)
+
 
 
     #**********************
@@ -402,7 +410,6 @@ class GenicamCamNode:
             need_data = True
         else:
           need_data = True
-
         # Get and Process Data if Needed
         if need_data == False:
           return False, "Waiting for Timer", None, None, None  # Return None data
@@ -412,10 +419,11 @@ class GenicamCamNode:
             encoding = "bgr8"
             self.img_lock.acquire()
             # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
-            ret, msg = self.driver.startImageAcquisition()
-            if ret is False:
-                self.img_lock.release()
-                return ret, msg, None, None, None
+            if self.color_image_acquisition_running == False:
+                ret, msg = self.driver.startImageAcquisition()
+                if ret is False:
+                    self.img_lock.release()
+                    return ret, msg, None, None, None
 
             self.color_image_acquisition_running = True
             timestamp = None
@@ -423,9 +431,6 @@ class GenicamCamNode:
             cv2_img, timestamp, ret, msg = self.driver.getImage()
             stop = time.time()
             #print('GI: ', stop - start)
-            if ret is False:
-                self.img_lock.release()
-                return ret, msg, None, None, None
             if timestamp is None:
                 timestamp = nepi_utils.get_time()
             self.img_lock.release()

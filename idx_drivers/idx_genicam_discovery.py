@@ -86,7 +86,7 @@ class GenicamCamDiscovery:
     
     ########################
     # Start node processes
-    nepi_sdk.start_timer_process((5), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
     nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
     nepi_sdk.on_shutdown(self.cleanup_actions)
 
@@ -138,6 +138,11 @@ class GenicamCamDiscovery:
     if self.check_for_devices == False:
       self.msg_if.pub_warn("Stopping device discovery process") 
       return
+    # if len(self.deviceList) > 0:
+    #   #self.msg_if.pub_warn("Stopping device discovery process") 
+    #   nepi_sdk.sleep(self.CHECK_INTERVAL_S,100)
+    #   nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+    #   return
     #self.msg_if.pub_warn("Starting detection process")
     # Make sure our genicam harvesters context is up to date.
     self.genicam_harvester.update()

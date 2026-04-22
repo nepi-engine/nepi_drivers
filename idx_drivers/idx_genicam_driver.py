@@ -202,6 +202,7 @@ class GenicamCamDriver(object):
                     entry["value"] = value
                 except:
                     pass
+            #print("GenICam_Settings Entry: " + node_name + " : " + str(entry))
             self.camera_settings[node_name] = entry
             if entry["readable"] == True and entry["writable"] == True and "value" in entry.keys():
                 self.camera_controls[node_name] = entry
@@ -332,7 +333,6 @@ class GenicamCamDriver(object):
 
 
     def getCurrentResolutionAvailableFramerates(self):
-        NUM_OPTIONS = 20
         available_framerates = [self.camera_settings["AcquisitionFrameRate"]["min"],self.camera_settings["AcquisitionFrameRate"]["max"]]
         #framerates = [math.ceil(available_framerates[0]), math.floor(available_framerates[1])]
         return True, available_framerates
