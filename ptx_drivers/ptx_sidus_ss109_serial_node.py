@@ -217,7 +217,10 @@ class SidusSS109SerialPTXNode:
             # else:
             #     self.speed_control = None
             
-
+            # getPanSpeedRatioCb = self.getPanSpeedRatio,
+            # setPanSpeedRatioCb = self.setPanSpeedRatio,
+            # getTiltSpeedRatioCb = self.getTiltSpeedRatio,
+            # setTiltSpeedRatioCb = self.setTiltSpeedRatio,
 
             self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict, 
                                         capSettings = self.cap_settings,
@@ -233,10 +236,6 @@ class SidusSS109SerialPTXNode:
                                         setSoftLimitsCb = self.setSoftLimits,
                                         getSpeedRatioCb = self.getSpeedRatio,
                                         setSpeedRatioCb = self.setSpeedRatio,
-                                        getPanSpeedRatioCb = self.getPanSpeedRatio,
-                                        setPanSpeedRatioCb = self.setPanSpeedRatio,
-                                        getTiltSpeedRatioCb = self.getTiltSpeedRatio,
-                                        setTiltSpeedRatioCb = self.setTiltSpeedRatio,
                                         getPositionCb = self.getPosition,
                                         gotoPositionCb = self.gotoPosition,
                                         gotoPanPositionCb = self.gotoPanPosition,
