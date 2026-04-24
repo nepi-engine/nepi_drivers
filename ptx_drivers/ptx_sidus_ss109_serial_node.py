@@ -52,8 +52,8 @@ class SidusSS109SerialPTXNode:
     LIMITS_DICT = dict()
     LIMITS_DICT['max_pan_hardstop_deg'] = 175
     LIMITS_DICT['min_pan_hardstop_deg'] = -175
-    LIMITS_DICT['max_tilt_hardstop_deg'] = 75
-    LIMITS_DICT['min_tilt_hardstop_deg'] = -75
+    LIMITS_DICT['max_tilt_hardstop_deg'] = 175
+    LIMITS_DICT['min_tilt_hardstop_deg'] = -175
     LIMITS_DICT['max_pan_softstop_deg'] = 174
     LIMITS_DICT['min_pan_softstop_deg'] = -174
     LIMITS_DICT['max_tilt_softstop_deg'] = 74
@@ -232,7 +232,7 @@ class SidusSS109SerialPTXNode:
                                         stopMovingCb = None, #self.stopMoving,
                                         movePanCb = None, #self.movePan,  # Stop command not working on jog
                                         moveTiltCb = None, #self.moveTilt, # Stop command not working on jog
-                                        getSoftLimitsCb = None, #self.getSoftLimits, # 109 does not return response
+                                        getSoftLimitsCb = self.getSoftLimits, # 109 does not return response
                                         setSoftLimitsCb = self.setSoftLimits,
                                         getSpeedRatioCb = self.getSpeedRatio,
                                         setSpeedRatioCb = self.setSpeedRatio,
@@ -622,15 +622,15 @@ class SidusSS109SerialPTXNode:
         else:
             dir_str = 'MRB'
         if axis_str == self.pan_str:
-            ser_msg= (self.pan_str + self.addr_str + dir_str + data_str + 'W')
+            ser_msg= (self.pan_str + self.addr_str + dir_str + data_str + 'R')
         elif axis_str == self.tilt_str:
-            ser_msg= (self.tilt_str + self.addr_str + dir_str + data_str + 'W')
+            ser_msg= (self.tilt_str + self.addr_str + dir_str + data_str + 'R')
         elif axis_str == self.both_str:
-            ser_msg= (self.both_str + self.addr_str + dir_str + data_str + 'W')
+            ser_msg= (self.both_str + self.addr_str + dir_str + data_str + 'R')
         else:
             return False
         #self.msg_if.pub_warn(method_name + ": Sending Get Soft Stop serial msg: " + ser_msg)
-        [success,response] = self.send_msg(ser_msg)
+        [success,response] = self.send_msg(ser_msg, verbose = True)
 
         if success:
             try:
@@ -673,7 +673,7 @@ class SidusSS109SerialPTXNode:
         else:
             return False
         #self.msg_if.pub_warn(method_name + ": Sending Set Soft Stop serial msg: " + ser_msg)
-        [success,response] = self.send_msg(ser_msg)  
+        [success,response] = self.send_msg(ser_msg, verbose = True)  
         return success 
 
     def driver_setSoftLimits(self, min_pan,max_pan,min_tilt,max_tilt): 
