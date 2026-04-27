@@ -760,10 +760,10 @@ class SidusSS109SerialPTXNode:
         reportsPos = True
         return reportsPos
 
-    def driver_getPosition(self, wait_on_busy = False, verbose = False):
+    def driver_getPosition(self, wait_on_busy = True, verbose = False):
         caller_method = inspect.currentframe().f_back.f_code.co_name
         method_name = sys._getframe().f_code.co_name
-        pan_deg = self.getCurrentPanPosition()
+        pan_deg = self.getCurrentPanPosition(wait_on_busy,verbose)
         '''
         while pan_deg < -360:
             if verbose == True:
@@ -776,7 +776,7 @@ class SidusSS109SerialPTXNode:
         if verbose == True:
             self.msg_if.pub_warn(caller_method + ": " + method_name + ": Got pan degs: " + str(pan_deg))
 
-        tilt_deg = self.getCurrentTiltPosition()
+        tilt_deg = self.getCurrentTiltPosition(wait_on_busy,verbose)
         '''
         while tilt_deg < -360:
             if verbose == True:
@@ -797,7 +797,8 @@ class SidusSS109SerialPTXNode:
         method_name = sys._getframe().f_code.co_name
         pan_deg = self.current_position[0]
         success = False
-        if self.serial_lock == False:
+        #self.msg_if.pub_warn(method_name + ": Got pan position serial lock: " + str(self.serial_lock))
+        if True: #self.serial_lock == False:
             data_str = self.create_blank_str()
             ser_msg= (self.pan_str + self.addr_str + 'MRL' + data_str + 'R')
             [success,response] = self.send_msg(ser_msg, wait_on_busy = wait_on_busy, verbose = verbose)
@@ -810,6 +811,7 @@ class SidusSS109SerialPTXNode:
                     pan_deg = self.pos_count2deg(pan_count) * -1
                 except Exception as e:
                     self.msg_if.pub_warn(method_name + ": Failed to convert message to int: " + data_str + " " + str(e))
+        #self.msg_if.pub_warn(method_name + ": Got pan position str: " + str(pan_deg))
         return pan_deg
 
 
