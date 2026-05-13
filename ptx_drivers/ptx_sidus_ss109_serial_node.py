@@ -62,7 +62,7 @@ class SidusSS109SerialPTXNode:
 
 
     CONFIGS_DICT = {
-         'Standard' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 0.5, 'max_degpsec': 20},
+         'Standard' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 1, 'max_degpsec': 40},
     }
     config_dict = CONFIGS_DICT['Standard']
     data_len = 4
@@ -117,7 +117,7 @@ class SidusSS109SerialPTXNode:
     current_position = [0.0,0.0]
 
     speed_ratio = 0.5
-    max_speed_dps = 20.0
+    max_speed_dps = 40.0
 
     drv_dict = dict()    
 
@@ -269,10 +269,8 @@ class SidusSS109SerialPTXNode:
         self.current_position = self.driver_getPosition(self.current_position)
         #self.msg_if.pub_info("Got current position :" + str(self.current_position))
         gtime = nepi_utils.get_time() - stime
-        wait_time = float(1.0) / self.MAX_POSITION_UPDATE_RATE - gtime
-        if wait_time > 0.1:
-            nepi_sdk.sleep(wait_time)
-        nepi_sdk.start_timer_process(0.1, self.updatePositionHandler, oneshot = True)
+        next_delay = max(0.01, float(1.0) / self.MAX_POSITION_UPDATE_RATE - gtime)
+        nepi_sdk.start_timer_process(next_delay, self.updatePositionHandler, oneshot = True)
 
     def logDeviceInfo(self):
         dev_info_string = self.node_name + " Device Info:\n"
@@ -731,6 +729,8 @@ class SidusSS109SerialPTXNode:
             data_str = self.create_speed_str(speed_count)
             if axis_str == self.tilt_str or axis_str == self.both_str:
                 ser_msg= (self.tilt_str  + self.addr_str + 'MSP' + data_str + 'W')
+                self.msg_if.pub_warn("Set Speed: " + str(data_str))
+
                 [success,response] = self.send_msg(ser_msg)
                 tilt_success = success
             else:
@@ -1126,7 +1126,7 @@ class SidusSS109SerialPTXNode:
         return count
 
     def ratio2speed_count(self,ratio):
-        max_count =  math.floor(self.max_speed_dps / self.config_dict['degpsec_per_count'])
+        max_count =  math.floor(self.config_dict['max_degpsec'] / self.config_dict['degpsec_per_count'])
         count = int(ratio * max_count)
         return count
 
