@@ -729,7 +729,7 @@ class SidusSS109SerialPTXNode:
             data_str = self.create_speed_str(speed_count)
             if axis_str == self.tilt_str or axis_str == self.both_str:
                 ser_msg= (self.tilt_str  + self.addr_str + 'MSP' + data_str + 'W')
-                self.msg_if.pub_warn("Set Speed: " + str(data_str))
+                #self.msg_if.pub_warn("Set Speed: " + str(data_str))
 
                 [success,response] = self.send_msg(ser_msg)
                 tilt_success = success
