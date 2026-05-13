@@ -117,6 +117,7 @@ class SidusSS109SerialPTXNode:
     current_position = [0.0,0.0]
 
     speed_ratio = 0.5
+    max_speed_dps = 20.0
 
     drv_dict = dict()    
 
@@ -155,6 +156,11 @@ class SidusSS109SerialPTXNode:
             if system_config in self.CONFIGS_DICT.keys():
                 self.config_dict = self.CONFIGS_DICT[system_config]
             self.data_len = self.config_dict['data_len']
+
+            try:
+                self.max_speed_dps = float(self.drv_dict['DISCOVERY_DICT']['OPTIONS']['max_speed_dps']['value'])
+            except Exception:
+                self.max_speed_dps = self.config_dict['max_degpsec']
         except Exception as e:
             self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
@@ -240,7 +246,8 @@ class SidusSS109SerialPTXNode:
                                         getNavPoseCb = self.getNavPoseDict,
                                         navpose_update_rate = self.MAX_POSITION_UPDATE_RATE,
                                         deviceResetCb = self.resetDevice,
-                                        calibrateCenterCB = self.calibrateCenter 
+                                        calibrateCenterCB = self.calibrateCenter,
+                                        speed_max_dps = self.max_speed_dps
 
                                         )
             self.msg_if.pub_info(" ... PTX interface running")
@@ -1119,7 +1126,7 @@ class SidusSS109SerialPTXNode:
         return count
 
     def ratio2speed_count(self,ratio):
-        max_count =  math.floor(self.config_dict['max_degpsec'] / self.config_dict['degpsec_per_count'])
+        max_count =  math.floor(self.max_speed_dps / self.config_dict['degpsec_per_count'])
         count = int(ratio * max_count)
         return count
 

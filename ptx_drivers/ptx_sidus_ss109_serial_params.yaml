@@ -41,3 +41,7 @@ driver:
           - 'Standard'
         default: 'Standard'
         value: 'Standard'
+      max_speed_dps:
+        type: 'Float'
+        default: '10.0'
+        value: '10.0'
