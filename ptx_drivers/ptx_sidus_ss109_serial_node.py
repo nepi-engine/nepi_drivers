@@ -726,6 +726,8 @@ class SidusSS109SerialPTXNode:
             self.msg_if.pub_warn(method_name + ": Failed to convert message: " + str(speedRatio) + " " + str(e))
             return False
         if speed_count is not None:
+            if speed_count == 0:
+                speed_count = 1
             data_str = self.create_speed_str(speed_count)
             if axis_str == self.tilt_str or axis_str == self.both_str:
                 ser_msg= (self.tilt_str  + self.addr_str + 'MSP' + data_str + 'W')
