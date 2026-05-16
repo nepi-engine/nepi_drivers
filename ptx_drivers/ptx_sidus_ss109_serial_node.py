@@ -72,10 +72,9 @@ class SidusSS109SerialPTXNode:
 
 
     CONFIGS_DICT = {
-         'Standard' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 1, 'max_degpsec': 40},
+         'Standard' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 0.5, 'max_degpsec': 20},
     }
     config_dict = CONFIGS_DICT['Standard']
-    data_len = 4
 
 
     CAP_SETTINGS = {
@@ -127,7 +126,6 @@ class SidusSS109SerialPTXNode:
     current_position = [0.0,0.0]
 
     speed_ratio = 0.5
-    max_speed_dps = 40.0
 
     drv_dict = dict()    
 
@@ -165,12 +163,13 @@ class SidusSS109SerialPTXNode:
             system_config = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['system_config']['value']
             if system_config in self.CONFIGS_DICT.keys():
                 self.config_dict = self.CONFIGS_DICT[system_config]
-            self.data_len = self.config_dict['data_len']
 
             try:
-                self.max_speed_dps = float(self.drv_dict['DISCOVERY_DICT']['OPTIONS']['max_speed_dps']['value'])
+                max_speed_dps = float(self.drv_dict['DISCOVERY_DICT']['OPTIONS']['max_speed_dps']['value'])
+                self.config_dict['max_degpsec'] = max_speed_dps
+                self.config_dict['degpsec_per_count'] = (max_speed_dps / 20) * 0.5
             except Exception:
-                self.max_speed_dps = self.config_dict['max_degpsec']
+                pass
         except Exception as e:
             self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
@@ -240,6 +239,8 @@ class SidusSS109SerialPTXNode:
                                         moveTiltCb = None, #self.moveTilt, # Stop command not working on jog
                                         getSoftLimitsCb = self.getSoftLimits, # 109 does not return response
                                         setSoftLimitsCb = self.setSoftLimits,
+                                        getSpeedMaxCb = self.getSpeedMax,
+                                        setSpeedMaxCb = self.setSpeedMax,
                                         getSpeedRatioCb = self.getSpeedRatio,
                                         setSpeedRatioCb = self.setSpeedRatio,
                                         getPanSpeedRatioCb = self.getPanSpeedRatio,
@@ -257,7 +258,7 @@ class SidusSS109SerialPTXNode:
                                         navpose_update_rate = self.MAX_POSITION_UPDATE_RATE,
                                         deviceResetCb = self.resetDevice,
                                         calibrateCenterCB = self.calibrateCenter,
-                                        speed_max_dps = self.max_speed_dps
+                                        
 
                                         )
             self.msg_if.pub_info(" ... PTX interface running")
@@ -459,6 +460,14 @@ class SidusSS109SerialPTXNode:
         self.speed_ratio = ratio
         self.driver_setSpeedRatios(ratio)
 
+    def getSpeedMax(self):
+        return self.config_dict['max_degpsec']
+    
+    def setSpeedMax(self, speed):
+        if speed >= 10 and speed <= 40:
+            self.config_dict['degpsec_per_count'] = (speed / 20) * 0.5
+            self.config_dict['max_degpsec'] = speed
+
     def getSpeedRatio(self):
         # TODO: Driver unit conversion?
         ratio = self.driver_getSpeedRatio()
@@ -643,7 +652,7 @@ class SidusSS109SerialPTXNode:
 
         if success:
             try:
-                data_str = response[5:(5 + self.data_len)]
+                data_str = response[5:(5 + self.config_dict['data_len'])]
                 #self.msg_if.pub_warn(method_name + ": Will convert soft limit data str: " + data_str)
                 pos_count = int(data_str)
                 softLimit = self.pos_count2deg(pos_count)
@@ -710,7 +719,7 @@ class SidusSS109SerialPTXNode:
         [success,response] = self.send_msg(ser_msg)
         if success:
             try:
-                data_str = response[5:(5 + self.data_len)]
+                data_str = response[5:(5 + self.config_dict['data_len'])]
                 #self.msg_if.pub_warn(method_name + ": Will convert speed str: " + data_str)
                 speed_count = int(data_str)
                 speedRatio = self.speed_count2ratio(speed_count)
@@ -731,7 +740,7 @@ class SidusSS109SerialPTXNode:
         speed_count = None
         try:
             speed_count = self.ratio2speed_count(speedRatio)
-            #self.msg_if.pub_warn(method_name + ": Updating Speed Count Data to: " + str(speed_count))
+            self.msg_if.pub_warn(method_name + ": Updating Speed Count Data to: " + str(speed_count))
         except Exception as e:
             self.msg_if.pub_warn(method_name + ": Failed to convert message: " + str(speedRatio) + " " + str(e))
             return False
@@ -741,16 +750,21 @@ class SidusSS109SerialPTXNode:
             data_str = self.create_speed_str(speed_count)
             if axis_str == self.tilt_str or axis_str == self.both_str:
                 ser_msg= (self.tilt_str  + self.addr_str + 'MSP' + data_str + 'W')
-                #self.msg_if.pub_warn("Set Speed: " + str(data_str))
+                self.msg_if.pub_warn("Set Tilt Speed Msg: " + str(data_str))
 
                 [success,response] = self.send_msg(ser_msg)
+                self.msg_if.pub_warn("Set Tilt Speed Response: " + str(response))
                 tilt_success = success
             else:
                 tilt_success = True
             if axis_str == self.pan_str or axis_str == self.both_str:
                 data_str = self.create_speed_str(speed_count)
                 ser_msg= (self.pan_str  + self.addr_str + 'MSP' + data_str + 'W')
+                self.msg_if.pub_warn("Set Pan Speed Msg: " + str(data_str))
+
                 [success,response] = self.send_msg(ser_msg)
+                self.msg_if.pub_warn("Set Pan Speed Response: " + str(response))
+                tilt_success = success
                 pan_success = success
             else:
                 pan_success = True
@@ -824,7 +838,7 @@ class SidusSS109SerialPTXNode:
 
             if success == True:
                 try:
-                    data_str = response[5:(5 + self.data_len)]
+                    data_str = response[5:(5 + self.config_dict['data_len'])]
                     #self.msg_if.pub_warn(method_name + ": Will convert pan position str: " + data_str)
                     pan_count = int(data_str) 
                     pan_deg = self.pos_count2deg(pan_count) * -1
@@ -844,7 +858,7 @@ class SidusSS109SerialPTXNode:
 
         if success:
             try:
-                data_str = response[5:(5 + self.data_len)]
+                data_str = response[5:(5 + self.config_dict['data_len'])]
                 #self.msg_if.pub_warn(method_name + ": Will convert tilt position str: " + data_str)
                 tilt_count = int(data_str)
                 tilt_deg = self.pos_count2deg(tilt_count) * -1
@@ -1083,7 +1097,7 @@ class SidusSS109SerialPTXNode:
     def check_valid_response(self,ser_msg, response):
         caller_method = inspect.currentframe().f_back.f_code.co_name
         valid = False
-        if len(response) >= 5 + self.data_len + 1:
+        if len(response) >= 5 + self.config_dict['data_len'] + 1:
             if response[0:4] == ser_msg[0:4]:
                 valid = True
         if valid == False:
@@ -1127,19 +1141,18 @@ class SidusSS109SerialPTXNode:
 
 
     def speed_count2dps(self, count):
-        max_dps = self.config_dict['max_degpsec']
-        dps = max
-        dps = float(pos - home)*dps  
+        dps_per_count = self.config_dict['degpsec_per_count']
+        dps = math.floor(count * dps_per_count)
         return dps
 
-    def dps2speed_count(self, deg):
+    def dps2speed_count(self, dps):
         dps_per_count = self.config_dict['degpsec_per_count']
-        count = floor(deg / dps_per_count)
+        count = math.floor(dps / dps_per_count)
         return count
 
     def ratio2speed_count(self,ratio):
-        max_count =  math.floor(self.config_dict['max_degpsec'] / self.config_dict['degpsec_per_count'])
-        count = int(ratio * max_count)
+        max_count =  self.config_dict['max_degpsec'] / self.config_dict['degpsec_per_count']
+        count = int(math.floor(ratio * max_count))
         return count
 
     def speed_count2ratio(self,count):
@@ -1149,21 +1162,21 @@ class SidusSS109SerialPTXNode:
 
     def create_blank_str(self):
         data_str = ""
-        zero_prefix_len = self.data_len-len(data_str)
-        for z in range(self.data_len):
+        zero_prefix_len = self.config_dict['data_len']-len(data_str)
+        for z in range(self.config_dict['data_len']):
             data_str += '0'
         return data_str
 
     def create_pos_str(self,count_val):
         data_str = str(count_val)
-        zero_prefix_len = self.data_len-len(data_str)
+        zero_prefix_len = self.config_dict['data_len']-len(data_str)
         for z in range(zero_prefix_len):
             data_str = ('0' + data_str)
         return data_str
 
     def create_speed_str(self,count_val):
         data_str = str(count_val)
-        zero_suffix_len = self.data_len-len(data_str)
+        zero_suffix_len = self.config_dict['data_len']-len(data_str)
         for z in range(zero_suffix_len):
             data_str = ('0' + data_str)
         return data_str
