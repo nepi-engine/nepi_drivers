@@ -54,7 +54,7 @@ class MicrostrainDiscovery:
 
     dont_retry_list = []
 
-    INCLUDE_DEVICES = ['microstrain']
+    INCLUDE_DEVICES = ['microstrain', 'ttyUSB']
     excludedDevices = []
 
 
