@@ -62,7 +62,7 @@ class SidusSS109SerialPTXNode:
 
 
     CONFIGS_DICT = {
-         'Standard' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 1, 'max_degpsec': 40},
+         'Standard' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': .5, 'max_degpsec': 10},
     }
     config_dict = CONFIGS_DICT['Standard']
     data_len = 4
@@ -117,7 +117,7 @@ class SidusSS109SerialPTXNode:
     current_position = [0.0,0.0]
 
     speed_ratio = 0.5
-    max_speed_dps = 40.0
+    max_speed_dps = 20.0
 
     drv_dict = dict()    
 
@@ -731,9 +731,11 @@ class SidusSS109SerialPTXNode:
             data_str = self.create_speed_str(speed_count)
             if axis_str == self.tilt_str or axis_str == self.both_str:
                 ser_msg= (self.tilt_str  + self.addr_str + 'MSP' + data_str + 'W')
-                #self.msg_if.pub_warn("Set Speed: " + str(data_str))
+                self.msg_if.pub_warn("Set Speed: " + str(data_str))
 
                 [success,response] = self.send_msg(ser_msg)
+                self.msg_if.pub_warn("Set Speed: " + str(data_str))
+
                 tilt_success = success
             else:
                 tilt_success = True
