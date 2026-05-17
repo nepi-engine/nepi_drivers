@@ -44,7 +44,7 @@ FILE_TYPE = 'NODE'
 class SidusSS109SerialPTXNode:
     SET_SPEED = False
 
-    MAX_POSITION_UPDATE_RATE = 10
+    MAX_POSITION_UPDATE_RATE = 5
     SERIAL_RECEIVE_DELAY = 0.005
 
     MIN_SERIAL_SEND_DELAY = 0.01
@@ -64,8 +64,8 @@ class SidusSS109SerialPTXNode:
     LIMITS_DICT['min_pan_hardstop_deg'] = -175
     LIMITS_DICT['max_tilt_hardstop_deg'] = 175
     LIMITS_DICT['min_tilt_hardstop_deg'] = -175
-    LIMITS_DICT['max_pan_softstop_deg'] = 174
-    LIMITS_DICT['min_pan_softstop_deg'] = -174
+    LIMITS_DICT['max_pan_softstop_deg'] = 165
+    LIMITS_DICT['min_pan_softstop_deg'] = -165
     LIMITS_DICT['max_tilt_softstop_deg'] = 74
     LIMITS_DICT['min_tilt_softstop_deg'] = -74
 
@@ -124,6 +124,7 @@ class SidusSS109SerialPTXNode:
     self_check_count = 100
 
     current_position = [0.0,0.0]
+    position_times = [0.0,0.0]
 
     speed_ratio = 0.5
 
@@ -248,6 +249,7 @@ class SidusSS109SerialPTXNode:
                                         getTiltSpeedRatioCb = self.getTiltSpeedRatio,
                                         setTiltSpeedRatioCb = self.setTiltSpeedRatio,
                                         getPositionCb = self.getPosition,
+                                        getPositionTimesCb = self.getPositionTimes,
                                         gotoPositionCb = self.gotoPosition,
                                         gotoPanPositionCb = self.gotoPanPosition,
                                         gotoTiltPositionCb = self.gotoTiltPosition,
@@ -277,8 +279,15 @@ class SidusSS109SerialPTXNode:
 
     def updatePositionHandler(self,timer):
         stime=nepi_utils.get_time()
-        self.current_position = self.driver_getPosition(self.current_position)
+        current_position = self.driver_getPosition(wait_on_busy = False)
+        if current_position[0] is not None:
+            self.current_position[0] = current_position[0]
+            self.position_times[0] = nepi_utils.get_time()
+        if current_position[1] is not None:
+            self.current_position[1] = current_position[1]
+            self.position_times[1] = nepi_utils.get_time()
         #self.msg_if.pub_info("Got current position :" + str(self.current_position))
+        #self.msg_if.pub_info("Got position times :" + str(self.position_times))
         gtime = nepi_utils.get_time() - stime
         next_delay = max(0.01, float(1.0) / self.MAX_POSITION_UPDATE_RATE - gtime)
         nepi_sdk.start_timer_process(next_delay, self.updatePositionHandler, oneshot = True)
@@ -489,7 +498,9 @@ class SidusSS109SerialPTXNode:
     def getPosition(self):
         return self.current_position
         
-
+    def getPositionTimes(self):
+        return self.position_times
+    
     def gotoPosition(self, pan_deg, tilt_deg):
         self.driver_moveToPosition(pan_deg * self.PAN_DEG_DIR, tilt_deg * self.TILT_DEG_DIR)
 
@@ -740,7 +751,7 @@ class SidusSS109SerialPTXNode:
         speed_count = None
         try:
             speed_count = self.ratio2speed_count(speedRatio)
-            self.msg_if.pub_warn(method_name + ": Updating Speed Count Data to: " + str(speed_count))
+            #self.msg_if.pub_warn(method_name + ": Updating Speed Count Data to: " + str(speed_count))
         except Exception as e:
             self.msg_if.pub_warn(method_name + ": Failed to convert message: " + str(speedRatio) + " " + str(e))
             return False
@@ -750,20 +761,20 @@ class SidusSS109SerialPTXNode:
             data_str = self.create_speed_str(speed_count)
             if axis_str == self.tilt_str or axis_str == self.both_str:
                 ser_msg= (self.tilt_str  + self.addr_str + 'MSP' + data_str + 'W')
-                self.msg_if.pub_warn("Set Tilt Speed Msg: " + str(data_str))
+                #self.msg_if.pub_warn("Set Tilt Speed Msg: " + str(data_str))
 
                 [success,response] = self.send_msg(ser_msg)
-                self.msg_if.pub_warn("Set Tilt Speed Response: " + str(response))
+                #self.msg_if.pub_warn("Set Tilt Speed Response: " + str(response))
                 tilt_success = success
             else:
                 tilt_success = True
             if axis_str == self.pan_str or axis_str == self.both_str:
                 data_str = self.create_speed_str(speed_count)
                 ser_msg= (self.pan_str  + self.addr_str + 'MSP' + data_str + 'W')
-                self.msg_if.pub_warn("Set Pan Speed Msg: " + str(data_str))
+                #self.msg_if.pub_warn("Set Pan Speed Msg: " + str(data_str))
 
                 [success,response] = self.send_msg(ser_msg)
-                self.msg_if.pub_warn("Set Pan Speed Response: " + str(response))
+                #self.msg_if.pub_warn("Set Pan Speed Response: " + str(response))
                 tilt_success = success
                 pan_success = success
             else:
@@ -797,28 +808,10 @@ class SidusSS109SerialPTXNode:
         caller_method = inspect.currentframe().f_back.f_code.co_name
         method_name = sys._getframe().f_code.co_name
         pan_deg = self.getCurrentPanPosition(wait_on_busy,verbose)
-        '''
-        while pan_deg < -360:
-            if verbose == True:
-                self.msg_if.pub_warn(caller_method + ": " + method_name + ": Failed to get valid pan degs: " + str(pan_deg))
-            nepi_sdk.sleep(self.serial_send_delay)
-            pan_deg_r = self.getCurrentPanPosition(wait_on_busy = wait_on_busy, verbose = verbose)
-            if pan_deg_r > -360:
-                pan_deg = pan_deg_r
-        '''
         if verbose == True:
             self.msg_if.pub_warn(caller_method + ": " + method_name + ": Got pan degs: " + str(pan_deg))
 
         tilt_deg = self.getCurrentTiltPosition(wait_on_busy,verbose)
-        '''
-        while tilt_deg < -360:
-            if verbose == True:
-                self.msg_if.pub_warn(caller_method + ": " + method_name + ": Failed to get valid tilt degs: " + str(tilt_deg))
-            nepi_sdk.sleep(self.serial_send_delay)
-            tilt_deg_r = self.getCurrentTiltPosition(wait_on_busy = wait_on_busy, verbose = verbose)
-            if tilt_deg_r > -360:
-                tilt_deg = tilt_deg_r
-        '''
         if verbose == True:
             self.msg_if.pub_warn(caller_method + ": " + method_name + ": Got tilt degs: " + str(tilt_deg))
         return pan_deg, tilt_deg
@@ -828,7 +821,7 @@ class SidusSS109SerialPTXNode:
 
     def getCurrentPanPosition(self, wait_on_busy = False, verbose = False):
         method_name = sys._getframe().f_code.co_name
-        pan_deg = self.current_position[0]
+        pan_deg = None #self.current_position[0]
         success = False
         #self.msg_if.pub_warn(method_name + ": Got pan position serial lock: " + str(self.serial_lock))
         if True: #self.serial_lock == False:
@@ -850,7 +843,7 @@ class SidusSS109SerialPTXNode:
 
     def getCurrentTiltPosition(self, wait_on_busy = False, verbose = False):
         method_name = sys._getframe().f_code.co_name
-        tilt_deg = self.current_position[1]
+        tilt_deg = None #self.current_position[1]
         success = False
         data_str = self.create_blank_str()
         ser_msg= (self.tilt_str + self.addr_str + 'MRL' + data_str + 'R')
@@ -887,13 +880,6 @@ class SidusSS109SerialPTXNode:
         #self.msg_if.pub_warn(" Will send move to pan pos with pos_count: " + str(pos_count) + "data_str: " + str(data_str))
         #self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
         [success,response] = self.send_msg(ser_msg)
-
-        # if self.SET_SPEED == True:
-        #     #self.msg_if.pub_warn("driver_setSpeedRatio called")
-        #     #self.msg_if.pub_warn("driver_setSpeedRatio: " + str(self.speed_ratio))
-        #     nepi_sdk.sleep(self.serial_send_delay)
-        #     self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.pan_str)
-
         
         return success
 
@@ -907,13 +893,6 @@ class SidusSS109SerialPTXNode:
         #self.msg_if.pub_warn("pos_count: " + str(pos_count) + "data_str: " + str(data_str))
         #self.msg_if.pub_warn("ser_msg: " + str(ser_msg))
         [success,response] = self.send_msg(ser_msg)
-
-        # if self.SET_SPEED == True:
-        #     #self.msg_if.pub_warn("driver_setSpeedRatio called")
-        #     #self.msg_if.pub_warn("driver_setSpeedRatio: " + str(self.speed_ratio))
-        #     nepi_sdk.sleep(self.serial_send_delay)
-        #     self.driver_setSpeedRatio(self.speed_ratio, axis_str = self.pan_str)
-
 
         return success
 

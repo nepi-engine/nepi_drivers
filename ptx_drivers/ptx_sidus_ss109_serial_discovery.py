@@ -313,8 +313,10 @@ class SidusSS109SerialDiscovery:
 
         try:
           self.logger.log_warn("Removing path from active paths list: " + str(path_str))
-          self.active_paths_list.remove(path_str)
-          active_paths_list.remove(path_str)
+          if path_str in self.active_paths_list:
+            self.active_paths_list.remove(path_str)
+          if path_str in active_paths_list:
+            active_paths_list.remove(path_str)
           self.logger.log_warn("Updated active paths list: " + str(active_paths_list))
         except Exception as e:
           self.logger.log_warn("Failed to remove driver from active paths list: " + str(e))
