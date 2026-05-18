@@ -52,6 +52,8 @@ class MicrostrainDiscovery:
     baud_int = 115200
     addr_str = "001"
 
+    serial_port = 'None'
+
     dont_retry_list = []
 
     INCLUDE_DEVICES = ['microstrain', 'ttyUSB']
@@ -111,6 +113,8 @@ class MicrostrainDiscovery:
                         baudrate_list.append(baudrate)
             self.baudrate_list = baudrate_list
             #self.logger.log_warn("Got selected baudrate list" + str(self.baudrate_list))
+            if 'serial_port' in drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
+                self.serial_port  = drv_dict['DISCOVERY_DICT']['OPTIONS']['serial_port']['value']
         except Exception as e:
             self.logger.log_warn("Failed to load options " + str(e))#
             return None
@@ -148,7 +152,11 @@ class MicrostrainDiscovery:
             if valid_path and path_str not in self.dont_retry_list:
                 #self.logger.log_warn("Looking for path: " + path_str)
                 #self.logger.log_warn("In path_list: " + str(self.active_paths_list))
-                found = self.checkForDevice(path_str)
+                if self.serial_port == os.path.basename(path_str):
+                    self.logger.log_warn("Using set port for to MicroStrain device on : " + str(path_str))
+                    found = True
+                else:
+                    found = self.checkForDevice(path_str)
                 if found:
                     success = self.launchDeviceNode(path_str)
                     if success:
@@ -175,20 +183,20 @@ class MicrostrainDiscovery:
             
 
             # Send an ping command to the device
-            command = b'\x75\x65\x01\x02\x02\x01\xE0\xC6' # Placeholder: replace with actual command
-
+            command = b'\x75\x65\x01\x02\x02\x01\xE0\xC6' 
+            #self.logger.log_warn("checking for device on: " + str(port_str))
             ser.write(command)
             #response = ser.readline().decode('utf-8').strip()
             response = str(ser.readline().hex()) # Read the response
-            #print("Response: " + str(response))
+            #self.logger.log_warn("Response: " + str(response))
             ser.close()
 
             # Check if the response is valid
             if response and '7565010404f10100d56a' in response: # Check for expected response
-                #print(f"Successfully verified connection to MicroStrain device on {port_str}.")
+                #self.logger.log_warn("Successfully verified connection to MicroStrain device on : " + str(port_str))
                 return True
             else:
-                #print(f"Device at {port_str} did not respond as expected.")
+                #self.logger.log_warn("Device did not respond as expected on port: " + str(port_str))
                 return False
 
         except serial.SerialException as e:
