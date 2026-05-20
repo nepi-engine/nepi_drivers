@@ -26,9 +26,9 @@ driver:
         value: '50000'
       serial_port:
         type: Discrete
-        options: ['None']
-        default: 'None'
-        value: 'None'
+        options: ['Auto']
+        default: 'Auto'
+        value: 'Auto'
       baud_rate:
         type: Discrete
         options: ['9600','19200','38400','57600','115200']

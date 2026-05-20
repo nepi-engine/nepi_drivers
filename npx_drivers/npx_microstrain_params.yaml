@@ -30,9 +30,9 @@ driver:
         value: '115200'
       serial_port:
         type: Discrete
-        options: ['None']
-        default: 'None'
-        value: 'None'
+        options: ['Auto']
+        default: 'Auto'
+        value: 'Auto'
       
 
 

@@ -220,7 +220,7 @@ class MicrostrainNode(object):
         # Update Param File Values
         node_params_dict['port'] = port
         node_params_dict['baudrate'] = baudrate
-        node_params_dict['aux_port'] = aux_port
+        node_params_dict['aux_port'] = port #aux_port
         node_params_dict['aux_baudrate'] = aux_baudrate
         node_params_dict['debug'] = debug
         success = nepi_utils.write_dict_to_file(node_params_dict,param_file)

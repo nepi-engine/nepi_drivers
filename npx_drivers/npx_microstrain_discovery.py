@@ -149,18 +149,26 @@ class MicrostrainDiscovery:
                 if path_str.find(exclude) != -1 or path_str in self.active_paths_list:
                     valid_path = False
             #self.logger.log_warn("Got path check valid: " + str(valid_path))
-            if valid_path and path_str not in self.dont_retry_list:
+            if valid_path and path_str not in self.dont_retry_list and path_str not in self.active_paths_list:
                 #self.logger.log_warn("Looking for path: " + path_str)
                 #self.logger.log_warn("In path_list: " + str(self.active_paths_list))
-                if self.serial_port == os.path.basename(path_str):
-                    self.logger.log_warn("Using set port for to MicroStrain device on : " + str(path_str))
-                    found = True
-                else:
+                found = False
+                if self.serial_port == 'Auto' and path_str:
                     found = self.checkForDevice(path_str)
+                    
+                elif self.serial_port == os.path.basename(path_str):
+                    #self.logger.log_warn("Using set port for to MicroStrain device on : " + str(path_str))
+                    found = True
+
                 if found:
+                    self.active_paths_list.append(path_str)
                     success = self.launchDeviceNode(path_str)
-                    if success:
-                        self.active_paths_list.append(path_str)
+                    if success == False:
+                        if path_str in self.active_paths_list:
+                            self.active_paths_list.remove(path_str)
+                        if path_str not in self.dont_retry_list:
+                            launch_id = path_str
+                            self.dont_retry_list.append(launch_id)
         return self.active_paths_list
     ################################################
 
@@ -247,7 +255,7 @@ class MicrostrainDiscovery:
         if launch_id in self.launch_time_dict.keys():
             launch_time = self.launch_time_dict[launch_id]
             cur_time = nepi_sdk.get_time()
-            launch_check = (cur_time - launch_time) > str(self.NODE_LOAD_TIME_SEC)
+            launch_check = (cur_time - launch_time) > (self.NODE_LOAD_TIME_SEC)
         if launch_check == False:
             return False   ###
         #self.logger.log_debug("Starting Launch process on path: " + str(path_str))###
