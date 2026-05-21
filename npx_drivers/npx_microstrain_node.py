@@ -295,9 +295,8 @@ class MicrostrainNode(object):
         rpy = nepi_nav.convert_quat2rpy(xyzw)
 
         timestamp = nepi_sdk.sec_from_msg_stamp(imu_msg.header.stamp)
-
+        #self.msg_if.pub_warn("Got Timestamp from msg: " + str(timestamp) + " : " + str(imu_msg.header.stamp), throttle_s = 5)
         self.driver_navpose_dict['time_orientation'] = timestamp
-        # Orientation Degrees in selected 3d frame (roll,pitch,yaw)
         self.driver_navpose_dict['roll_deg'] = rpy[0]
         self.driver_navpose_dict['pitch_deg'] = rpy[1]
         self.driver_navpose_dict['yaw_deg'] = rpy[2]
