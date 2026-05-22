@@ -181,7 +181,10 @@ class V4L2CamDiscovery:
           usbBus = None
           for all_line in all_out:
             if ('Bus info' in all_line):
-              usbBus = all_line.rsplit("-",1)[1].replace(".","")
+              if '-' in all_line:
+                usbBus = all_line.rsplit("-",1)[1].replace(".","")
+              elif 'platform:' in all_line:
+                usbBus = all_line.rsplit("platform:",1)[1].rsplit(".")[0]
             if ('Device Caps' in all_line):
               in_device_caps = True
             elif in_device_caps:
