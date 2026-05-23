@@ -39,7 +39,7 @@ class V4L2CamDiscovery:
   CHECK_INTERVAL_S = 2.0
 
   INCLUDE_DEVICES = []
-  EXCLUDE_DEVICES = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X']  
+  EXCLUDE_DEVICES = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X','pispbe']  
 
   launch_time_dict = dict()
   retry = True
@@ -180,6 +180,7 @@ class V4L2CamDiscovery:
           in_device_caps = False
           usbBus = None
           for all_line in all_out:
+            #self.msg_if.pub_warn("Got all_line: " + str(all_line) + " on path " + path_str)
             if ('Bus info' in all_line):
               if '-' in all_line:
                 usbBus = all_line.rsplit("-",1)[1].replace(".","")
@@ -193,7 +194,7 @@ class V4L2CamDiscovery:
             elif ':' in all_line:
               in_device_caps = False
           
-          if is_video_cap_device:
+          if is_video_cap_device and usbBus is not None:
             active_paths.append(path_str) # To check later that the device list has no entries for paths that have disappeared
             known_device = False
             for device in self.deviceList:
