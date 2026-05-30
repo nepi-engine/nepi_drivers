@@ -310,7 +310,9 @@ class V4L2CamDiscovery:
         else:
           id = str(same_type_count)
         device_name += '_' + id
+        
 
+        device_name = nepi_utils.get_clean_name(device_name)
         node_name = nepi_system.get_device_alias(device_name)
         node_namespace = os.path.join(self.base_namespace, node_name)
 
