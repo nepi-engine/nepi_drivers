@@ -39,7 +39,7 @@ class V4L2CamDiscovery:
   CHECK_INTERVAL_S = 2.0
 
   INCLUDE_DEVICES = []
-  EXCLUDE_DEVICES = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X','pispbe']  
+  EXCLUDE_DEVICES = ['msm_vidc_vdec','ZED 2','ZED 2i','ZED-M','ZED-X','pispbe','rpi-hevc-dec']  
 
   launch_time_dict = dict()
   retry = True
