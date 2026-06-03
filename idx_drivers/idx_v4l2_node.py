@@ -95,7 +95,8 @@ class V4l2CamNode:
 
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
-    drv_dict = dict()                             
+    drv_dict = dict()                          
+    driver = None   
     def __init__(self):
         ####  NODE Initialization ####
         nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
@@ -116,7 +117,7 @@ class V4l2CamNode:
         # Get required drv driver dict info
         try:
             self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
-            #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
+            self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
             self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
             self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
             self.driver_path = self.drv_dict['path']
@@ -129,21 +130,24 @@ class V4l2CamNode:
             return
 
         if self.device_path == "":
-            self.device_path = self.DEFAULT_DEVICE_PATH
+            #self.device_path = self.DEFAULT_DEVICE_PATH
+            self.msg_if.pub_warn("No Device Path given")#
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no No Device Path given")
+            return
         # import driver class fromn driver module
         self.msg_if.pub_info("Importing driver class " + self.driver_class_name + " from module " + self.driver_module)
         [success, msg, self.driver_class] = nepi_drvs.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
         if success:
-            mjpg = False
+            is_mjpg = False
             for cam in self.MJPG_CAMS:
                 if self.node_name.find(cam) != -1:
-                    mjpg = True
+                    is_mjpg = True
                     break
-            self.msg_if.pub_info("Launching driver with mjpg mode: " + str(mjpg))
+            self.msg_if.pub_info("Launching driver with mjpg mode: " + str(is_mjpg))
             self.msg_if.pub_warn("device path: " + str(self.device_path))
 
             try:
-                self.driver = self.driver_class(self.device_path,mjpg=mjpg)
+                self.driver = self.driver_class(self.device_path, is_mjpg)
             except Exception as e:
                 # Only log the error every 30 seconds -- don't want to fill up log in the case that the camera simply isn't attached.
                 self.msg_if.pub_warn("Failed to instantiate driver: " + str(e) )
@@ -151,7 +155,10 @@ class V4l2CamNode:
         ################################################
         # Start node initialization
         
-
+        if self.driver is None:
+            self.msg_if.pub_warn("No Driver loaded")#
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because No Driver loaded")
+            return            
         if not self.driver.isConnected():
            self.msg_if.pub_warn("Failed to connect to camera device")
             

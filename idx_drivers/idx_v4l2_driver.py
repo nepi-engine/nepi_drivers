@@ -30,11 +30,11 @@ mjpg = False
 class V4l2CamDriver(object):
   MAX_CONSEC_FRAME_FAIL_COUNT = 3
   
-  def __init__(self, device_path, mjpg = False):
+  def __init__(self, device_path, use_mjpg):
     self.device_path = device_path
     self.v4l2ctl_prefix = ['v4l2-ctl', '-d', str(self.device_path)]
 
-    self.mjpg = mjpg
+    self.mjpg = use_mjpg
 
     # First check that the desired device exists:
     p = subprocess.Popen(self.v4l2ctl_prefix + ['--list-devices'],
@@ -128,35 +128,38 @@ class V4l2CamDriver(object):
 
       # Put parameters into a dictionary
       for j in range(0, len(param)):
-        key,value = param[j].split('=',2)
-        if (a['type'] == 'int' or a['type'] == 'menu'):
-          try:
-            a[key] = int(value)
-          except:
-            a[key] = value
-        elif (a['type'] == 'bool'):
-          try:
-            int_val = int(value)
-            a[key] = True if value == 1 else False
-          except:
-            a[key] = value
-        
-        # Build a legend for a discrete menu
-        if (a['type'] == 'menu'):
-          h = 0
-          legend = dict()
-          while h >= 0:
-            h += 1
-            ih = i + h
+        try:
+          key,value = param[j].split('=',2)
+          if (a['type'] == 'int' or a['type'] == 'menu'):
             try:
-              if (ih < nLines) and out[ih].startswith('\t\t\t\t'):
-                legend_value,legend_key = out[i+h].strip().split(':')
-                legend[legend_key.strip()] = int(legend_value)
-              else:
+              a[key] = int(value)
+            except:
+              a[key] = value
+          elif (a['type'] == 'bool'):
+            try:
+              int_val = int(value)
+              a[key] = True if value == 1 else False
+            except:
+              a[key] = value
+          
+          # Build a legend for a discrete menu
+          if (a['type'] == 'menu'):
+            h = 0
+            legend = dict()
+            while h >= 0:
+              h += 1
+              ih = i + h
+              try:
+                if (ih < nLines) and out[ih].startswith('\t\t\t\t'):
+                  legend_value,legend_key = out[i+h].strip().split(':')
+                  legend[legend_key.strip()] = int(legend_value)
+                else:
+                  h = -1
+              except Exception as e:
                 h = -1
-            except Exception as e:
-              h = -1
-          a['legend'] = legend    # additional data on settings
+            a['legend'] = legend    # additional data on settings
+        except:
+          pass
         a['step'] = 1           # adding to work with updateUVCsetting()
         
       # Use setting name as key and dictionary of params as value

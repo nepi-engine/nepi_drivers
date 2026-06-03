@@ -169,8 +169,13 @@ class V4L2CamDiscovery:
       if line.startswith('/dev/video'):
         path_str = line
         # Check if this device is already known and launched  
-        if device_type not in self.EXCLUDE_DEVICES:  
-          # self.msg_if.pub_warn("Found device type: " + device_type + " on path " + path_str) 
+        valid_device = True
+        for excluded in self.EXCLUDE_DEVICES:
+          if excluded in device_type:
+            valid_device = False
+        
+        if valid_device == True:  
+          #self.msg_if.pub_warn("Found device type: " + device_type + " on path " + path_str) 
           # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
           is_video_cap_device = False
           sub_process = subprocess.Popen(['v4l2-ctl', '-d', path_str, '--all'],
