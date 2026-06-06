@@ -17,10 +17,10 @@
 
 
 import os
-import rospy
 import subprocess
 import time
 import copy
+import re
 
 
 from nepi_sdk import nepi_sdk
@@ -199,7 +199,23 @@ class ZedCamDiscovery:
           usbBus = None
           for all_line in all_out:
             if ('Bus info' in all_line):
-              usbBus = all_line.rsplit("-",1)[1].replace(".","")
+              bus_line = copy.deepcopy(all_line)
+              try:
+                bus_line=bus_line.split(': ')[1]
+                bus_line=bus_line.split(' ')[0]
+                bus_line=bus_line.replace(".","").replace("-","")
+                all_numbers = re.findall(r'\d+', bus_line) 
+
+                if all_numbers:
+                    usbBus = all_numbers[-1]
+              except:
+                pass
+              #self.msg_if.pub_warn("Got Bus ID: " + str(usbBus) + " from line " + str(all_line))
+                   
+              # if '-' in all_line:
+              #   usbBus = all_line.rsplit("-",1)[1].replace(".","")
+              # elif 'platform:' in all_line:
+              #   usbBus = all_line.rsplit("platform:",1)[1].rsplit(".")[0]
             if ('Device Caps' in all_line):
               in_device_caps = True
             elif in_device_caps:

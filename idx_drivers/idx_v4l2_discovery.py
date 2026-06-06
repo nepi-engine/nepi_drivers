@@ -20,6 +20,7 @@ import os
 import subprocess
 import time
 import copy
+import re
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
@@ -175,7 +176,7 @@ class V4L2CamDiscovery:
             valid_device = False
         
         if valid_device == True:  
-          #self.msg_if.pub_warn("Found device type: " + device_type + " on path " + path_str) 
+          #self.msg_if.pub_warn("Found a device type: " + device_type + " on path " + path_str) 
           # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
           is_video_cap_device = False
           sub_process = subprocess.Popen(['v4l2-ctl', '-d', path_str, '--all'],
@@ -187,10 +188,23 @@ class V4L2CamDiscovery:
           for all_line in all_out:
             #self.msg_if.pub_warn("Got all_line: " + str(all_line) + " on path " + path_str)
             if ('Bus info' in all_line):
-              if '-' in all_line:
-                usbBus = all_line.rsplit("-",1)[1].replace(".","")
-              elif 'platform:' in all_line:
-                usbBus = all_line.rsplit("platform:",1)[1].rsplit(".")[0]
+              bus_line = copy.deepcopy(all_line)
+              try:
+                bus_line=bus_line.split(': ')[1]
+                bus_line=bus_line.split(' ')[0]
+                bus_line=bus_line.replace(".","").replace("-","")
+                all_numbers = re.findall(r'\d+', bus_line) 
+
+                if all_numbers:
+                    usbBus = all_numbers[-1]
+              except:
+                pass
+              #self.msg_if.pub_warn("Got Bus ID: " + str(usbBus) + " from line " + str(all_line))
+                   
+              # if '-' in all_line:
+              #   usbBus = all_line.rsplit("-",1)[1].replace(".","")
+              # elif 'platform:' in all_line:
+              #   usbBus = all_line.rsplit("platform:",1)[1].rsplit(".")[0]
             if ('Device Caps' in all_line):
               in_device_caps = True
             elif in_device_caps:
@@ -238,6 +252,7 @@ class V4L2CamDiscovery:
                     # Only start one device per check 
                     if success == False:
                       # Restart Device
+                      self.msg_if.pub_info("Restarting known device on path: " + device_type + ' : ' + path_str)
                       success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
                       if success == True:
                         self.msg_if.pub_warn("Started new node on: " + path_str)
@@ -250,7 +265,7 @@ class V4L2CamDiscovery:
               
               # Only start one device per check 
               if success == False:
-                #self.msg_if.pub_info("Found new device on path: " + path_str)
+                self.msg_if.pub_info("Found new device on path: " + device_type + ' : ' + path_str)
                 # Restart Device
                 success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
                 if success == True:
