@@ -63,12 +63,13 @@ When a simulator is running, the driver node connects to `localhost` on the conf
 
 ## Current Driver Inventory
 
-**IDX — Image/Camera (5 drivers):**
+**IDX — Image/Camera (6 drivers):**
 - `idx_genicam` — GenICam/GigE Vision cameras via Baumer Harvester library
 - `idx_v4l2` — V4L2 USB cameras (scans `/dev/video*`, excludes ZED and virtual devices)
 - `idx_onvif_generic` — Generic ONVIF IP cameras
 - `idx_onvif_econroutecam` — EconRoute-specific ONVIF cameras
 - `idx_zed` — Stereoscopic ZED cameras
+- `idx_rpi_cam3` — Raspberry Pi Camera Module 3 (IMX708) via MIPI CSI-2 on Raspberry Pi 5; uses libcamera/picamera2 stack
 
 **NPX — Navigation/Positioning (3 drivers):**
 - `npx_nmea_udp` — NMEA sentences over TCP/UDP (configurable host:port, built-in simulator)
@@ -111,6 +112,7 @@ Hardware-specific runtime dependencies:
 | PTX Sidus | Serial port present, correct baud rate |
 | LSX Sealite | Serial port present, device at configured address |
 | All serial | `pyserial`, `nepi_serial` SDK module |
+| IDX RPi cam3 | `picamera2`, libcamera stack (`sudo apt install python3-picamera2`); Raspberry Pi 5 only |
 
 ## Naming Conventions
 
@@ -137,6 +139,8 @@ def discoveryFunction(available_paths_list, active_paths_list, base_namespace, d
 **`rbx_drivers/` is empty.** The directory exists and `drivers_mgr` is aware of the RBX category, but no robot drivers are implemented. Adding an RBX driver requires creating all three files (discovery, node, params) and registering with `RBXDeviceIF`.
 
 **ONVIF drivers use HTTP/XML.** Network timeouts during ONVIF device probing can cause discovery to block. The `nepi_app_onvif_mgr` app (in `nepi_apps`) handles ONVIF device management at a higher level; the ONVIF drivers here are the low-level node implementations.
+
+**RPi cam3 discovery requires libcamera-hello.** The `idx_rpi_cam3` discovery subprocess calls `libcamera-hello --list-cameras` to enumerate CSI cameras. This binary is only present on Raspberry Pi OS; the discovery node will find no cameras and remain idle on Jetson or x86 build hosts. The `device_path` for RPi cam3 is a camera index string (e.g. `'0'`), not a `/dev/` path — this is unique to this driver family.
 
 **No hardware-in-the-loop CI.** Driver code is not covered by automated tests that require physical hardware. The built-in simulators partially address this for NPX, but IDX, PTX, and LSX drivers have no equivalent.
 
