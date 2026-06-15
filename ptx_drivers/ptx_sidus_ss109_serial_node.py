@@ -642,34 +642,47 @@ class SidusSS109SerialPTXNode:
                
 
     def driver_getSoftLimit(self,axis_str = '#', direction = 1):
-        method_name = sys._getframe().f_code.co_name
-        softLimit = -999
-        success = False
-        data_str = self.create_blank_str()
-        if direction > 0:
-            dir_str = 'MRF'
-        else:
-            dir_str = 'MRB'
-        if axis_str == self.pan_str:
-            ser_msg= (self.pan_str + self.addr_str + dir_str + data_str + 'R')
-        elif axis_str == self.tilt_str:
-            ser_msg= (self.tilt_str + self.addr_str + dir_str + data_str + 'R')
-        elif axis_str == self.both_str:
-            ser_msg= (self.both_str + self.addr_str + dir_str + data_str + 'R')
-        else:
-            return False
-        #self.msg_if.pub_warn(method_name + ": Sending Get Soft Stop serial msg: " + ser_msg)
-        [success,response] = self.send_msg(ser_msg, verbose = True)
+        # method_name = sys._getframe().f_code.co_name
+        # softLimit = -999
+        # success = False
+        # data_str = self.create_blank_str()
+        # if direction > 0:
+        #     dir_str = 'MRF'
+        # else:
+        #     dir_str = 'MRB'
+        # if axis_str == self.pan_str:
+        #     ser_msg= (self.pan_str + self.addr_str + dir_str + data_str + 'R')
+        # elif axis_str == self.tilt_str:
+        #     ser_msg= (self.tilt_str + self.addr_str + dir_str + data_str + 'R')
+        # elif axis_str == self.both_str:
+        #     ser_msg= (self.both_str + self.addr_str + dir_str + data_str + 'R')
+        # else:
+        #     return False
+        # #self.msg_if.pub_warn(method_name + ": Sending Get Soft Stop serial msg: " + ser_msg)
+        # [success,response] = self.send_msg(ser_msg, verbose = True)
 
-        if success:
-            try:
-                data_str = response[5:(5 + self.config_dict['data_len'])]
-                #self.msg_if.pub_warn(method_name + ": Will convert soft limit data str: " + data_str)
-                pos_count = int(data_str)
-                softLimit = self.pos_count2deg(pos_count)
-                success = True
-            except Exception as e:
-                self.msg_if.pub_warn(method_name + ": Failed to convert message to int: " + data_str + " " + str(e))
+        # if success:
+        #     try:
+        #         data_str = response[5:(5 + self.config_dict['data_len'])]
+        #         #self.msg_if.pub_warn(method_name + ": Will convert soft limit data str: " + data_str)
+        #         pos_count = int(data_str)
+        #         softLimit = self.pos_count2deg(pos_count)
+        #         success = True
+        #     except Exception as e:
+        #         self.msg_if.pub_warn(method_name + ": Failed to convert message to int: " + data_str + " " + str(e))
+
+        softLimit = -999
+        if axis_str == self.pan_str:
+            if direction > 0:
+                 softLimit = self.LIMITS_DICT['max_pan_softstop_deg']
+            else:
+                softLimit = self.LIMITS_DICT['min_pan_softstop_deg']
+        elif axis_str == self.tilt_str:
+            if direction > 0:
+                 softLimit = self.LIMITS_DICT['max_tilt_softstop_deg']
+            else:
+                softLimit = self.LIMITS_DICT['min_tilt_softstop_deg']
+
         return softLimit
 
     def driver_getSoftLimits(self): 
