@@ -140,24 +140,24 @@ class MicrostrainDiscovery:
                 self.active_paths_list.remove(path_str)
 
         ### Checking for devices on available paths
-        #self.logger.log_warn("Starting Check for Device Process with path list: " + str(self.path_list))
+        self.logger.log_warn("Starting Check for Device Process with path list: " + str(self.path_list))
         for path_str in self.path_list:
             valid_path = True
-            #self.logger.log_warn("Checking path against exclude list: " + str(self.excludedDevices))
+            self.logger.log_warn("Checking path against exclude list: " + str(self.excludedDevices))
             for exclude in self.excludedDevices:
                 #self.logger.log_warn("Checking exclude : " + str(exclude) + " with active list " + str(self.active_paths_list))
                 if path_str.find(exclude) != -1 or path_str in self.active_paths_list:
                     valid_path = False
-            #self.logger.log_warn("Got path check valid: " + str(valid_path))
+            self.logger.log_warn("Got path check valid: " + str(valid_path))
             if valid_path and path_str not in self.dont_retry_list and path_str not in self.active_paths_list:
-                #self.logger.log_warn("Looking for path: " + path_str)
-                #self.logger.log_warn("In path_list: " + str(self.active_paths_list))
+                self.logger.log_warn("Looking for path: " + path_str)
+                self.logger.log_warn("In path_list: " + str(self.active_paths_list))
                 found = False
                 if self.serial_port == 'Auto' and path_str:
                     found = self.checkForDevice(path_str)
                     
                 elif self.serial_port == os.path.basename(path_str):
-                    #self.logger.log_warn("Using set port for to MicroStrain device on : " + str(path_str))
+                    self.logger.log_warn("Using set port for to MicroStrain device on : " + str(path_str))
                     found = True
 
                 if found:
@@ -192,19 +192,19 @@ class MicrostrainDiscovery:
 
             # Send an ping command to the device
             command = b'\x75\x65\x01\x02\x02\x01\xE0\xC6' 
-            #self.logger.log_warn("checking for device on: " + str(port_str))
+            self.logger.log_warn("checking for device on: " + str(port_str))
             ser.write(command)
             #response = ser.readline().decode('utf-8').strip()
             response = str(ser.readline().hex()) # Read the response
-            #self.logger.log_warn("Response: " + str(response))
+            self.logger.log_warn("Response: " + str(response))
             ser.close()
 
             # Check if the response is valid
             if response and '7565010404f10100d56a' in response: # Check for expected response
-                #self.logger.log_warn("Successfully verified connection to MicroStrain device on : " + str(port_str))
+                self.logger.log_warn("Successfully verified connection to MicroStrain device on : " + str(port_str))
                 return True
             else:
-                #self.logger.log_warn("Device did not respond as expected on port: " + str(port_str))
+                self.logger.log_warn("Device did not respond as expected on port: " + str(port_str))
                 return False
 
         except serial.SerialException as e:
