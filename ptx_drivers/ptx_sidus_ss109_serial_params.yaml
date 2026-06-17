@@ -39,9 +39,6 @@ driver:
         type: Discrete
         options:
           - 'Standard'
+          - 'HighSpeed'
         default: 'Standard'
         value: 'Standard'
-      max_speed_dps:
-        type: 'Float'
-        default: '20.0'
-        value: '20.0'

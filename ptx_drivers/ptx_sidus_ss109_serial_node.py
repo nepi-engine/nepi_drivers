@@ -73,6 +73,7 @@ class SidusSS109SerialPTXNode:
 
     CONFIGS_DICT = {
          'Standard' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 0.5, 'max_degpsec': 20},
+         'HighSpeed' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 0.5, 'max_degpsec': 40},
     }
     config_dict = CONFIGS_DICT['Standard']
 
@@ -166,9 +167,9 @@ class SidusSS109SerialPTXNode:
                 self.config_dict = self.CONFIGS_DICT[system_config]
 
             try:
-                max_speed_dps = float(self.drv_dict['DISCOVERY_DICT']['OPTIONS']['max_speed_dps']['value'])
-                self.config_dict['max_degpsec'] = max_speed_dps
-                self.config_dict['degpsec_per_count'] = (max_speed_dps / 20) * 0.5
+                system_config = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['system_config']['value']
+                if system_config in self.CONsystem_configFIG_DICT.keys():
+                    self.config_dict = self.CONFIGS_DICT[system_config]
             except Exception:
                 pass
         except Exception as e:
@@ -474,7 +475,7 @@ class SidusSS109SerialPTXNode:
     
     def setSpeedMax(self, speed):
         if speed >= 10 and speed <= 40:
-            self.config_dict['degpsec_per_count'] = (speed / 20) * 0.5
+            self.config_dict['degpsec_per_count'] = speed * 0.5
             self.config_dict['max_degpsec'] = speed
 
     def getSpeedRatio(self):

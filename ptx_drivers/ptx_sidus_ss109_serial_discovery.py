@@ -52,6 +52,7 @@ class SidusSS109SerialDiscovery:
   baud_str = '9600'
   baud_int = 9600
   addr_str = "001"
+  system_config = "Standard"
 
   dont_retry_list = []
 
@@ -121,6 +122,9 @@ class SidusSS109SerialDiscovery:
 
       self.addr_search_list = list(self.letters_list[start_ind:stop_ind + 1])
       #self.logger.log_warn("Disc Addr List: " + str(self.addr_search_list))
+
+      self.system_config = drv_dict['DISCOVERY_DICT']['OPTIONS']['system_config']['value']
+      #self.logger.log_warn("Ending discovery addr: " + str(self.letters_list[stop_ind]))
 
     except Exception as e:
       self.logger.log_warn("" + self.log_name + ": Failed to setup options " + str(e))#
@@ -273,6 +277,7 @@ class SidusSS109SerialDiscovery:
                                   'device_path': path_str}
     self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str
     self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
+    self.drv_dict['DEVICE_DICT']['system_config'] = self.system_config
     nepi_sdk.set_param(dict_param_name,self.drv_dict)
 
 

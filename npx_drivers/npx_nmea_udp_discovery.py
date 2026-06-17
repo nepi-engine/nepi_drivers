@@ -20,6 +20,7 @@ import time
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_system
+from nepi_sdk import nepi_utils
 
 
 PKG_NAME = 'NPX_NMEA_UDP'
@@ -37,11 +38,25 @@ class NMEAUDPDiscovery:
     active_devices_dict = dict()
     node_launch_name = "nmea"
 
+    system_config = dict()
+    system_nav_ip = 'NONE'
+
     ################################################
     def __init__(self):
         self.log_name = PKG_NAME.lower() + "_discovery"
         self.logger = nepi_sdk.logger(log_name=self.log_name)
         time.sleep(0.2)
+        self.system_config = nepi_system.load_nepi_system_config()
+        self.msg_if.pub_warn("Got System Config: " + str(self.system_config))
+        if self.system_config is None:
+            self.system_config = dict()
+        if len(self.system_config.keys()) == 0:
+            self.msg_if.pub_warn("Failed to Read NEPI config file")
+        else:
+          if 'NEPI_NAV_IP' in self.system_config.keys():
+            nav_ip = self.system_config['NEPI_NAV_IP']
+            if nepi_utils.is_valid_ip(nav_ip):
+              self.system_nav_ip = nav_ip
         self.logger.log_info("Starting Initialization")
         self.logger.log_info("Initialization Complete")
 
@@ -53,7 +68,10 @@ class NMEAUDPDiscovery:
         self.base_namespace = base_namespace
 
         opts = (self.drv_dict.get('DISCOVERY_DICT') or {}).get('OPTIONS', {})
-        host = str(opts.get('tcp_host', {}).get('value', '127.0.0.1'))
+        if nepi_utils.is_valid_ip(self.system_nav_ip):
+            host = str(self.system_nav_ip)
+        else:
+            host = str(opts.get('tcp_host', {}).get('value', '127.0.0.1'))
         port = int(opts.get('tcp_port', {}).get('value', 50000))
 
         self.retry = retry_enabled
