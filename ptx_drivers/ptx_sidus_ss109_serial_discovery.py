@@ -39,7 +39,8 @@ FILE_TYPE = 'DISCOVERY'
 class SidusSS109SerialDiscovery:
 
   DATA_LENGTH_DICT = {
-      'Standard' : 4
+      'Standard' : 4,
+      'HighSpeed' : 4
   }
 
   data_len = 4

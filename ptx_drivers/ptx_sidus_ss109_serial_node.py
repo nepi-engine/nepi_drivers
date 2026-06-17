@@ -242,7 +242,7 @@ class SidusSS109SerialPTXNode:
                                         getSoftLimitsCb = self.getSoftLimits, # 109 does not return response
                                         setSoftLimitsCb = self.setSoftLimits,
                                         getSpeedMaxCb = self.getSpeedMax,
-                                        setSpeedMaxCb = self.setSpeedMax,
+                                        setSpeedMaxCb = None, #self.setSpeedMax,
                                         getSpeedRatioCb = self.getSpeedRatio,
                                         setSpeedRatioCb = self.setSpeedRatio,
                                         getPanSpeedRatioCb = self.getPanSpeedRatio,
@@ -475,7 +475,6 @@ class SidusSS109SerialPTXNode:
     
     def setSpeedMax(self, speed):
         if speed >= 10 and speed <= 40:
-            self.config_dict['degpsec_per_count'] = speed * 0.5
             self.config_dict['max_degpsec'] = speed
 
     def getSpeedRatio(self):
@@ -778,7 +777,11 @@ class SidusSS109SerialPTXNode:
                 #self.msg_if.pub_warn("Set Tilt Speed Msg: " + str(data_str))
 
                 [success,response] = self.send_msg(ser_msg)
-                #self.msg_if.pub_warn("Set Tilt Speed Response: " + str(response))
+                self.msg_if.pub_warn("")
+                dps=int(speed_count * 0.5) 
+                self.msg_if.pub_warn("Set Tilt Speed DPS: " + str(dps))
+                self.msg_if.pub_warn("Set Tilt Speed Msg: " + str(ser_msg))
+                self.msg_if.pub_warn("Set Tilt Speed Response: " + str(response))
                 tilt_success = success
             else:
                 tilt_success = True
@@ -788,7 +791,10 @@ class SidusSS109SerialPTXNode:
                 #self.msg_if.pub_warn("Set Pan Speed Msg: " + str(data_str))
 
                 [success,response] = self.send_msg(ser_msg)
-                #self.msg_if.pub_warn("Set Pan Speed Response: " + str(response))
+                dps=int(speed_count * 0.5) 
+                self.msg_if.pub_warn("Set Pan Speed DPS: " + str(dps))
+                self.msg_if.pub_warn("Set Pan Speed Msg: " + str(ser_msg))
+                self.msg_if.pub_warn("Set Pan Speed Response: " + str(response))
                 tilt_success = success
                 pan_success = success
             else:
