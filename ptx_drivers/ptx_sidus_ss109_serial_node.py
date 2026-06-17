@@ -777,11 +777,11 @@ class SidusSS109SerialPTXNode:
                 #self.msg_if.pub_warn("Set Tilt Speed Msg: " + str(data_str))
 
                 [success,response] = self.send_msg(ser_msg)
-                self.msg_if.pub_warn("")
-                dps=int(speed_count * 0.5) 
-                self.msg_if.pub_warn("Set Tilt Speed DPS: " + str(dps))
-                self.msg_if.pub_warn("Set Tilt Speed Msg: " + str(ser_msg))
-                self.msg_if.pub_warn("Set Tilt Speed Response: " + str(response))
+                # self.msg_if.pub_warn("")
+                # dps=int(speed_count * 0.5) 
+                # self.msg_if.pub_warn("Set Tilt Speed DPS: " + str(dps))
+                # self.msg_if.pub_warn("Set Tilt Speed Msg: " + str(ser_msg))
+                # self.msg_if.pub_warn("Set Tilt Speed Response: " + str(response))
                 tilt_success = success
             else:
                 tilt_success = True
@@ -791,10 +791,11 @@ class SidusSS109SerialPTXNode:
                 #self.msg_if.pub_warn("Set Pan Speed Msg: " + str(data_str))
 
                 [success,response] = self.send_msg(ser_msg)
-                dps=int(speed_count * 0.5) 
-                self.msg_if.pub_warn("Set Pan Speed DPS: " + str(dps))
-                self.msg_if.pub_warn("Set Pan Speed Msg: " + str(ser_msg))
-                self.msg_if.pub_warn("Set Pan Speed Response: " + str(response))
+                # self.msg_if.pub_warn("")
+                # dps=int(speed_count * 0.5) 
+                # self.msg_if.pub_warn("Set Pan Speed DPS: " + str(dps))
+                # self.msg_if.pub_warn("Set Pan Speed Msg: " + str(ser_msg))
+                # self.msg_if.pub_warn("Set Pan Speed Response: " + str(response))
                 tilt_success = success
                 pan_success = success
             else:
