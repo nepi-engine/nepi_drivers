@@ -117,9 +117,9 @@ class HNavDiscovery:
 
         try:
             safe_host   = host.replace('.', '').replace('-', '_')
-            device_name = f"{self.node_launch_name}_{safe_host}"
+            device_name = f"{self.node_launch_name}" #_{safe_host}"
         except Exception:
-            device_name = f"{self.node_launch_name}_{launch_key.replace(':', '_').replace('.', '')}"
+            device_name = f"{self.node_launch_name}" #_{launch_key.replace(':', '_').replace('.', '')}"
 
         node_name = nepi_system.get_device_alias(device_name)
 
