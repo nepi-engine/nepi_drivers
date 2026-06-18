@@ -47,11 +47,11 @@ class NMEAUDPDiscovery:
         self.logger = nepi_sdk.logger(log_name=self.log_name)
         time.sleep(0.2)
         self.system_config = nepi_system.load_nepi_system_config()
-        self.msg_if.pub_warn("Got System Config: " + str(self.system_config))
+        self.logger.log_warn("Got System Config: " + str(self.system_config))
         if self.system_config is None:
             self.system_config = dict()
         if len(self.system_config.keys()) == 0:
-            self.msg_if.pub_warn("Failed to Read NEPI config file")
+            self.logger.log_warn("Failed to Read NEPI config file")
         else:
           if 'NEPI_NAV_IP' in self.system_config.keys():
             nav_ip = self.system_config['NEPI_NAV_IP']
