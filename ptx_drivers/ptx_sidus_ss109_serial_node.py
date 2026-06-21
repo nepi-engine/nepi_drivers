@@ -1002,8 +1002,7 @@ class SidusSS109SerialPTXNode:
 
         method_name = sys._getframe().f_code.co_name
         success = False
-        data_str = self.create_blank_str()[1:]
-        data_str = data_str + math.floor(speed_dps/self.speed_max_dps)
+        data_str = self.create_velocity_str(speed_dps) 
         if direction == 1:
             cmd_str = 'MMV0'
         else:
@@ -1228,6 +1227,13 @@ class SidusSS109SerialPTXNode:
     def create_speed_str(self,count_val):
         data_str = str(count_val)
         zero_suffix_len = self.config_dict['data_len']-len(data_str)
+        for z in range(zero_suffix_len):
+            data_str = ('0' + data_str)
+        return data_str
+    
+    def create_velocity_str(self,velocity_val):
+        data_str = str(math.floor(velocity_val/self.speed_max_dps * self.speed_max_dps * 10))
+        zero_suffix_len = self.config_dict['data_len']-len(data_str)-1
         for z in range(zero_suffix_len):
             data_str = ('0' + data_str)
         return data_str
