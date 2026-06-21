@@ -128,6 +128,7 @@ class SidusSS109SerialPTXNode:
     position_times = [0.0,0.0]
 
     speed_ratio = 0.5
+    speed_max_dps = 20
 
     drv_dict = dict()    
 
@@ -165,6 +166,8 @@ class SidusSS109SerialPTXNode:
             system_config = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['system_config']['value']
             if system_config in self.CONFIGS_DICT.keys():
                 self.config_dict = self.CONFIGS_DICT[system_config]
+
+            self.speed_max_dps = self.config_dict['max_degpsec']
 
             try:
                 system_config = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['system_config']['value']
@@ -237,8 +240,10 @@ class SidusSS109SerialPTXNode:
                                         factoryControls = self.FACTORY_CONTROLS,
                                         factoryLimits = self.LIMITS_DICT,
                                         stopMovingCb = None, #self.stopMoving,
-                                        movePanCb = None, #self.movePan,  # Stop command not working on jog
-                                        moveTiltCb = None, #self.moveTilt, # Stop command not working on jog
+                                        movePanCb = self.movePan,  # Stop command not working on jog
+                                        moveTiltCb = self.moveTilt, # Stop command not working on jog
+                                        movePanSpeedRatioCb = self.movePanSpeedRatio,  # Stop command not working on jog
+                                        moveTiltSpeedRatioCb = self.moveTiltSpeedRatio, # Stop command not working on jog
                                         getSoftLimitsCb = self.getSoftLimits, # 109 does not return response
                                         setSoftLimitsCb = self.setSoftLimits,
                                         getSpeedMaxCb = self.getSpeedMax,
@@ -403,8 +408,6 @@ class SidusSS109SerialPTXNode:
         self.driver_stopMotion()
 
     def movePan(self, direction, duration):
-        pass
-        '''
         axis_str = self.pan_str
         if self.ptx_if is not None:
             direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
@@ -413,16 +416,13 @@ class SidusSS109SerialPTXNode:
 
             if success:
                 if duration > 0:
-                    nepi_sdk.sleep(time_s)
+                    nepi_sdk.sleep(duration)
                     while success == False:
-                        self.driver_stopAxisMotion(axis_str = axis_str, direction = direction)
+                        self.driver_stopAxisMotion(axis_str = axis_str)
                         nepi_sdk.sleep(self.serial_send_delay)
-            '''
 
 
     def moveTilt(self, direction, duration):
-        pass
-        '''
         axis_str = self.tilt_str
         if self.ptx_if is not None:
             direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
@@ -431,12 +431,47 @@ class SidusSS109SerialPTXNode:
 
             if success:
                 if duration > 0:
-                    nepi_sdk.sleep(time_s)
+                    nepi_sdk.sleep(duration)
                     while success == False:
-                        self.driver_stopAxisMotion(axis_str = axis_str, direction = direction)
+                        self.driver_stopAxisMotion(axis_str = axis_str)
                         nepi_sdk.sleep(self.serial_send_delay)
-            '''
 
+
+    def movePanSpeedRatio(self, direction, speed_ratio, duration):
+
+        axis_str = self.pan_str
+        if self.ptx_if is not None:
+            direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
+            direction = direction * self.PAN_DEG_DIR
+            speed_dps = speed_ratio * self.speed_max_dps
+            success = self.driver_jog_speed_dps(axis_str = axis_str, speed_dps = speed_dps, direction = direction)
+
+            if success:
+                if duration > 0:
+                    nepi_sdk.sleep(duration)
+                    while success == False:
+                        self.driver_stopAxisMotion(axis_str = axis_str)
+                        nepi_sdk.sleep(self.serial_send_delay)
+
+
+
+    def moveTiltSpeedRatio(self, direction, speed_ratio, duration):
+        pass
+        axis_str = self.tilt_str
+        if self.ptx_if is not None:
+            direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
+            direction = direction * self.PAN_DEG_DIR
+            speed_dps = speed_ratio * self.speed_max_dps
+            success = self.driver_jog_speed_dps(axis_str = axis_str, speed_dps = speed_dps, direction = direction)
+
+            if success:
+                if duration > 0:
+                    nepi_sdk.sleep(duration)
+                    while success == False:
+                        self.driver_stopAxisMotion(axis_str = axis_str)
+                        nepi_sdk.sleep(self.serial_send_delay)
+
+        
 
     def setSoftLimits(self, min_pan,max_pan,min_tilt,max_tilt):
         # TODO: Limits checking and driver unit conversion?
@@ -951,11 +986,6 @@ class SidusSS109SerialPTXNode:
 
     def driver_jog(self,axis_str, direction):
 
-
-        #self.driver_setSpeedRatios(self.speed_ratio)
-
-        #nepi_sdk.sleep(self.serial_send_delay)
-
         method_name = sys._getframe().f_code.co_name
         success = False
         data_str = self.create_blank_str()
@@ -965,6 +995,27 @@ class SidusSS109SerialPTXNode:
             cmd_str = 'MMB'
         ser_msg= (axis_str + self.addr_str + cmd_str + data_str + 'W')
         [success,response] = self.send_msg(ser_msg)
+        return success
+    
+
+    def driver_jog_speed_dps(self,axis_str, speed_dps, direction):
+
+        method_name = sys._getframe().f_code.co_name
+        success = False
+        data_str = self.create_blank_str()[1:]
+        data_str = data_str + math.floor(speed_dps/self.speed_max_dps)
+        if direction == 1:
+            cmd_str = 'MMV0'
+        else:
+            cmd_str = 'MMV-'
+
+        ser_msg= (axis_str + self.addr_str + cmd_str + data_str + 'W')
+        [success,response] = self.send_msg(ser_msg)
+        self.msg_if.pub_warn("")
+        dps=round(speed_dps,2)
+        self.msg_if.pub_warn("Set Jog Speed DPS: " + str(dps))
+        self.msg_if.pub_warn("Set Jog Speed Msg: " + str(ser_msg))
+        self.msg_if.pub_warn("Set Jog Speed Response: " + str(response))
         return success
 
     #######################
