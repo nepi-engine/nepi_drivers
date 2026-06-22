@@ -410,7 +410,7 @@ class SidusSS109SerialPTXNode:
     def movePan(self, direction, duration):
         axis_str = self.pan_str
         if self.ptx_if is not None:
-            direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
+            direction = self.PT_DIRECTION_POSITIVE if direction == 1 else self.PT_DIRECTION_NEGATIVE
             direction = direction * self.PAN_DEG_DIR
             success = self.driver_jog(axis_str = axis_str, direction = direction)
 
@@ -425,7 +425,7 @@ class SidusSS109SerialPTXNode:
     def moveTilt(self, direction, duration):
         axis_str = self.tilt_str
         if self.ptx_if is not None:
-            direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
+            direction = self.PT_DIRECTION_POSITIVE if direction == 1 else self.PT_DIRECTION_NEGATIVE
             direction = direction * self.TILT_DEG_DIR
             success = self.driver_jog(axis_str = axis_str, direction = direction)
 
@@ -441,7 +441,7 @@ class SidusSS109SerialPTXNode:
 
         axis_str = self.pan_str
         if self.ptx_if is not None:
-            direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
+            direction = self.PT_DIRECTION_POSITIVE if direction == 1 else self.PT_DIRECTION_NEGATIVE
             direction = direction * self.PAN_DEG_DIR
             speed_dps = speed_ratio * self.speed_max_dps
             success = self.driver_jog_speed_dps(axis_str = axis_str, speed_dps = speed_dps, direction = direction)
@@ -456,10 +456,9 @@ class SidusSS109SerialPTXNode:
 
 
     def moveTiltSpeedRatio(self, direction, speed_ratio, duration):
-        pass
         axis_str = self.tilt_str
         if self.ptx_if is not None:
-            direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
+            direction = self.PT_DIRECTION_POSITIVE if direction == 1 else self.PT_DIRECTION_NEGATIVE
             direction = direction * self.TILT_DEG_DIR
             speed_dps = speed_ratio * self.speed_max_dps
             success = self.driver_jog_speed_dps(axis_str = axis_str, speed_dps = speed_dps, direction = direction)
