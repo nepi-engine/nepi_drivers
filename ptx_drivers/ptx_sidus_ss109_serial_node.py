@@ -460,7 +460,7 @@ class SidusSS109SerialPTXNode:
         axis_str = self.tilt_str
         if self.ptx_if is not None:
             direction = self.PT_DIRECTION_POSITIVE if direction == self.ptx_if.PTX_DIRECTION_POSITIVE else self.PT_DIRECTION_NEGATIVE
-            direction = direction * self.PAN_DEG_DIR
+            direction = direction * self.TILT_DEG_DIR
             speed_dps = speed_ratio * self.speed_max_dps
             success = self.driver_jog_speed_dps(axis_str = axis_str, speed_dps = speed_dps, direction = direction)
 
