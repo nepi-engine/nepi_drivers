@@ -49,7 +49,6 @@
 
 
 import os
-import rospy
 
 import rosnode
 import time
@@ -154,7 +153,7 @@ class RBXFakeGPS:
     # Start navpose callbacks
     self.nepi_nav_service_name = os.path.join(self.base_namespace, "nav_pose_query")
     self.msg_if.pub_info("will call NEPI navpose service for current heading at: " + self.nepi_nav_service_name)
-    rospy.Timer(rospy.Duration(self.navpose_update_interval), self.update_current_heading_callback)
+    nepi_sdk.start_timer_process(self.navpose_update_interval, self.update_current_heading_callback)
     
     #Start Mavlink Fake GPS publisher if needed
     # Check if need to send Mavlink message
@@ -167,7 +166,7 @@ class RBXFakeGPS:
       # MAVLINK Fake GPS Publish Topic
       MAVLINK_HILGPS_TOPIC = MAVLINK_NAMESPACE + "hil/gps"
       self.msg_if.pub_info("Will publish fake gps on mavlink topic: " + MAVLINK_HILGPS_TOPIC)
-      self.mavlink_pub = rospy.Publisher(MAVLINK_HILGPS_TOPIC, HilGPS, queue_size=1)
+      self.mavlink_pub = nepi_sdk.create_publisher(MAVLINK_HILGPS_TOPIC, HilGPS, queue_size=1)
       self.msg_if.pub_info("Fake gps publishing to " + MAVLINK_HILGPS_TOPIC)
       self.send_mavlink_gps_msg = True
     else:
@@ -177,10 +176,10 @@ class RBXFakeGPS:
     self.odom_msg = Odometry()
     #self.odom_msg.header.frame_id = self.name + '_fixed_frame'
     #self.odom_msg.child_frame_id = self.name + '_rotating_frame'
-    self.fake_odom_pub = rospy.Publisher("~odom", Odometry, queue_size=1)
-    self.fake_gps_pub = rospy.Publisher("~gps_fix", NavSatFix, queue_size=1)
+    self.fake_odom_pub = nepi_sdk.create_publisher("~odom", Odometry, queue_size=1)
+    self.fake_gps_pub = nepi_sdk.create_publisher("~gps_fix", NavSatFix, queue_size=1)
     time.sleep(1)
-    rospy.Timer(rospy.Duration(self.gps_publish_interval_sec), self.fake_gps_pub_callback)
+    nepi_sdk.start_timer_process(self.gps_publish_interval_sec, self.fake_gps_pub_callback)
 
    # Setup RBX driver interfaces
     self.msg_if.pub_info("Got fake gps node name: " + self.node_name)
@@ -192,14 +191,14 @@ class RBXFakeGPS:
     self.msg_if.pub_info("Found rbx namespace: " + rbx_namespace)
         
     # Create Fake GPS controls subscribers
-    rospy.Subscriber("~enable", Bool, self.fakeGPSEnableCb)
-    rospy.Subscriber("~reset", GeoPoint, self.fakeGPSResetLocCb)
-    rospy.Subscriber("~go_stop", Empty, self.fakeGPSGoStopCb)
-    rospy.Subscriber("~goto_position", Point, self.fakeGPSGoPosCb)
-    rospy.Subscriber("~goto_location", GeoPoint, self.fakeGPSGoLocCb)
+    nepi_sdk.create_subscriber("~enable", Bool, self.fakeGPSEnableCb)
+    nepi_sdk.create_subscriber("~reset", GeoPoint, self.fakeGPSResetLocCb)
+    nepi_sdk.create_subscriber("~go_stop", Empty, self.fakeGPSGoStopCb)
+    nepi_sdk.create_subscriber("~goto_position", Point, self.fakeGPSGoPosCb)
+    nepi_sdk.create_subscriber("~goto_location", GeoPoint, self.fakeGPSGoLocCb)
 
 
-    self.status_pub = rospy.Publisher("~status", Bool, queue_size=1, latch = True)
+    self.status_pub = nepi_sdk.create_publisher("~status", Bool, queue_size=1, latch=True)
     time.sleep(1)
     self.status_pub.publish(self.fake_gps_enabled)
     ## Initiation Complete
@@ -208,7 +207,7 @@ class RBXFakeGPS:
     #Set up node shutdown
     #rospy.on_shutdown(self.cleanup_actions)
     # Spin forever (until object is detected)
-    rospy.spin()
+    nepi_sdk.spin()
 
   #######################
   ### Node Methods
@@ -223,24 +222,24 @@ class RBXFakeGPS:
     if self.fake_gps_enabled:
       # Publish a fake gps message
       navsatfix = NavSatFix()
-      navsatfix.header.stamp = rospy.Time.now()
+      navsatfix.header.stamp = nepi_sdk.get_msg_stamp()
       navsatfix.latitude = self.current_location_wgs84_geo.latitude
       navsatfix.longitude = self.current_location_wgs84_geo.longitude
       navsatfix.altitude = self.current_location_wgs84_geo.altitude
       #self.msg_if.pub_info(navsatfix)
       # Calculate position change from reset position
-      self.odom_msg.header.stamp = rospy.Time.now()
+      self.odom_msg.header.stamp = nepi_sdk.get_msg_stamp()
       self.odom_msg.pose.pose.position.x = self.current_point.x
       self.odom_msg.pose.pose.position.y = self.current_point.y
       self.odom_msg.pose.pose.position.z = self.current_point.z
 
-      if not rospy.is_shutdown():
+      if not nepi_sdk.is_shutdown():
         self.fake_gps_pub.publish(navsatfix)
         self.fake_odom_pub.publish(self.odom_msg)
       # Send Mavlink GPS Override if needed
       if self.send_mavlink_gps_msg:
         hilgps=HilGPS()
-        hilgps.header = Header(stamp=rospy.Time.now(), frame_id="mavlink_fake_gps")
+        hilgps.header = Header(stamp=nepi_sdk.get_msg_stamp(), frame_id="mavlink_fake_gps")
         hilgps.fix_type=3
         hilgps.geo.latitude=self.current_location_wgs84_geo.latitude
         hilgps.geo.longitude=self.current_location_wgs84_geo.longitude
@@ -249,8 +248,8 @@ class RBXFakeGPS:
         #self.msg_if.pub_info("Created new HilGPS message")
         #self.msg_if.pub_info(hilgps)
         # Create and publish Fake GPS Publisher
-        hilgps.header = Header(stamp=rospy.Time.now(), frame_id="mavlink_fake_gps")
-        if not rospy.is_shutdown():
+        hilgps.header = Header(stamp=nepi_sdk.get_msg_stamp(), frame_id="mavlink_fake_gps")
+        if not nepi_sdk.is_shutdown():
           self.mavlink_pub.publish(hilgps)
 
 
@@ -304,7 +303,6 @@ class RBXFakeGPS:
       for ind, val in enumerate(ramp_norm):
         step_norm[ind]=np.sum(ramp_norm[0:ind])
       
-      rospy.loginfo_timer = 0
       for ind, val in enumerate(step_norm):
         time.sleep(stp_interval_sec)
         #rospy.loginfo_timer = rospy.loginfo_timer + stp_interval_sec
@@ -346,10 +344,10 @@ class RBXFakeGPS:
   ### Setup a regular background navpose get and update heading data
   def update_current_heading_callback(self,timer):
     # Get current NEPI NavPose data from NEPI ROS nav_pose_query service call
-    if not rospy.is_shutdown():
+    if not nepi_sdk.is_shutdown():
       try:
-        get_navpose_service = rospy.ServiceProxy(self.nepi_nav_service_name, NavPoseQuery)
-        nav_pose_response = get_navpose_service(NavPoseQueryRequest())
+        get_navpose_service = nepi_sdk.connect_service(self.nepi_nav_service_name, NavPoseQuery)
+        nav_pose_response = nepi_sdk.call_service(get_navpose_service, NavPoseQueryRequest())
         self.current_heading_deg = nav_pose_response.nav_pose.heading.heading
         self.current_yaw_enu_deg = nepi_nav.get_navpose_orientation_enu_degs(nav_pose_response)[2]
         #self.msg_if.pub_info('')
