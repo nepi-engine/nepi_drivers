@@ -32,7 +32,7 @@ driver:
         type: Discrete
         options: ['Auto']
         default: 'Auto'
-        value: 'Auto'
+        value: 'ttyACM_imu'
       
 
 
