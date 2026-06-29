@@ -18,8 +18,8 @@ driver:
       tcp_host:
         type: String
         default: '127.0.0.1'
-        value: '127.0.0.1'
+        value: 'NEPI_NAV_IP_HNAV'
       tcp_port:
         type: Int
         default: '16718'
-        value: '16718'
+        value: 'NEPI_NAV_PORT_HNAV'
