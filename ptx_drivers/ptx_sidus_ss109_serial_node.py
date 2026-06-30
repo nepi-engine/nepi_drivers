@@ -72,8 +72,8 @@ class SidusSS109SerialPTXNode:
 
 
     CONFIGS_DICT = {
-         'Standard' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 0.5, 'max_degpsec': 20},
-         'HighSpeed' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 0.5, 'max_degpsec': 40},
+         'Standard' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 0.5, 'max_degpsec': 20, 'hasjogspeed': False},
+         'HighSpeed' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 0.5, 'max_degpsec': 40, 'hasjogspeed': True},
     }
     config_dict = CONFIGS_DICT['Standard']
 
@@ -231,6 +231,14 @@ class SidusSS109SerialPTXNode:
 
             self.home_pan_deg = 0.0
             self.home_tilt_deg = 0.0
+
+            hasjogspeed = self.config_dict['hasjogspeed']
+            if hasjogspeed == True:
+                jspfunction = self.movePanSpeedRatio
+                jstfunction = self.moveTiltSpeedRatio
+            else:
+                jspfunction = None
+                jstfunction = None
             
             self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict,
                                         capSettings = self.cap_settings,
@@ -242,8 +250,8 @@ class SidusSS109SerialPTXNode:
                                         stopMovingCb = None, #self.stopMoving,
                                         movePanCb = self.movePan,  # Stop command not working on jog
                                         moveTiltCb = self.moveTilt, # Stop command not working on jog
-                                        movePanSpeedRatioCb = self.movePanSpeedRatio,  # Stop command not working on jog
-                                        moveTiltSpeedRatioCb = self.moveTiltSpeedRatio, # Stop command not working on jog
+                                        movePanSpeedRatioCb = jspfunction,  # Stop command not working on jog
+                                        moveTiltSpeedRatioCb = jstfunction, # Stop command not working on jog
                                         getSoftLimitsCb = self.getSoftLimits, # 109 does not return response
                                         setSoftLimitsCb = self.setSoftLimits,
                                         getSpeedMaxCb = self.getSpeedMax,
@@ -443,8 +451,8 @@ class SidusSS109SerialPTXNode:
         if self.ptx_if is not None:
             direction = self.PT_DIRECTION_POSITIVE if direction == 1 else self.PT_DIRECTION_NEGATIVE
             direction = direction * self.PAN_DEG_DIR
-            self.driver_setSpeedRatio(speed_ratio, axis_str=self.pan_str)
-            success = self.driver_jog(axis_str=axis_str, direction=direction)
+            speed_dps = speed_ratio * self.speed_max_dps
+            success = self.driver_jog_speed_dps(axis_str = axis_str, speed_dps = speed_dps, direction = direction)
 
             if success:
                 if duration > 0:
@@ -460,8 +468,8 @@ class SidusSS109SerialPTXNode:
         if self.ptx_if is not None:
             direction = self.PT_DIRECTION_POSITIVE if direction == 1 else self.PT_DIRECTION_NEGATIVE
             direction = direction * self.TILT_DEG_DIR
-            self.driver_setSpeedRatio(speed_ratio, axis_str=self.tilt_str)
-            success = self.driver_jog(axis_str=axis_str, direction=direction)
+            speed_dps = speed_ratio * self.speed_max_dps
+            success = self.driver_jog_speed_dps(axis_str = axis_str, speed_dps = speed_dps, direction = direction)
 
             if success:
                 if duration > 0:
