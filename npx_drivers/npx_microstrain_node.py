@@ -294,12 +294,19 @@ class MicrostrainNode(object):
         xyzw = list([pose.x, pose.y, pose.z, pose.w])
         rpy = nepi_nav.convert_quat2rpy(xyzw)
 
+        # Angular rates: 3DM-GV7 gyro body-frame angular velocity (rad/s) about
+        # x/y/z -> roll/pitch/yaw rates. Convert to deg/s to match roll/pitch/yaw_deg.
+        ang_vel = imu_msg.angular_velocity
+
         timestamp = nepi_sdk.sec_from_msg_stamp(imu_msg.header.stamp)
         #self.msg_if.pub_warn("Got Timestamp from msg: " + str(timestamp) + " : " + str(imu_msg.header.stamp), throttle_s = 5)
         self.driver_navpose_dict['time_orientation'] = timestamp
         self.driver_navpose_dict['roll_deg'] = rpy[0]
         self.driver_navpose_dict['pitch_deg'] = rpy[1]
         self.driver_navpose_dict['yaw_deg'] = rpy[2]
+        self.driver_navpose_dict['roll_deg_per_sec'] = math.degrees(ang_vel.x)
+        self.driver_navpose_dict['pitch_deg_per_sec'] = math.degrees(ang_vel.y)
+        self.driver_navpose_dict['yaw_deg_per_sec'] = math.degrees(ang_vel.z)
 
 
 
