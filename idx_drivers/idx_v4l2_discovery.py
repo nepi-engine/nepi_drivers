@@ -213,6 +213,13 @@ class V4L2CamDiscovery:
             elif ':' in all_line:
               in_device_caps = False
           
+          # Debug aid: summarize the two conditions that gate whether this
+          # /dev/video* path becomes an Imaging device, so a rejection is never
+          # silent. Enable Debug Mode to see these lines.
+          self.msg_if.pub_debug("V4L2 eval " + path_str + " (" + str(device_type) +
+                                "): video_capture=" + str(is_video_cap_device) +
+                                " usb_bus=" + str(usbBus))
+
           if is_video_cap_device and usbBus is not None:
             active_paths.append(path_str) # To check later that the device list has no entries for paths that have disappeared
             known_device = False
@@ -274,6 +281,21 @@ class V4L2CamDiscovery:
               else:
                 pass
                 self.msg_if.pub_debug("Failed to start new node for path: " + path_str, throttle_s = 10.0)
+
+          else:
+            # Debug aid: this /dev/video* path was found but did NOT qualify as an
+            # Imaging device, so no node is launched (Devices shows "Waiting for
+            # Apps"). Say exactly which condition failed and dump the raw
+            # 'v4l2-ctl --all' output so the camera's real caps/bus can be inspected.
+            reasons = []
+            if is_video_cap_device == False:
+              reasons.append("no 'Video Capture' capability in Device Caps")
+            if usbBus is None:
+              reasons.append("could not parse a USB Bus info id")
+            self.msg_if.pub_debug("Skipping path " + path_str + " (" + str(device_type) +
+                                  "): " + " and ".join(reasons))
+            for skip_line in all_out:
+              self.msg_if.pub_debug("  v4l2-ctl --all [" + path_str + "]: " + str(skip_line))
             
     ######################
     # Check that device paths are still active

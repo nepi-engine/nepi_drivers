@@ -160,8 +160,11 @@ class V4l2CamNode:
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because No Driver loaded")
             return            
         if not self.driver.isConnected():
-           self.msg_if.pub_warn("Failed to connect to camera device")
-            
+            self.msg_if.pub_warn("Failed to connect to camera device at " + str(self.device_path) +
+                                 "; shutting down node instead of presenting a device that produces no images")
+            nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because camera device not connected")
+            return
+
         self.msg_if.pub_info("... Connected!")
 
 
@@ -549,9 +552,21 @@ class V4l2CamNode:
             # Always try to start image acquisition -- no big deal if it was already started; driver returns quickly
             ret, msg = self.driver.startImageAcquisition()
             if ret is False:
+                # Debug aid: surface why streaming could not start (results in no image at all).
+                self.msg_if.pub_warn("Image acquisition failed to start for " + str(self.device_path) + ": " + str(msg), throttle_s = 5.0)
                 self.img_lock.release()
                 return ret, msg, None, None, None
             self.color_image_acquisition_running = True
+            # Debug aid: log the negotiated format/resolution/framerate once, so when no
+            # image appears we can confirm how the camera actually opened (e.g. YUYV vs MJPG).
+            if getattr(self, '_acq_settings_logged', False) == False:
+                self._acq_settings_logged = True
+                try:
+                    settings = self.driver.getCurrentVideoSettings()
+                    self.msg_if.pub_info("Color image acquisition started for " + str(self.device_path) +
+                                         " (mjpg=" + str(self.driver.mjpg) + ", settings=" + str(settings) + ")")
+                except Exception as e:
+                    self.msg_if.pub_debug("Could not read negotiated video settings for " + str(self.device_path) + ": " + str(e))
             timestamp = None
             start = time.time()
 
@@ -559,11 +574,17 @@ class V4l2CamNode:
             stop = time.time()
             #print('GI: ', stop - start)
             if ret is False:
+                # Debug aid: this is the "camera on but no image" case -- say exactly why.
+                self.msg_if.pub_warn("No color image from " + str(self.device_path) + ": " + str(msg), throttle_s = 20.0)
                 self.img_lock.release()
                 return ret, msg, None, None, None
             if timestamp is None:
                 timestamp = nepi_utils.get_time()
             self.img_lock.release()
+            # Debug aid: confirm frames are actually decoding and their dimensions
+            # (if frames flow here but the viewer is black, the issue is downstream).
+            if cv2_img is not None:
+                self.msg_if.pub_debug("Got color image " + str(getattr(cv2_img, 'shape', None)) + " from " + str(self.device_path), throttle_s = 10.0)
             return ret, msg, cv2_img, timestamp, encoding
     
     # Good base class candidate - Shared with ONVIF

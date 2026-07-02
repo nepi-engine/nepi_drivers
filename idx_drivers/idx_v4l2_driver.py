@@ -602,20 +602,26 @@ class V4l2CamDriver(object):
         ret, self.latest_frame = self.v4l2_cap.retrieve()
         stop = time.time()
         #print('R: ', stop - start)
+        # Debug aid: a failure here means the frame was grabbed but not decodable.
+        fail_reason = "retrieve()/decode failed - frame was grabbed but could not be decoded (likely pixel-format/MJPG mismatch)"
     else:
         ret = False
         self.latest_frame = None
+        # Debug aid: grab() in the acquisition thread is not returning frames.
+        fail_reason = "grab() returned no frame - camera not delivering frames (check USB bandwidth, pixel format, or mjpg mode)"
 
     self.img_acq_lock.release()
     if not ret:
         self.consec_failed_frames += 1
         if self.consec_failed_frames < self.MAX_CONSEC_FRAME_FAIL_COUNT:
-            return None, None, False, "Failed to read next frame for " + self.device_path
+            return None, None, False, "Failed to read next frame for " + self.device_path + ": " + fail_reason
         else:
             self.stopImageAcquisition()
             self.startImageAcquisition()
-            return None, None, False, "Failed to read next frame " + str(self.MAX_CONSEC_FRAME_FAIL_COUNT) + "times consec... auto-restarting image acquisition"
-    
+            return None, None, False, "Failed to read next frame " + str(self.MAX_CONSEC_FRAME_FAIL_COUNT) + " times consec (" + fail_reason + ")... auto-restarting image acquisition"
+
+    # Reset on success so the counter tracks *consecutive* failures, not cumulative ones over the stream's lifetime
+    self.consec_failed_frames = 0
     return self.latest_frame, self.latest_frame_timestamp, True, "Success"
 
 if __name__ == '__main__':
