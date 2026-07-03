@@ -176,7 +176,7 @@ class V4L2CamDiscovery:
             valid_device = False
         
         if valid_device == True:  
-          #self.msg_if.pub_warn("Found a device type: " + device_type + " on path " + path_str) 
+          self.msg_if.pub_debug("Found a device type: " + device_type + " on path " + path_str) 
           # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
           is_video_cap_device = False
           sub_process = subprocess.Popen(['v4l2-ctl', '-d', path_str, '--all'],
@@ -186,7 +186,7 @@ class V4L2CamDiscovery:
           in_device_caps = False
           usbBus = None
           for all_line in all_out:
-            #self.msg_if.pub_warn("Got all_line: " + str(all_line) + " on path " + path_str)
+            self.msg_if.pub_debug("Got all_line: " + str(all_line) + " on path " + path_str)
             if ('Bus info' in all_line):
               bus_line = copy.deepcopy(all_line)
               try:
@@ -199,7 +199,7 @@ class V4L2CamDiscovery:
                     usbBus = all_numbers[-1]
               except:
                 pass
-              #self.msg_if.pub_warn("Got Bus ID: " + str(usbBus) + " from line " + str(all_line))
+              self.msg_if.pub_debug("Got Bus ID: " + str(usbBus) + " from line " + str(all_line))
                    
               # if '-' in all_line:
               #   usbBus = all_line.rsplit("-",1)[1].replace(".","")
@@ -278,7 +278,7 @@ class V4L2CamDiscovery:
     ######################
     # Check that device paths are still active
     ######################
-    #self.msg_if.pub_warn("Active paths " + str(active_paths))
+    self.msg_if.pub_debug("Active paths " + str(active_paths))
     purge_list = []
     for device in self.deviceList:
       path_str = device['device_path']

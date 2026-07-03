@@ -232,13 +232,7 @@ class SidusSS109SerialPTXNode:
             self.home_pan_deg = 0.0
             self.home_tilt_deg = 0.0
 
-            hasjogspeed = self.config_dict['hasjogspeed']
-            if hasjogspeed == True:
-                jspfunction = self.movePanSpeedRatio
-                jstfunction = self.moveTiltSpeedRatio
-            else:
-                jspfunction = None
-                jstfunction = None
+
             
             self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict,
                                         capSettings = self.cap_settings,
@@ -250,8 +244,8 @@ class SidusSS109SerialPTXNode:
                                         stopMovingCb = None, #self.stopMoving,
                                         movePanCb = self.movePan,  # Stop command not working on jog
                                         moveTiltCb = self.moveTilt, # Stop command not working on jog
-                                        movePanSpeedRatioCb = jspfunction,  # Stop command not working on jog
-                                        moveTiltSpeedRatioCb = jstfunction, # Stop command not working on jog
+                                        movePanSpeedRatioCb = self.movePanSpeedRatio,  # Stop command not working on jog
+                                        moveTiltSpeedRatioCb = self.moveTiltSpeedRatio, # Stop command not working on jog
                                         getSoftLimitsCb = self.getSoftLimits, # 109 does not return response
                                         setSoftLimitsCb = self.setSoftLimits,
                                         getSpeedMaxCb = self.getSpeedMax,
@@ -452,8 +446,12 @@ class SidusSS109SerialPTXNode:
             direction = self.PT_DIRECTION_POSITIVE if direction == 1 else self.PT_DIRECTION_NEGATIVE
             direction = direction * self.PAN_DEG_DIR
             speed_dps = speed_ratio * self.speed_max_dps
-            success = self.driver_jog_speed_dps(axis_str = axis_str, speed_dps = speed_dps, direction = direction)
-
+            hasjogspeed = self.config_dict['hasjogspeed']
+            if hasjogspeed == True:
+                success = self.driver_jog_speed_dps(axis_str = axis_str, speed_dps = speed_dps, direction = direction)
+            else:
+                self.driver_setSpeedRatio(speed_ratio, axis_str=self.pan_str)
+                success = self.driver_jog(axis_str=axis_str, direction=direction)
             if success:
                 if duration > 0:
                     nepi_sdk.sleep(duration)
@@ -469,7 +467,15 @@ class SidusSS109SerialPTXNode:
             direction = self.PT_DIRECTION_POSITIVE if direction == 1 else self.PT_DIRECTION_NEGATIVE
             direction = direction * self.TILT_DEG_DIR
             speed_dps = speed_ratio * self.speed_max_dps
-            success = self.driver_jog_speed_dps(axis_str = axis_str, speed_dps = speed_dps, direction = direction)
+
+            hasjogspeed = self.config_dict['hasjogspeed']
+            if hasjogspeed == True:
+                success = self.driver_jog_speed_dps(axis_str = axis_str, speed_dps = speed_dps, direction = direction)
+            else:
+                self.driver_setSpeedRatio(speed_ratio, axis_str=self.pan_str)
+                success = self.driver_jog(axis_str=axis_str, direction=direction)
+
+            
 
             if success:
                 if duration > 0:
@@ -1014,14 +1020,14 @@ class SidusSS109SerialPTXNode:
             cmd_str = 'MMV0'
         else:
             cmd_str = 'MMV-'
-
         ser_msg= (axis_str + self.addr_str + cmd_str + data_str + 'W')
         [success,response] = self.send_msg(ser_msg)
-        self.msg_if.pub_warn("")
-        dps=round(speed_dps,2)
-        self.msg_if.pub_warn("Set Jog Speed DPS: " + str(dps))
-        self.msg_if.pub_warn("Set Jog Speed Msg: " + str(ser_msg))
-        self.msg_if.pub_warn("Set Jog Speed Response: " + str(response))
+
+        # self.msg_if.pub_warn("")
+        # dps=round(speed_dps,2)
+        # self.msg_if.pub_warn("Set Jog Speed DPS: " + str(dps))
+        # self.msg_if.pub_warn("Set Jog Speed Msg: " + str(ser_msg))
+        # self.msg_if.pub_warn("Set Jog Speed Response: " + str(response))
         return success
 
     #######################
