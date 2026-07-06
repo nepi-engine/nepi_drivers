@@ -35,7 +35,7 @@ from nepi_sdk import nepi_settings
 from std_msgs.msg import Empty, Int8, UInt8, UInt32, Bool, String, Float32, Float64
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
 from geographic_msgs.msg import GeoPoint, GeoPose, GeoPoseStamped
-from mavros_msgs.msg import State, AttitudeTarget
+from mavros_msgs.msg import State, AttitudeTarget, StatusText
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest, CommandTOL, CommandTOLRequest, CommandHome, CommandHomeRequest
 
 from nav_msgs.msg import Odometry
@@ -151,6 +151,17 @@ class ArdupilotNode:
   gps_connected = False
   has_fake_gps = False
 
+  # Most recent flight-controller STATUSTEXT (e.g. pre-arm/arm rejection reasons).
+  # Recorded from the mavros statustext/recv topic and surfaced to the RBX status
+  # so operators see the FCU's reason without digging through the mavros log.
+  FCU_TEXT_REMIND_S = 10.0   # re-surface a persisting FCU message at most this often
+  FCU_TEXT_RECENT_S = 15.0   # treat FCU text within this window as a command's failure reason
+  last_fcu_text = ""
+  last_fcu_severity = None
+  last_fcu_text_time = 0.0
+  _last_surfaced_fcu_text = ""
+  _last_surfaced_fcu_time = 0.0
+
   #######################
   ### Node Initialization
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
@@ -230,6 +241,10 @@ class ArdupilotNode:
     nepi_sdk.create_subscriber(MAVLINK_SOURCE_GPS_TOPIC, NavSatFix, self.gps_topic_callback, queue_size = 1)
     nepi_sdk.create_subscriber(MAVLINK_SOURCE_ODOM_TOPIC, Odometry, self.odom_topic_callback, queue_size = 1)
     nepi_sdk.create_subscriber(MAVLINK_SOURCE_HEADING_TOPIC, Float64, self.heading_topic_callback, queue_size = 1)
+
+    # FCU status text (pre-arm/arm rejections, EKF messages, failsafes, etc.)
+    MAVLINK_STATUSTEXT_TOPIC = MAVLINK_NAMESPACE + "statustext/recv"
+    nepi_sdk.create_subscriber(MAVLINK_STATUSTEXT_TOPIC, StatusText, self.get_statustext_callback, queue_size = 10)
 
     ## Define Mavlink Publishers
     MAVLINK_SETPOINT_ATTITUDE_TOPIC = MAVLINK_NAMESPACE + "setpoint_raw/attitude"
@@ -630,6 +645,47 @@ class ArdupilotNode:
       self.navpose_dict['heading_deg'] = heading_msg.data
 
 
+  ### Callback for flight-controller status text (pre-arm/arm rejections, EKF, failsafes).
+  ### The FCU reports why a command is refused (e.g. "Arm: Compass not healthy") only as
+  ### STATUSTEXT, which otherwise lands in the mavros log. Surface warning-or-worse text to
+  ### the RBX status so it shows in the UI, and record it for command handlers to report.
+  def get_statustext_callback(self, statustext_msg):
+      text = statustext_msg.text.strip()
+      if text == "":
+          return
+      severity = statustext_msg.severity
+      now = nepi_utils.get_time()
+      # Record the latest so command handlers (e.g. arm) can report the FCU reason
+      self.last_fcu_text = text
+      self.last_fcu_severity = severity
+      self.last_fcu_text_time = now
+      # StatusText.WARNING == 4; lower severity value == more severe (MAV_SEVERITY).
+      # Skip NOTICE/INFO/DEBUG to avoid log noise. Dedupe identical consecutive
+      # messages, but re-remind every FCU_TEXT_REMIND_S while a condition persists.
+      if severity <= StatusText.WARNING:
+          is_new = (text != self._last_surfaced_fcu_text)
+          is_stale = (now - self._last_surfaced_fcu_time) > self.FCU_TEXT_REMIND_S
+          if is_new or is_stale:
+              self._last_surfaced_fcu_text = text
+              self._last_surfaced_fcu_time = now
+              fcu_msg = "FCU: " + text
+              self.msg_if.pub_warn(fcu_msg)
+              if self.rbx_if is not None:
+                  self.rbx_if.update_error_msg(fcu_msg)
+
+  ### Returns the most recent FCU status text when it is a recent warning-or-worse
+  ### message, used to annotate a failed command with the flight-controller's reason.
+  def get_recent_fcu_reason(self):
+      if self.last_fcu_text == "":
+          return ""
+      age = nepi_utils.get_time() - self.last_fcu_text_time
+      recent = age <= self.FCU_TEXT_RECENT_S
+      severe = (self.last_fcu_severity is None or self.last_fcu_severity <= StatusText.WARNING)
+      if recent and severe:
+          return self.last_fcu_text
+      return ""
+
+
   ### Callback returning the full navpose dict to the RBX/NPX interface
   def getNavPoseCb(self):
     return self.navpose_dict
@@ -666,7 +722,10 @@ class ArdupilotNode:
     arm_cmd = CommandBoolRequest()
     arm_cmd.value = arm_value
     if arm_value == True and self.gps_connected == False:
-      self.msg_if.pub_info("Ignoring Arm command as no GPS is connected")
+      no_gps_msg = "Arm command ignored: no GPS connected"
+      self.msg_if.pub_warn(no_gps_msg)
+      if self.rbx_if is not None:
+        self.rbx_if.update_error_msg(no_gps_msg)
     else:
       self.msg_if.pub_info("Updating State to: " + str(arm_value))
       time.sleep(1) # Give time for other process to see busy
@@ -690,7 +749,14 @@ class ArdupilotNode:
           home_loc.altitude = self.rbx_if.current_location_wgs84_geo[2]
           self.home_location = home_loc
       else:
-        self.msg_if.pub_info("Setting Armed value timed-out")
+        action = "Arm" if arm_value == True else "Disarm"
+        fail_msg = action + " command timed out"
+        reason = self.get_recent_fcu_reason()
+        if reason != "":
+          fail_msg = fail_msg + " (FCU: " + reason + ")"
+        self.msg_if.pub_warn(fail_msg)
+        if self.rbx_if is not None:
+          self.rbx_if.update_error_msg(fail_msg)
       self.msg_if.pub_info("Armed value set to " + str(arm_value))
   
 
