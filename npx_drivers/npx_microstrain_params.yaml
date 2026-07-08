@@ -30,7 +30,7 @@ driver:
         value: '115200'
       serial_port:
         type: Discrete
-        options: ['Auto']
+        options: ['SERIAL_DEVICES']
         default: 'ttyACM_imu'
         value: 'Auto'
       
