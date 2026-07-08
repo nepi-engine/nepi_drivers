@@ -12,9 +12,9 @@ nepi_drivers/
 ├── npx_drivers/        # Navigation/positioning drivers (NMEA, HNav, Microstrain)
 ├── ptx_drivers/        # Pan-tilt/actuator drivers (Sidus SS109, IQR, ONVIF PTZ)
 ├── lsx_drivers/        # Lighting drivers (Deepsea Sealite, Sidus SS182, AfTower)
-├── rbx_drivers/        # Robot drivers (placeholder — no drivers implemented)
+├── rbx_drivers/        # Robot drivers (ArduPilot autopilot via mavros)
 ├── scripts/
-│   └── fake_gps_node.py   # Test/development GPS simulator node
+│   └── fake_gps_node.py   # Legacy per-device GPS simulator (superseded by the nepi_app_fake_gps app)
 ├── CMakeLists.txt
 ├── package.xml
 └── setup.py
@@ -47,7 +47,7 @@ Where `{cat}` is the three-letter category prefix (idx, npx, ptx, lsx, rbx).
 | NPX | `NPXDeviceIF` |
 | PTX | `PTXActuatorIF` |
 | LSX | `LSXDeviceIF` |
-| RBX | `RBXDeviceIF` |
+| RBX | `RBXRobotIF` |
 
 The interface class handles all ROS publisher/subscriber/service creation. The node provides callbacks for hardware reads and commands. Nodes run until hardware disconnects or `drivers_mgr` terminates them.
 
@@ -86,7 +86,8 @@ When a simulator is running, the driver node connects to `localhost` on the conf
 - `lsx_sidus_SS182` — Sidus SS182 strobe, serial
 - `lsx_aftowerlight` — AfTower tower light system
 
-**RBX — Robots (0 drivers):** Directory exists as a placeholder. No implementations present.
+**RBX — Robots (1 driver):**
+- `rbx_ardupilot` — ArduPilot autopilot systems (e.g. ArduCopter) via `mavros`. Unlike the other categories, the discovery script launches a `mavros_node` (as a `subprocess.Popen`, no `.launch` file) to carry the MAVLink link, then launches the `ArdupilotNode` RBX node, which attaches to that mavros namespace and registers with `RBXRobotIF`. The connection is selected by the `connection` discovery option: `SERIAL` (probes serial ports for a MAVLink heartbeat) is the production path; the code also implements `TCP`/`UDP` branches. See `rbx_drivers/SITL_IMPLEMENTATION_PLAN.md` (adding an ArduPilot SITL connection) and `rbx_drivers/DISCOVERY_EXPLAINED.md` (full discovery walkthrough).
 
 ## ROS Interface
 
@@ -136,7 +137,7 @@ def discoveryFunction(available_paths_list, active_paths_list, base_namespace, d
 
 **NMEA and HNav simulators run on localhost TCP.** If another process is already bound to the simulator port, the simulator thread will fail silently. The driver node will then fail to connect.
 
-**`rbx_drivers/` is empty.** The directory exists and `drivers_mgr` is aware of the RBX category, but no robot drivers are implemented. Adding an RBX driver requires creating all three files (discovery, node, params) and registering with `RBXDeviceIF`.
+**RBX ArduPilot discovery launches `mavros` as a subprocess.** Unlike other categories, `rbx_ardupilot_discovery.py` does not only launch a node — it also spawns a `mavros_node` (via `subprocess.Popen` with `_fcu_url:=...`) to carry MAVLink, then launches `ArdupilotNode`. There are no `.launch` files; the `fcu_url` connection string is built in the per-type `launch*DeviceNode` helpers, and the shared `launchDeviceNode` writes a `DEVICE_DICT` param the node reads. The RBX node is connection-agnostic — it needs no change to switch transports. Only `SERIAL` is exposed in the params `connection` options today even though `TCP`/`UDP` branches exist; adding an ArduPilot SITL link is therefore mostly a new discovery branch plus a params-YAML option (see `rbx_drivers/SITL_IMPLEMENTATION_PLAN.md`). The APM configs it `rosparam load`s (`apm_pluginlists.yaml`, `apm_config.yaml`) live only at the installed path `/opt/nepi/nepi_engine/share/mavros/launch/`, not in this checkout.
 
 **ONVIF drivers use HTTP/XML.** Network timeouts during ONVIF device probing can cause discovery to block. The `nepi_app_onvif_mgr` app (in `nepi_apps`) handles ONVIF device management at a higher level; the ONVIF drivers here are the low-level node implementations.
 
@@ -147,3 +148,4 @@ def discoveryFunction(available_paths_list, active_paths_list, base_namespace, d
 ## Decision Log
 
 - 2026-03 — CLAUDE.md created — Initial developer reference, Claude Code authoring pass.
+- 2026-07 — Corrected stale RBX content — `rbx_drivers/` is no longer empty; documented the `rbx_ardupilot` driver (mavros subprocess launch, connection-agnostic node), fixed the RBX interface class name to `RBXRobotIF`, and noted `scripts/fake_gps_node.py` is superseded by the `nepi_app_fake_gps` app.
