@@ -839,12 +839,25 @@ class ArdupilotNode:
       takeoff_cmd.min_pitch = takeoff_min_pitch_deg
       takeoff_cmd.altitude = takeoff_height_m
       nepi_sdk.call_service(self.takeoff_client, takeoff_cmd)
-      geo_point = GeoPoint()
-      geo_point.latitude = self.rbx_if.current_location_wgs84_geo[0]
-      geo_point.longitude = self.rbx_if.current_location_wgs84_geo[1]
-      goal_alt = self.rbx_if.current_location_wgs84_geo[2] + takeoff_height_m
-      geo_point.altitude = goal_alt
-      self.fake_gps_goto_location_pub.publish(geo_point)
+      # Command the fake GPS to climb straight up by takeoff_height_m using a
+      # RELATIVE ENU move (east=0, north=0, up=+height) rather than an absolute
+      # goto_location. Holding lat/lon and moving relative avoids two bench bugs:
+      # (1) it never depends on current_location being populated (an absolute
+      #     goto with a [0,0,0] current sent the vehicle to lat/lon 0,0), and
+      # (2) it is immune to the ~20 m ellipsoid/AMSL geoid offset that mavros
+      #     applies but the geoid-less NEPI pipeline does not - an absolute
+      #     altitude goal computed from the mavros (ellipsoid) reading and then
+      #     applied by the fake GPS as AMSL sends the climb the wrong way.
+      # goal_alt stays in the mavros (ellipsoid) frame for the completion check
+      # below, which converges because a +height AMSL climb is a +height
+      # ellipsoid climb at a fixed lat/lon. See fakeGpsGoPosCb in the fake_gps app.
+      start_alt = self.rbx_if.current_location_wgs84_geo[2]
+      goal_alt = start_alt + takeoff_height_m
+      climb_point = Point()
+      climb_point.x = 0.0
+      climb_point.y = 0.0
+      climb_point.z = float(takeoff_height_m)
+      self.fake_gps_goto_position_pub.publish(climb_point)
 
       error_bound_m = self.rbx_if.rbx_info.error_bounds.max_distance_error_m
       timeout_sec = self.rbx_if.rbx_info.cmd_timeout
