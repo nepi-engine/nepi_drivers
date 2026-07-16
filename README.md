@@ -1,2 +1,2 @@
 # nepi_drivers
-NEPI driver file repo
+NEPI drivers repo
