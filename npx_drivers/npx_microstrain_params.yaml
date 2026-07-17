@@ -33,7 +33,7 @@ driver:
         options: 
           - 'SERIAL_DEVICES'
         default: 'ttyACM_imu'
-        value: 'Auto'
+        value: 'ttyACM_imu'
       
 
 
