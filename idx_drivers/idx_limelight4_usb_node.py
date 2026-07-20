@@ -28,7 +28,7 @@ from nepi_sdk import nepi_settings
 
 from nepi_api.device_if_idx import IDXDeviceIF
 from nepi_api.device_if_npx import NPXDeviceIF
-from nepi_api.ai_if_detector import AiDetectorIF
+from nepi_api.process_if_ai_detector import AiDetectorIF
 from nepi_api.messages_if import MsgIF
 
 
