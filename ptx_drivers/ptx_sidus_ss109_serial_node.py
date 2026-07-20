@@ -1044,7 +1044,7 @@ class SidusSS109SerialPTXNode:
             try:
                 # Try and open serial port
                 self.msg_if.pub_info("Opening serial port " + self.port_str + " with baudrate: " + self.baud_str)
-                self.serial_port = serial.Serial(self.port_str,self.baud_int,timeout = 1)
+                self.serial_port = serial.Serial(self.port_str,self.baud_int,timeout = 50)
                 self.msg_if.pub_info("Serial port opened")
                 success = True
             except Exception as e:
