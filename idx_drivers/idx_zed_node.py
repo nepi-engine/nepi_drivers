@@ -739,8 +739,9 @@ class ZedCamNode(object):
         msg = ""    
         frame_id = "sensor frame"
         o3d_pc = None
+        timestamp = None
         # Check for control framerate adjustment
-        last_time = self.pc_data_last_time
+        last_time = self.pc_last_time
         current_time = nepi_utils.get_time()
         
         need_data = False
@@ -774,7 +775,7 @@ class ZedCamNode(object):
               o3d_pc.points = o3d.utility.Vector3dVector(xyz_data)
 
               timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)
-              self.pc_data_last_time = nepi_utils.get_time()            
+              self.pc_last_time = nepi_utils.get_time()
           return status, msg, o3d_pc, timestamp, frame_id
 
 
