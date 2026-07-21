@@ -267,9 +267,11 @@ class ZedCamNode(object):
 
         init_params.camera_resolution = resolution #sl.RESOLUTION.AUTO # Use HD720 opr HD1200 video mode, depending on camera type.
         init_params.camera_fps = self.framerate #30  # Set fps at 30
-        # Use a right-handed Y-up coordinate system
-        init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP
-        init_params.coordinate_units = sl.UNIT.MILLIMETER  # Set units in meters
+        # Use the ROS coordinate system (X forward, Y left, Z up). NEPI's pointcloud
+        # render camera + rotate/tilt/zoom controls are built for X-fwd/Z-up; Y-up
+        # here rendered the cloud side-on and rolled 90 deg.
+        init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Z_UP_X_FWD
+        init_params.coordinate_units = sl.UNIT.METER  # NEPI range/clip/render pipeline is meters-based
 
 
 
@@ -739,8 +741,9 @@ class ZedCamNode(object):
         msg = ""    
         frame_id = "sensor frame"
         o3d_pc = None
+        timestamp = None
         # Check for control framerate adjustment
-        last_time = self.pc_data_last_time
+        last_time = self.pc_last_time
         current_time = nepi_utils.get_time()
         
         need_data = False
@@ -767,14 +770,23 @@ class ZedCamNode(object):
               # Get the point cloud data as a numpy array
               zed_pc = point_cloud.get_data()
               # Extract the XYZ data
-              xyz_data = zed_pc[:, :, :3]
-              xyz_data = xyz_data.reshape(-1,3)
+              xyz_data = zed_pc[:, :, :3].reshape(-1,3)
               # Create an Open3D point cloud
               o3d_pc = o3d.geometry.PointCloud()
               o3d_pc.points = o3d.utility.Vector3dVector(xyz_data)
+              # Unpack the packed-float RGBA 4th channel into per-point RGB colors.
+              # ZED stores color as a float32 whose bytes are R,G,B,A (little-endian);
+              # reinterpret the bits as uint32 and split out the channels. If red and
+              # blue look swapped in the rendered image, swap the r and b lines below
+              # (packed byte order can vary by ZED SDK build).
+              rgba_u32 = np.ascontiguousarray(zed_pc[:, :, 3]).reshape(-1).view(np.uint32)
+              r = (rgba_u32 & 0x000000FF).astype(np.float64)
+              g = ((rgba_u32 & 0x0000FF00) >> 8).astype(np.float64)
+              b = ((rgba_u32 & 0x00FF0000) >> 16).astype(np.float64)
+              o3d_pc.colors = o3d.utility.Vector3dVector(np.stack([r, g, b], axis=1) / 255.0)
 
               timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)
-              self.pc_data_last_time = nepi_utils.get_time()            
+              self.pc_last_time = nepi_utils.get_time()
           return status, msg, o3d_pc, timestamp, frame_id
 
 
