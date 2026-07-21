@@ -269,7 +269,7 @@ class ZedCamNode(object):
         init_params.camera_fps = self.framerate #30  # Set fps at 30
         # Use a right-handed Y-up coordinate system
         init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP
-        init_params.coordinate_units = sl.UNIT.MILLIMETER  # Set units in meters
+        init_params.coordinate_units = sl.UNIT.METER  # NEPI range/clip/render pipeline is meters-based
 
 
 
