@@ -716,7 +716,13 @@ class ZedCamNode(object):
             zed_depth_map[np.isinf(zed_depth_map)] = np.nan
             #print('Zed Depth Map Min Max: ' + str([np.nanmin(zed_depth_map),np.nanmax(zed_depth_map)]) )
             timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
-            np_depth_map = (np.array(zed_depth_map, dtype=np.float32)) # replace nan values
+            # The ZED is configured in METER units for the pointcloud render pipeline
+            # (see init_params.coordinate_units above), so this DEPTH measure comes back
+            # in meters. The NEPI depth_map data product and its colorizer expect
+            # millimeters (nepi_img.npDepthMap_to_cv2ColorImg scales the range bounds by
+            # 1e3), so convert meters -> millimeters here. Without this, every depth value
+            # falls below min_range_m*1e3 and the depth map renders as a flat single color.
+            np_depth_map = (np.array(zed_depth_map, dtype=np.float32)) * 1000.0 # meters -> mm; replaces nan values
             self.dm_data_last_time = nepi_utils.get_time()
         return status, msg, np_depth_map, timestamp, encoding
 
