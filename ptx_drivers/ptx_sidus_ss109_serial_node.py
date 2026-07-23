@@ -42,6 +42,33 @@ FILE_TYPE = 'NODE'
 
 
 class SidusSS109SerialPTXNode:
+
+    start_time = nepi_utils.get_time()
+    debug_update_delay = -1 # -1 to disable
+    debug_times = []
+    debug_delays = []
+    debug_send_msgs = []
+    debug_response_msgs = []
+    debug_process_results = []
+    debug_process_times = []
+    debug_last_time = 0
+    debugs_dict = dict()
+
+    BLANK_DEBUG_DICT = dict(
+    last_success_time = 0,
+    num_requests = 0,
+    num_skips = 0,
+    num_successes = 0,
+    num_fails = 0,
+    request_delays = [],
+    send_msgs = [],
+    response_msgs = [],
+    process_results = [],
+    process_times = [],
+    success_delays = []
+    )
+
+
     SET_SPEED = False
 
     MAX_POSITION_UPDATE_RATE = 5
@@ -1007,7 +1034,7 @@ class SidusSS109SerialPTXNode:
         else:
             cmd_str = 'MMB'
         ser_msg= (axis_str + self.addr_str + cmd_str + data_str + 'W')
-        [success,response] = self.send_msg(ser_msg)
+        [success,response] = self.send_msg(ser_msg, wait_on_busy = False)
         return success
     
 
@@ -1021,7 +1048,7 @@ class SidusSS109SerialPTXNode:
         else:
             cmd_str = 'MMV-'
         ser_msg= (axis_str + self.addr_str + cmd_str + data_str + 'W')
-        [success,response] = self.send_msg(ser_msg)
+        [success,response] = self.send_msg(ser_msg, wait_on_busy = False)
 
         # self.msg_if.pub_warn("")
         # dps=round(speed_dps,2)
@@ -1078,9 +1105,11 @@ class SidusSS109SerialPTXNode:
 
 
     def send_msg(self,ser_msg, wait_on_busy = True, verbose = False):
+        start_time = round(nepi_utils.get_time() - self.start_time,3)
         caller_method = inspect.currentframe().f_back.f_code.co_name
         success = False
         response = "-999"
+        
         if self.serial_port is not None:
 
 
@@ -1088,8 +1117,9 @@ class SidusSS109SerialPTXNode:
                 while self.serial_busy == True and not nepi_sdk.is_shutdown():
                     nepi_sdk.sleep(self.MIN_SERIAL_SEND_DELAY / 2)  
 
-
+            skip = True
             if self.serial_busy == False:
+                skip = False
                 self.serial_busy = True
                 self.serial_port.reset_input_buffer()
                 if verbose == True:
@@ -1154,6 +1184,75 @@ class SidusSS109SerialPTXNode:
             #     #self.msg_if.pub_warn(caller_method + ": Serial send delay updated to : " +  str(self.serial_send_delay))
             # if self.serial_fail_attempts > self.MAX_SERIAL_ATTEMPTS:
             #     nepi_sdk.signal_shutdown(caller_method + ": Exceeded Max Serial Fail attempts in a row, Shutting Down")
+
+
+            #############################
+            update_delay = self.debug_update_delay
+            if update_delay != -1:
+                debug_time = start_time
+                process_time = nepi_utils.get_time() - start_time
+                debug_key = str(ser_msg[:5])
+                if success == True:
+                    result = "Success"
+                elif skip == True:
+                    result = "Skip"
+                else:
+                    result = "Failed"
+
+                try:
+                    last_time = copy.deepcopy(self.debug_last_time)
+                    debug_delay = round(debug_time - last_time,3)
+
+                    debug_times = copy.deepcopy(self.debug_times)
+                    debug_times.append(debug_time)
+                    debug_delays = copy.deepcopy(self.debug_delays)
+                    debug_delays.append(debug_delay)
+                    debug_send_msgs = copy.deepcopy(self.debug_send_msgs)
+                    debug_send_msgs.append(ser_msg)
+                    debug_response_msgs = copy.deepcopy(self.debug_response_msgs)
+                    debug_response_msgs.append(response)
+                    debug_process_results = copy.deepcopy(self.debug_process_results)
+                    debug_process_results.append(result)
+                    debug_process_times = copy.deepcopy(self.debug_process_times)
+                    debug_process_times.append(process_time)
+
+
+                    if debug_delay > update_delay:
+                        self.debug_last_time = copy.deepcopy(debug_time)
+                        self.debug_times = []
+                        self.debug_delays = []
+                        self.debug_send_msgs = []
+                        self.debug_response_msgs = []
+                        self.debug_process_results = []
+                        self.debug_process_times = []
+
+                        self.msg_if.pub_warn("")
+                        self.msg_if.pub_warn("----------------------------")
+                        self.msg_if.pub_warn("Debug Time: "  + str(debug_time))
+                        self.msg_if.pub_warn("Debug Times: "  + str(debug_times))
+                        for i, dtime in enumerate(debug_times):
+                            self.msg_if.pub_warn(str(debug_key) +  \
+                                                " : " + str(debug_times[i]) + \
+                                                " : " + str(debug_delays[i]) + \
+                                                " : " + str(debug_process_results[i]) + \
+                                                " : " + str(debug_process_times[i]) + \
+                                                " : " + str(debug_send_msgs[i]) + \
+                                                " : " + str(debug_response_msgs[i])
+                                                )
+                        self.msg_if.pub_warn("----------------------------")
+                    else:
+                        self.debug_times = debug_times
+                        self.debug_delays = debug_delays
+                        self.debug_send_msgs = debug_send_msgs
+                        self.debug_response_msgs = debug_response_msgs
+                        self.debug_process_results = debug_process_results
+                        self.debug_process_times = debug_process_times
+                except Exception as e:
+                    self.msg_if.pub_warn("Debug Process Failed: " + str(e))
+
+            ###############################
+
+
         return [success, response]
 
 
