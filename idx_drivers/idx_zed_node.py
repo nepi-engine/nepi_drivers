@@ -275,11 +275,28 @@ class ZedCamNode(object):
 
 
 
-        # Open the camera
-        err = self.zed.open(init_params)
+        # Open the camera. On a fresh hot-plug the ZED SDK often reports
+        # CAMERA NOT DETECTED because the USB device is not fully enumerated yet,
+        # so retry a few times with a short settle delay before giving up.
+        OPEN_MAX_TRIES = 5
+        OPEN_RETRY_DELAY_SEC = 2.0
+        err = None
+        for attempt in range(OPEN_MAX_TRIES):
+            err = self.zed.open(init_params)
+            if err == sl.ERROR_CODE.SUCCESS:
+                break
+            self.msg_if.pub_warn("Camera Open (attempt " + str(attempt + 1) + "/" +
+                                 str(OPEN_MAX_TRIES) + ") : " + str(err))
+            if nepi_sdk.is_shutdown():
+                return
+            nepi_sdk.sleep(OPEN_RETRY_DELAY_SEC)
         if err != sl.ERROR_CODE.SUCCESS:
-            self.msg_if.pub_warn("Camera Open : " + str(err))
+            self.msg_if.pub_warn("Camera Open failed after " + str(OPEN_MAX_TRIES) + " attempts : " + str(err))
+            # Cleanly exit so drivers_mgr can re-discover and relaunch the node
+            # once the camera is available. Without the return the node would fall
+            # through into a half-open state and flood the log with grab errors.
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Not Able to Connect to Zed Camera")
+            return
 
         self.msg_if.pub_info("Zed Camera Connected!")
 
@@ -288,6 +305,7 @@ class ZedCamNode(object):
         if err != sl.ERROR_CODE.SUCCESS:
             self.msg_if.pub_warn("Positional Tracking enable failed : " + str(err))
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Not Able to Connect to Zed Camera")
+            return
 
         self.runtime_parameters = sl.RuntimeParameters()
         self.zed_pose = sl.Pose()
