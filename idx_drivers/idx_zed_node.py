@@ -831,13 +831,16 @@ class ZedCamNode(object):
 
     
     def stopPointcloud(self):
-      self.pc_lock.acquire()
+      self.stop_pointcloud = True
 
-      self.pc_sub.unregister()
-      self.pc_sub = None
-
-      self.pc_msg = None
-      self.pc_lock.release()
+      # ZED grabs the pointcloud directly (no ROS subscriber), so there is no
+      # pc_sub/pc_msg to tear down here — mirror stopColorImage/stopDepthMap.
+      # self.pc_lock.acquire()
+      # self.pc_sub.unregister()
+      # self.pc_sub = None
+      # self.pc_msg = None
+      # self.pc_lock.release()
+      self.msg_if.pub_warn("Stopped Pointcloud Acquire")
       ret = True
       msg = "Success"
       return ret,msg
