@@ -67,7 +67,7 @@ class ZedCamNode(object):
       #pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","15"]},
       #depth_confidence = {"type":"Int","name":"depth_confidence","options":["0","100"]},
       #depth_texture_conf = {"type":"Int","name":"depth_texture_conf","options":["0","100"]},
-      point_cloud_freq = {"type":"Int","name":"point_cloud_freq","options":["1","10"]},
+      point_cloud_freq = {"type":"Int","name":"point_cloud_freq","options":["1","30"]},
       brightness = {"type":"Int","name":"brightness","options":["0","8"]},
       contrast ={"type":"Int","name":"contrast","options":["0","8"]},
       hue = {"type":"Int","name":"hue","options":["0","11"]},
@@ -185,7 +185,12 @@ class ZedCamNode(object):
     data_products = []
 
     max_framerate = 100
-    max_pointcloud_framerate = 1
+    # Pointcloud rate cap. Previously hard-defaulted to 1 Hz, which throttled the
+    # pointcloud ~15x below the camera fps even though depth (same grab+retrieve
+    # path) ran at full rate. Overridden to the camera framerate in __init__ so the
+    # pointcloud defaults to the same full-speed behavior as color/depth. grab()
+    # blocks at the camera fps, so this can never over-grab the hardware.
+    max_pointcloud_framerate = 30
 
     cap_settings = CAP_SETTINGS
 
@@ -331,6 +336,13 @@ class ZedCamNode(object):
         
         self.current_controls = self.factory_controls # Updateded during initialization
         self.current_fps = self.framerate # Should be updateded when settings read
+
+        # Default the pointcloud rate cap to the camera framerate so the pointcloud
+        # runs as fast as the hardware/pipeline allow (matching color/depth), instead
+        # of the old fixed 1 Hz. Set before getFactorySettings() below so the
+        # point_cloud_freq factory/default value reflects the full camera rate. Users
+        # can still throttle it at runtime via the point_cloud_freq setting.
+        self.max_pointcloud_framerate = self.framerate
 
         # Initialize settings
         # self.cap_settings = self.getCapSettings()
@@ -619,8 +631,11 @@ class ZedCamNode(object):
             return False, 'Got None Max Framerate'
         if rate < 1:
             rate = 1
-        if rate > 10:
-            rate = 10
+        # Allow up to 30 Hz (the max selectable camera framerate in idx_zed_params.yaml).
+        # The old ceiling of 10 held the pointcloud below the camera fps. grab() blocks
+        # at the actual camera fps, so a value above the running fps simply tracks it.
+        if rate > 30:
+            rate = 30
         self.max_pointcloud_framerate = rate
         status = True
         err_str = ""
