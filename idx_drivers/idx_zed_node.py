@@ -124,7 +124,20 @@ class ZedCamNode(object):
     runtime_parameters = None
     zed_pose = None
 
-    # Create shared class variables and thread locks 
+    # Shared single-grab state. All three data-product threads (color/depth/
+    # pointcloud) drive the SAME camera handle. Previously each thread called
+    # self.zed.grab() independently, which (a) contended on the non-thread-safe
+    # handle and (b) consumed a separate frame per product, so the collective
+    # throughput was capped near cam_fps/num_products and the slowest product
+    # (pointcloud) was starved to ~1 Hz. _grabSharedFrame() performs at most one
+    # grab per frame period under zed_grab_lock; all products then retrieve from
+    # that same frame, so each can run up to the camera framerate.
+    zed_grab_lock = threading.Lock()
+    last_grab_time = None
+    last_grab_status = False
+    grab_interval = None  # seconds between shared grabs; set to 1/framerate in __init__
+
+    # Create shared class variables and thread locks
     
     device_info_dict = dict(device_name = "",
                             path = "",
@@ -343,6 +356,13 @@ class ZedCamNode(object):
         # point_cloud_freq factory/default value reflects the full camera rate. Users
         # can still throttle it at runtime via the point_cloud_freq setting.
         self.max_pointcloud_framerate = self.framerate
+
+        # Shared-grab pacing: one camera grab per frame period, reused by every
+        # enabled data product (see _grabSharedFrame / getColorImage etc.).
+        try:
+            self.grab_interval = 1.0 / float(self.framerate)
+        except (ZeroDivisionError, TypeError, ValueError):
+            self.grab_interval = 0.0
 
         # Initialize settings
         # self.cap_settings = self.getCapSettings()
@@ -566,8 +586,10 @@ class ZedCamNode(object):
         rpy = None
         # return rpy
         orientation_pose = sl.Pose()
-        if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
-            if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+        # Route pose grabs through the shared lock so the navpose path does not
+        # contend with the color/depth/pointcloud threads on the single ZED handle.
+        with self.zed_grab_lock:
+            if self._grabSharedFrame():
               # Get camera pose
               self.zed.get_position(orientation_pose, sl.REFERENCE_FRAME.WORLD)
 
@@ -590,17 +612,20 @@ class ZedCamNode(object):
       position = None
       position_pose = sl.Pose()
 
-      if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
-        # Get the pose of the left eye of the camera with reference to the world frame
-        # Get the pose of the camera relative to the world frame
-        state = self.zed.get_position(position_pose, sl.REFERENCE_FRAME.WORLD)
-        # Display translation and timestamp
-        py_translation = sl.Translation()
-        tx = round(position_pose.get_translation(py_translation).get()[0], 3)
-        ty = round(position_pose.get_translation(py_translation).get()[1], 3)
-        tz = round(position_pose.get_translation(py_translation).get()[2], 3)
+      # Route pose grabs through the shared lock (see getColorImage) so the
+      # navpose path does not contend with the data-product threads.
+      with self.zed_grab_lock:
+        if self._grabSharedFrame():
+          # Get the pose of the left eye of the camera with reference to the world frame
+          # Get the pose of the camera relative to the world frame
+          state = self.zed.get_position(position_pose, sl.REFERENCE_FRAME.WORLD)
+          # Display translation and timestamp
+          py_translation = sl.Translation()
+          tx = round(position_pose.get_translation(py_translation).get()[0], 3)
+          ty = round(position_pose.get_translation(py_translation).get()[1], 3)
+          tz = round(position_pose.get_translation(py_translation).get()[2], 3)
 
-        position = [tx, ty, tz]
+          position = [tx, ty, tz]
       return position
 
 
@@ -667,6 +692,22 @@ class ZedCamNode(object):
        return int(self.framerate)
 
 
+    def _grabSharedFrame(self):
+        # Perform at most one camera grab per frame period, shared across the
+        # color/depth/pointcloud product threads. MUST be called while holding
+        # self.zed_grab_lock. Whichever product thread runs first in a given
+        # frame period does the grab; the others reuse that same frame via their
+        # own retrieve_* calls, so no product is starved by the others each
+        # grabbing (and consuming) a separate frame from the single 15 fps stream.
+        now = nepi_utils.get_time()
+        interval = self.grab_interval if self.grab_interval is not None else 0.0
+        if self.last_grab_time is None or (now - self.last_grab_time) >= interval:
+            self.last_grab_status = (self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS)
+            if self.last_grab_status:
+                self.last_grab_time = now
+        return self.last_grab_status
+
+
     # Good base class candidate - Shared with ONVIF
     def getColorImage(self):
       status = False
@@ -692,15 +733,20 @@ class ZedCamNode(object):
       if need_data == False:
         return False, "Waiting for Timer", None, None, None  # Return None data
       else:
-        # Grab an image, a RuntimeParameters object must be given to grab()
-        if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+        # Retrieve the left view from the shared grab (see _grabSharedFrame).
+        # Hold the lock only for the camera access; do the color conversion
+        # afterwards so other product threads aren't blocked.
+        raw_img = None
+        with self.zed_grab_lock:
+            if self._grabSharedFrame():
+                zed_img = sl.Mat()
+                self.zed.retrieve_image(zed_img, sl.VIEW.LEFT)
+                raw_img = zed_img.get_data()
+                timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
+                self.cl_img_last_time = nepi_utils.get_time()
+        if raw_img is not None:
             status = True
-            zed_img = sl.Mat()
-            # A new image is available if grab() returns SUCCESS
-            self.zed.retrieve_image(zed_img, sl.VIEW.LEFT)
-            cv2_img = cv2.cvtColor(zed_img.get_data(), cv2.COLOR_BGRA2BGR)
-            timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
-            self.cl_img_last_time = nepi_utils.get_time()
+            cv2_img = cv2.cvtColor(raw_img, cv2.COLOR_BGRA2BGR)
         return status, msg, cv2_img, timestamp, encoding
 
       
@@ -740,15 +786,21 @@ class ZedCamNode(object):
       if need_data == False:
         return False, "Waiting for Timer", None, None, None  # Return None data
       else:
-        # Grab an depth_image_zed, a RuntimeParameters object must be given to grab()
-        if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+        # Retrieve the DEPTH measure from the shared grab (see _grabSharedFrame).
+        # Hold the lock only for the camera access; do the numpy conversion
+        # afterwards so other product threads aren't blocked.
+        zed_depth_map = None
+        with self.zed_grab_lock:
+            if self._grabSharedFrame():
+                zed_depth = sl.Mat()
+                self.zed.retrieve_measure(zed_depth, sl.MEASURE.DEPTH, sl.MEM.CPU)
+                zed_depth_map = zed_depth.get_data()
+                timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
+                self.dm_data_last_time = nepi_utils.get_time()
+        if zed_depth_map is not None:
             status = True
-            zed_depth = sl.Mat()
-            self.zed.retrieve_measure(zed_depth, sl.MEASURE.DEPTH, sl.MEM.CPU)
-            zed_depth_map = zed_depth.get_data() 
             zed_depth_map[np.isinf(zed_depth_map)] = np.nan
             #print('Zed Depth Map Min Max: ' + str([np.nanmin(zed_depth_map),np.nanmax(zed_depth_map)]) )
-            timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)  # Get the timestamp at the time the image was captured
             # The ZED is configured in METER units for the pointcloud render pipeline
             # (see init_params.coordinate_units above), so this DEPTH measure comes back
             # in meters. The NEPI depth_map data product and its colorizer expect
@@ -756,7 +808,6 @@ class ZedCamNode(object):
             # 1e3), so convert meters -> millimeters here. Without this, every depth value
             # falls below min_range_m*1e3 and the depth map renders as a flat single color.
             np_depth_map = (np.array(zed_depth_map, dtype=np.float32)) * 1000.0 # meters -> mm; replaces nan values
-            self.dm_data_last_time = nepi_utils.get_time()
         return status, msg, np_depth_map, timestamp, encoding
 
 
@@ -800,14 +851,26 @@ class ZedCamNode(object):
         if need_data == False:
           return False, "Waiting for Timer", None, None, None  # Return None data
         else:
-          # Initialize some process return variables
-          if self.zed.grab(self.runtime_parameters) == sl.ERROR_CODE.SUCCESS:
+          # Retrieve the XYZRGBA measure from the shared grab (see
+          # _grabSharedFrame), holding the lock ONLY for the camera access. The
+          # Open3D construction below is by far the most expensive per-frame work
+          # of the three products, so it runs OUTSIDE the lock — otherwise it
+          # would block the color/depth threads' grabs and drag every product
+          # down to the pointcloud's rate.
+          zed_pc = None
+          with self.zed_grab_lock:
+              if self._grabSharedFrame():
+                  # Retrieve the point cloud into this call's own Mat (the local
+                  # stays alive for the whole method, so its buffer remains valid
+                  # after the lock is released even as other threads grab again).
+                  point_cloud = sl.Mat()
+                  self.zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA)
+                  # Get the point cloud data as a numpy array
+                  zed_pc = point_cloud.get_data()
+                  timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)
+                  self.pc_last_time = nepi_utils.get_time()
+          if zed_pc is not None:
               status = True
-              # Retrieve the point cloud
-              point_cloud = sl.Mat()
-              self.zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA)
-              # Get the point cloud data as a numpy array
-              zed_pc = point_cloud.get_data()
               # Extract the XYZ data
               xyz_data = zed_pc[:, :, :3].reshape(-1,3)
               # Create an Open3D point cloud
@@ -823,9 +886,6 @@ class ZedCamNode(object):
               g = ((rgba_u32 & 0x0000FF00) >> 8).astype(np.float64)
               b = ((rgba_u32 & 0x00FF0000) >> 16).astype(np.float64)
               o3d_pc.colors = o3d.utility.Vector3dVector(np.stack([r, g, b], axis=1) / 255.0)
-
-              timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)
-              self.pc_last_time = nepi_utils.get_time()
           return status, msg, o3d_pc, timestamp, frame_id
 
 
