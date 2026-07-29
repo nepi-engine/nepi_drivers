@@ -178,10 +178,10 @@ class SidusSS109SerialDiscovery:
           valid_path = False
       if valid_path:
         #self.logger.log_warn("Looking for path: " + path_str + " In path_list: " + str(self.active_paths_list))
-        found = self.checkForDevice(path_str)
+        [found, found_baud_str, found_addr_str] = self.checkForDevice(path_str)
         if found and path_str not in self.dont_retry_list:
           self.logger.log_warn("Found device for path: " + path_str )
-          success = self.launchDeviceNode(path_str)
+          success = self.launchDeviceNode(path_str, found_baud_str, found_addr_str)
           self.logger.log_warn("Got Launch success: " + str(success) )
     return self.active_paths_list
   ################################################
@@ -191,6 +191,8 @@ class SidusSS109SerialDiscovery:
     #self.logger.log_warn("Entering check for device function for path: " + str(path_str))###
 
     found_device = False
+    found_baud_str = ''
+    found_addr_str = ''
     #self.logger.log_warn("active paths list: " + str(self.active_paths_list))###
 
     if path_str not in self.active_paths_list:
@@ -211,6 +213,7 @@ class SidusSS109SerialDiscovery:
         #self.logger.log_warn("addr_search_list: " + str(self.addr_search_list))
 
         for addr_str in self.addr_search_list:
+          
           data_str = ''
           for i in range(self.data_len):
             data_str = data_str + '0'
@@ -239,10 +242,12 @@ class SidusSS109SerialDiscovery:
               self.logger.log_info("Found device at path: " + path_str)
               self.logger.log_info("Found device at address: " + self.addr_str)
               found_device = True
+              found_baud_str = baud_str
+              found_addr_str = addr_str
               break # Don't check any more addresses
         # Clean up the serial port
         serial_port.close()
-    return found_device
+    return found_device, found_baud_str, found_addr_str]
 
 
   def checkOnDevice(self,path_str):
@@ -262,11 +267,11 @@ class SidusSS109SerialDiscovery:
     return active
 
 
-  def launchDeviceNode(self, path_str):
-    self.logger.log_warn("Entering launch device function for path: " + str(path_str) + ' addr: ' + str(self.addr_str))###
+  def launchDeviceNode(self, path_str,baud_str, addr_str):
+    self.logger.log_warn("Entering launch device function for path: " + str(path_str) + ' addr: ' + str(addr_str))###
     file_name = self.drv_dict['NODE_DICT']['file_name']
     
-    device_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(self.addr_str)
+    device_name = self.node_launch_name + "_" + path_str.split('/')[-1] + "_" + str(addr_str)
     node_name = nepi_system.get_device_alias(device_name)
     self.logger.log_warn(" launching node: " + node_name)
 
@@ -276,8 +281,8 @@ class SidusSS109SerialDiscovery:
 
     self.drv_dict['DEVICE_DICT']={'device_name': device_name,
                                   'device_path': path_str}
-    self.drv_dict['DEVICE_DICT']['baud_str'] = self.baud_str
-    self.drv_dict['DEVICE_DICT']['addr_str'] = self.addr_str
+    self.drv_dict['DEVICE_DICT']['baud_str'] = baud_str
+    self.drv_dict['DEVICE_DICT']['addr_str'] = addr_str
     self.drv_dict['DEVICE_DICT']['system_config'] = self.system_config
     nepi_sdk.set_param(dict_param_name,self.drv_dict)
 
