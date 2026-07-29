@@ -247,7 +247,7 @@ class SidusSS109SerialDiscovery:
               break # Don't check any more addresses
         # Clean up the serial port
         serial_port.close()
-    return found_device, found_baud_str, found_addr_str]
+    return found_device, found_baud_str, found_addr_str
 
 
   def checkOnDevice(self,path_str):
