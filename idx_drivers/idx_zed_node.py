@@ -91,14 +91,33 @@ class ZedCamNode(object):
       gamma = sl.VIDEO_SETTINGS.GAMMA,
       gain = sl.VIDEO_SETTINGS.GAIN,
       exposure = sl.VIDEO_SETTINGS.EXPOSURE,
-      auto_exposure_gain = sl.VIDEO_SETTINGS.AEC_AGC_ROI,
+      # AEC_AGC is the auto exposure/gain ENABLE. AEC_AGC_ROI is the region-of-
+      # interest variant, which is only reachable via set_camera_settings_roi() --
+      # reading or writing it through set/get_camera_settings() silently fails, so
+      # auto exposure could never be reported or turned on and the camera stayed
+      # pinned at whatever exposure/gain was written at init (black image, and a
+      # black stereo pair yields an all-NaN depth map).
+      auto_exposure_gain = sl.VIDEO_SETTINGS.AEC_AGC,
       whitebalance_temperature = sl.VIDEO_SETTINGS.WHITEBALANCE_TEMPERATURE,
       auto_whitebalance = sl.VIDEO_SETTINGS.WHITEBALANCE_AUTO
 
 
     )
 
-    FACTORY_SETTINGS_OVERRIDES = dict( )
+    # Settings NEPI declares as Bool but the ZED SDK carries as 0/1 ints. These
+    # need converting in both directions, keyed on the NEPI setting name.
+    BOOL_SETTINGS = ['auto_exposure_gain','auto_whitebalance']
+
+    # Writing either of these to the ZED turns AEC_AGC off as a side effect, so
+    # they must not be applied while auto exposure/gain is enabled.
+    AUTO_EXPOSURE_SETTINGS = ['exposure','gain']
+
+    # Come up in auto exposure/gain and auto whitebalance, matching the v4l2 node's
+    # use of FACTORY_SETTINGS_OVERRIDES for its own auto controls. Without this the
+    # exposure/gain values captured at startup are written straight back, which
+    # disables AEC_AGC and latches the camera dark.
+    FACTORY_SETTINGS_OVERRIDES = dict( auto_exposure_gain = "True",
+                                    auto_whitebalance = "True" )
     
     #Factory Control Values 
     FACTORY_CONTROLS = dict( 
@@ -472,11 +491,14 @@ class ZedCamNode(object):
             zed_name = setting_name.upper()
             zed_setting = self.CAP_ZED_DICT[setting_name]
             value = self.zed.get_camera_settings(zed_setting)[1]
-            if zed_name == "WHITEBALANCE_AUTO":
+            # Keyed on the NEPI setting name. The previous checks compared
+            # setting_name.upper() against the ZED constant names, which never
+            # matched, so Bool settings were reported as "0"/"1" and
+            # nepi_settings.get_data_from_setting parsed every one of them as
+            # False (it tests s_value == "True").
+            if setting_name in self.BOOL_SETTINGS:
               value = value == 1
-            elif zed_name == "AEC_AGC_ROI":
-              value = value == 1 
-            
+
             setting["value"] = str(value)
             settings[setting_name] = setting
 
@@ -498,6 +520,15 @@ class ZedCamNode(object):
 
       return settings
 
+    def getAutoExposureEnabled(self):
+      enabled = False
+      try:
+        enabled = self.zed.get_camera_settings(self.CAP_ZED_DICT['auto_exposure_gain'])[1] == 1
+      except Exception as e:
+        self.msg_if.pub_warn("Failed to get auto_exposure_gain state: " + str(e))
+      return enabled
+
+
     def settingUpdateFunction(self,setting):
       success = False
       msg = ""
@@ -509,17 +540,18 @@ class ZedCamNode(object):
 
         if setting_name in self.CAP_ZED_DICT.keys():
           zed_name = setting_name.upper()
-          zed_setting = self.CAP_ZED_DICT[setting_name]  
-          if zed_name == "WHITEBALANCE_AUTO":
+          zed_setting = self.CAP_ZED_DICT[setting_name]
+          if setting_name in self.BOOL_SETTINGS:
               if data == True:
                 data = 1
               elif data == False:
                  data = 0
-          elif zed_name == "AEC_AGC_ROI":
-              if data == True:
-                data = 1
-              elif data == False:
-                 data = 0        
+          elif setting_name in self.AUTO_EXPOSURE_SETTINGS and self.getAutoExposureEnabled() == True:
+              # Applying a stored or factory exposure/gain value here would turn
+              # AEC_AGC off behind the operator's back and pin the camera dark.
+              # Turn auto_exposure_gain off first to set these manually.
+              msg = (self.node_name + " Skipped " + setting_name + " update while auto_exposure_gain is enabled")
+              return True, msg
           try:
             self.zed.set_camera_settings(zed_setting, data)
             success = True
