@@ -67,7 +67,8 @@ class ZedCamNode(object):
       #pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","15"]},
       #depth_confidence = {"type":"Int","name":"depth_confidence","options":["0","100"]},
       #depth_texture_conf = {"type":"Int","name":"depth_texture_conf","options":["0","100"]},
-      point_cloud_freq = {"type":"Int","name":"point_cloud_freq","options":["1","30"]},
+      pointcloud_max_rate = {"type":"Int","name":"pointcloud_max_rate","options":["1","30"]},
+      pointcloud_rez_ratio = {"type":"Float","name":"pointcloud_rez_ratio","options":["0","1"]},
       brightness = {"type":"Int","name":"brightness","options":["0","8"]},
       contrast ={"type":"Int","name":"contrast","options":["0","8"]},
       hue = {"type":"Int","name":"hue","options":["0","11"]},
@@ -91,33 +92,14 @@ class ZedCamNode(object):
       gamma = sl.VIDEO_SETTINGS.GAMMA,
       gain = sl.VIDEO_SETTINGS.GAIN,
       exposure = sl.VIDEO_SETTINGS.EXPOSURE,
-      # AEC_AGC is the auto exposure/gain ENABLE. AEC_AGC_ROI is the region-of-
-      # interest variant, which is only reachable via set_camera_settings_roi() --
-      # reading or writing it through set/get_camera_settings() silently fails, so
-      # auto exposure could never be reported or turned on and the camera stayed
-      # pinned at whatever exposure/gain was written at init (black image, and a
-      # black stereo pair yields an all-NaN depth map).
-      auto_exposure_gain = sl.VIDEO_SETTINGS.AEC_AGC,
+      auto_exposure_gain = sl.VIDEO_SETTINGS.AEC_AGC_ROI,
       whitebalance_temperature = sl.VIDEO_SETTINGS.WHITEBALANCE_TEMPERATURE,
       auto_whitebalance = sl.VIDEO_SETTINGS.WHITEBALANCE_AUTO
 
 
     )
 
-    # Settings NEPI declares as Bool but the ZED SDK carries as 0/1 ints. These
-    # need converting in both directions, keyed on the NEPI setting name.
-    BOOL_SETTINGS = ['auto_exposure_gain','auto_whitebalance']
-
-    # Writing either of these to the ZED turns AEC_AGC off as a side effect, so
-    # they must not be applied while auto exposure/gain is enabled.
-    AUTO_EXPOSURE_SETTINGS = ['exposure','gain']
-
-    # Come up in auto exposure/gain and auto whitebalance, matching the v4l2 node's
-    # use of FACTORY_SETTINGS_OVERRIDES for its own auto controls. Without this the
-    # exposure/gain values captured at startup are written straight back, which
-    # disables AEC_AGC and latches the camera dark.
-    FACTORY_SETTINGS_OVERRIDES = dict( auto_exposure_gain = "True",
-                                    auto_whitebalance = "True" )
+    FACTORY_SETTINGS_OVERRIDES = dict( )
     
     #Factory Control Values 
     FACTORY_CONTROLS = dict( 
@@ -223,6 +205,16 @@ class ZedCamNode(object):
     # pointcloud defaults to the same full-speed behavior as color/depth. grab()
     # blocks at the camera fps, so this can never over-grab the hardware.
     max_pointcloud_framerate = 30
+
+    # Pointcloud-only spatial decimation. Applied to the shared XYZRGBA grab
+    # in getPointcloud() BEFORE the Open3D conversion, so color image and
+    # depth map keep the full camera capture resolution untouched — only the
+    # pointcloud gets sparser. Vector3dVector's per-point construction cost
+    # scales with point count, so striding by N cuts that cost by ~N^2.
+    # Derived from pointcloud_rez_ratio via setPointRezRatio() - this class
+    # default is only a placeholder until __init__ calls it.
+    pointcloud_decimation_stride = 2
+    pointcloud_rez_ratio = .1
 
     cap_settings = CAP_SETTINGS
 
@@ -372,9 +364,13 @@ class ZedCamNode(object):
         # Default the pointcloud rate cap to the camera framerate so the pointcloud
         # runs as fast as the hardware/pipeline allow (matching color/depth), instead
         # of the old fixed 1 Hz. Set before getFactorySettings() below so the
-        # point_cloud_freq factory/default value reflects the full camera rate. Users
-        # can still throttle it at runtime via the point_cloud_freq setting.
+        # pointcloud_max_rate factory/default value reflects the full camera rate. Users
+        # can still throttle it at runtime via the pointcloud_max_rate setting.
         self.max_pointcloud_framerate = self.framerate
+
+        # setPointRezRatio() also derives pointcloud_decimation_stride from this,
+        # so getPointcloud() uses the same ratio->stride mapping from startup.
+        self.setPointRezRatio(.3)
 
         # Shared-grab pacing: one camera grab per frame period, reused by every
         # enabled data product (see _grabSharedFrame / getColorImage etc.).
@@ -491,22 +487,23 @@ class ZedCamNode(object):
             zed_name = setting_name.upper()
             zed_setting = self.CAP_ZED_DICT[setting_name]
             value = self.zed.get_camera_settings(zed_setting)[1]
-            # Keyed on the NEPI setting name. The previous checks compared
-            # setting_name.upper() against the ZED constant names, which never
-            # matched, so Bool settings were reported as "0"/"1" and
-            # nepi_settings.get_data_from_setting parsed every one of them as
-            # False (it tests s_value == "True").
-            if setting_name in self.BOOL_SETTINGS:
+            if zed_name == "WHITEBALANCE_AUTO":
               value = value == 1
-
+            elif zed_name == "AEC_AGC_ROI":
+              value = value == 1 
+            
             setting["value"] = str(value)
             settings[setting_name] = setting
 
           except Exception as e:
               purge_settings.append(setting_name)
               self.msg_if.pub_warn("Failed to get setting: " + str(zed_name) + " : " + str(e))
-        elif setting_name == "point_cloud_freq":
+        elif setting_name == "pointcloud_max_rate":
             value = self.max_pointcloud_framerate
+            setting["value"] = str(value)
+            settings[setting_name] = setting
+        elif setting_name == "pointcloud_rez_ratio":
+            value = self.pointcloud_rez_ratio
             setting["value"] = str(value)
             settings[setting_name] = setting
       for setting_name in purge_settings:
@@ -520,15 +517,6 @@ class ZedCamNode(object):
 
       return settings
 
-    def getAutoExposureEnabled(self):
-      enabled = False
-      try:
-        enabled = self.zed.get_camera_settings(self.CAP_ZED_DICT['auto_exposure_gain'])[1] == 1
-      except Exception as e:
-        self.msg_if.pub_warn("Failed to get auto_exposure_gain state: " + str(e))
-      return enabled
-
-
     def settingUpdateFunction(self,setting):
       success = False
       msg = ""
@@ -540,18 +528,17 @@ class ZedCamNode(object):
 
         if setting_name in self.CAP_ZED_DICT.keys():
           zed_name = setting_name.upper()
-          zed_setting = self.CAP_ZED_DICT[setting_name]
-          if setting_name in self.BOOL_SETTINGS:
+          zed_setting = self.CAP_ZED_DICT[setting_name]  
+          if zed_name == "WHITEBALANCE_AUTO":
               if data == True:
                 data = 1
               elif data == False:
                  data = 0
-          elif setting_name in self.AUTO_EXPOSURE_SETTINGS and self.getAutoExposureEnabled() == True:
-              # Applying a stored or factory exposure/gain value here would turn
-              # AEC_AGC off behind the operator's back and pin the camera dark.
-              # Turn auto_exposure_gain off first to set these manually.
-              msg = (self.node_name + " Skipped " + setting_name + " update while auto_exposure_gain is enabled")
-              return True, msg
+          elif zed_name == "AEC_AGC_ROI":
+              if data == True:
+                data = 1
+              elif data == False:
+                 data = 0        
           try:
             self.zed.set_camera_settings(zed_setting, data)
             success = True
@@ -559,8 +546,10 @@ class ZedCamNode(object):
 
           except Exception as e:
             self.msg_if.pub_warn("Failed to set setting: " + str(zed_name) + " : " + str(e))
-        elif setting_name == "point_cloud_freq":
-          success = self.setPointcloudFramerate(data)
+        elif setting_name == "pointcloud_max_rate":
+          success, msg = self.setPointcloudFramerate(data)
+        elif setting_name == "pointcloud_rez_ratio":
+          success, msg = self.setPointRezRatio(data)
         else:
           msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                   
       else:
@@ -698,6 +687,24 @@ class ZedCamNode(object):
         err_str = ""
         return status, err_str
 
+      
+    def setPointRezRatio(self, ratio):
+        if ratio is None:
+            return False, 'Got None Pointcloud Rez Ratio'
+        if ratio > 1:
+            ratio = 1
+        # Floor at 0.1 (stride 10) rather than 0 - a ratio of 0 has no sensible
+        # stride (would need to drop every point) and would divide-by-zero below.
+        if ratio < 0.1:
+            ratio = 0.1
+        self.pointcloud_rez_ratio = ratio
+        # Derive the integer stride getPointcloud() applies to the shared XYZRGBA
+        # grab from this ratio: ratio 1.0 -> stride 1 (full res), 0.5 -> stride 2,
+        # 0.3 -> stride 3, etc. (approximate fraction of full resolution kept per axis).
+        self.pointcloud_decimation_stride = max(1, round(1.0 / ratio))
+        status = True
+        err_str = ""
+        return status, err_str
 
     def setRangeRatio(self, min_ratio, max_ratio):
         if min_ratio > 1:
@@ -903,6 +910,13 @@ class ZedCamNode(object):
                   self.pc_last_time = nepi_utils.get_time()
           if zed_pc is not None:
               status = True
+              # Decimate spatially before the Open3D conversion (see
+              # pointcloud_decimation_stride) — this is the only place the
+              # pointcloud product reads zed_pc, so color image and depth map
+              # are unaffected.
+              stride = self.pointcloud_decimation_stride
+              if stride > 1:
+                  zed_pc = zed_pc[::stride, ::stride, :]
               # Extract the XYZ data
               xyz_data = zed_pc[:, :, :3].reshape(-1,3)
               # Create an Open3D point cloud
