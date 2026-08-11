@@ -93,6 +93,8 @@ class V4l2CamNode:
 
     last_brightness_setting = 50
 
+    cap_settings = dict()
+
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
     drv_dict = dict()                          
@@ -177,6 +179,7 @@ class V4l2CamNode:
         # Initialize settings
         self.cap_settings = self.getCapSettings()
         self.factory_settings = self.getFactorySettings()
+        
 
         # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
         self.msg_if.pub_info("Launching NEPI IDX () interface...")
@@ -187,6 +190,7 @@ class V4l2CamNode:
                                     data_ref_description = 'camera_lense',
                                     capSettings = self.cap_settings,
                                     factorySettings = self.factory_settings,
+                                    getCapSettingsFunction= self.getCapSettingsFunction,
                                     settingUpdateFunction= self.settingUpdateFunction,
                                     getSettingsFunction=self.getSettings,
                                     factoryControls = self.factory_controls,
@@ -239,7 +243,9 @@ class V4l2CamNode:
                 options = []
                 for option_name in legend.keys():
                     option_ind = legend[option_name]
-                    options.append(option_name + ":" + str(option_ind))
+                    option_entry = option_name + ":" + str(option_ind)
+                    if option_entry not in options:
+                        options.append(option_entry)
                 cap_setting['options'] = options
             cap_settings[cap_setting_name] = cap_setting    
         # Add Resolution Cap Settting
@@ -248,35 +254,55 @@ class V4l2CamNode:
             cap_setting = dict()
             cap_setting['type'] = 'Discrete'
             options = []
-            for res_dict in available_resolutions:
-                width = str(res_dict['width'])
-                height = str(res_dict['height'])
-                cap_setting_option = (width + ":" + height)
-                options.append(cap_setting_option)
-            cap_setting['options'] = options
-            cap_setting['name'] = 'resolution'
-            cap_settings['resolution'] = cap_setting
+            if len(available_resolutions) > 0:
+                for res_dict in available_resolutions:
+                    width = str(res_dict['width'])
+                    height = str(res_dict['height'])
+                    cap_setting_option = (width + ":" + height)
+                    if cap_setting_option not in options:
+                        options.append(cap_setting_option)
+                cap_setting['options'] = options
+                cap_setting['name'] = 'resolution'
+                cap_settings['resolution'] = cap_setting
+                updated = False
+                if 'resolution' not in self.cap_settings.keys():
+                    updated = True
+                elif cap_settings['resolution'] != self.cap_settings['resolution']:
+                    updated = True
+                if updated == True:
+                    self.msg_if.pub_info(" " + "Driver returned resolution options: " + str(cap_settings['resolution']))
         except Exception as e:
             self.msg_if.pub_info(" " + "Driver returned invalid resolution options: " + str(available_resolutions))
         # Add Framerate Cap cap_setting
         try:
             [success,framerates] = self.driver.getCurrentResolutionAvailableFramerates()
-            self.msg_if.pub_info(" " + "Driver returned framerate options: " + str(framerates))
+          
             cap_setting = dict()
             cap_setting['type'] = 'Discrete'
             options = []
             if len(framerates) > 0:
                 for rate in framerates:
                     cap_setting_option = (str(round(rate,2)))
-                    options.append(cap_setting_option)
+                    if cap_setting_option not in options:
+                        options.append(cap_setting_option)
                 cap_setting['options'] = options
                 cap_setting['name'] = 'framerate'
                 cap_settings['framerate'] = cap_setting
+                updated = False
+                if 'framerate' not in self.cap_settings.keys():
+                    updated = True
+                elif cap_settings['framerate'] != self.cap_settings['framerate']:
+                    updated = True
+                if updated == True:
+                    self.msg_if.pub_info(" " + "Driver returned framerate options: " + str(cap_settings['framerate']))
         except Exception as e:
             self.msg_if.pub_info(" " + "Driver returned invalid framerate options: " + str(framerates))
+        self.cap_settings = cap_settings
         return cap_settings
 
-
+    def getCapSettingsFunction(self):
+        return self.getCapSettings()
+        
 
     def getFactorySettings(self):
         settings = dict()
