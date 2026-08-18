@@ -141,8 +141,11 @@ class V4l2CamNode:
         [success, msg, self.driver_class] = nepi_drvs.importDriverClass(self.driver_file,self.driver_path,self.driver_module,self.driver_class_name)
         if success:
             is_mjpg = False
+            # Match MJPG_CAMS against the raw device_name (e.g. 'explorehd_213'),
+            # not node_name, which is the alias (e.g. 'Vis_Zoom') and would never
+            # match the camera-type keywords. Also check node_name as a fallback.
             for cam in self.MJPG_CAMS:
-                if self.node_name.find(cam) != -1:
+                if self.device_name.find(cam) != -1 or self.node_name.find(cam) != -1:
                     is_mjpg = True
                     break
             self.msg_if.pub_info("Launching driver with mjpg mode: " + str(is_mjpg))
