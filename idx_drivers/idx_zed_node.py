@@ -195,6 +195,7 @@ class ZedCamNode(object):
 
     zed_type = 'zed'
     resolution = 'VGA'
+    resolution_wh = [640,480]
     framerate = 15
     data_products = []
 
@@ -213,8 +214,7 @@ class ZedCamNode(object):
     # scales with point count, so striding by N cuts that cost by ~N^2.
     # Derived from pointcloud_rez_ratio via setPointRezRatio() - this class
     # default is only a placeholder until __init__ calls it.
-    pointcloud_decimation_stride = 2
-    pointcloud_rez_ratio = .1
+    pointcloud_rez_ratio = 0.3
 
     cap_settings = CAP_SETTINGS
 
@@ -223,6 +223,9 @@ class ZedCamNode(object):
     navpose_dict = copy.deepcopy(nepi_nav.BLANK_NAVPOSE_DICT)
  
     nav_published = False
+
+    print_pc_stats = True
+
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"         
     drv_dict = dict()                          
@@ -287,12 +290,20 @@ class ZedCamNode(object):
             'VGA': sl.RESOLUTION.VGA
         }
 
+        res_wh_dict = {
+            'HD2K': [2048,1080],
+            'HD1080': [1920,1080],
+            'HD720': [1280,720],
+            'VGA': [640,480]
+        }
 
 
-        if self.resolution in res_dict.keys():
-           resolution = res_dict[self.resolution]
-        else:
-           resolution = sl.RESOLUTION.AUTO
+
+        if self.resolution not in res_dict.keys():
+           self.resolution = 'VGA'
+
+        resolution = res_dict[self.resolution]
+        self.resolution_wh = res_wh_dict[self.resolution]
 
         init_params.camera_resolution = resolution #sl.RESOLUTION.AUTO # Use HD720 opr HD1200 video mode, depending on camera type.
         init_params.camera_fps = self.framerate #30  # Set fps at 30
@@ -368,9 +379,6 @@ class ZedCamNode(object):
         # can still throttle it at runtime via the pointcloud_max_rate setting.
         self.max_pointcloud_framerate = self.framerate
 
-        # setPointRezRatio() also derives pointcloud_decimation_stride from this,
-        # so getPointcloud() uses the same ratio->stride mapping from startup.
-        self.setPointRezRatio(.3)
 
         # Shared-grab pacing: one camera grab per frame period, reused by every
         # enabled data product (see _grabSharedFrame / getColorImage etc.).
@@ -685,25 +693,20 @@ class ZedCamNode(object):
         self.max_pointcloud_framerate = rate
         status = True
         err_str = ""
+        self.print_pc_stats = True
         return status, err_str
 
       
     def setPointRezRatio(self, ratio):
         if ratio is None:
             return False, 'Got None Pointcloud Rez Ratio'
-        if ratio > 1:
-            ratio = 1
-        # Floor at 0.1 (stride 10) rather than 0 - a ratio of 0 has no sensible
-        # stride (would need to drop every point) and would divide-by-zero below.
-        if ratio < 0.1:
-            ratio = 0.1
+        ratio = nepi_utils.check_ratio(ratio)
+        
         self.pointcloud_rez_ratio = ratio
-        # Derive the integer stride getPointcloud() applies to the shared XYZRGBA
-        # grab from this ratio: ratio 1.0 -> stride 1 (full res), 0.5 -> stride 2,
-        # 0.3 -> stride 3, etc. (approximate fraction of full resolution kept per axis).
-        self.pointcloud_decimation_stride = max(1, round(1.0 / ratio))
+
         status = True
         err_str = ""
+        self.print_pc_stats = True
         return status, err_str
 
     def setRangeRatio(self, min_ratio, max_ratio):
@@ -723,6 +726,7 @@ class ZedCamNode(object):
         else:
           status = False
           err_str = "Invalid Range Window"
+        self.print_pc_stats = True
         return status, err_str
 
 
@@ -866,6 +870,8 @@ class ZedCamNode(object):
         return ret,msg
 
     def getPointcloud(self): 
+        start_time = nepi_utils.get_time()
+        acquire_dict = dict()
         status = False
         msg = ""    
         frame_id = "sensor frame"
@@ -898,30 +904,46 @@ class ZedCamNode(object):
           # down to the pointcloud's rate.
           zed_pc = None
           with self.zed_grab_lock:
+              acquire_dict['start'] = round(nepi_utils.get_time() - start_time, 3)
               if self._grabSharedFrame():
                   # Retrieve the point cloud into this call's own Mat (the local
                   # stays alive for the whole method, so its buffer remains valid
                   # after the lock is released even as other threads grab again).
-                  point_cloud = sl.Mat()
-                  self.zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA)
+                  res_scale =  0.1 + 0.9 * self.pointcloud_rez_ratio
+                  custom_res = sl.Resolution(int(self.resolution_wh[0] * res_scale), int(self.resolution_wh[1] * res_scale)) 
+                  self.point_cloud = sl.Mat(custom_res.width,custom_res.height)
+                  acquire_dict['create'] = round(nepi_utils.get_time() - start_time, 3)
+
+                  self.zed.retrieve_measure(self.point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.CPU, custom_res)
+                  acquire_dict['retrieve'] = round(nepi_utils.get_time() - start_time, 3)
+
                   # Get the point cloud data as a numpy array
-                  zed_pc = point_cloud.get_data()
+                  zed_pc = self.point_cloud.get_data()
                   timestamp = self.zed.get_timestamp(sl.TIME_REFERENCE.CURRENT)
                   self.pc_last_time = nepi_utils.get_time()
+                  acquire_dict['grab'] = round(nepi_utils.get_time() - start_time, 3)
           if zed_pc is not None:
               status = True
               # Decimate spatially before the Open3D conversion (see
-              # pointcloud_decimation_stride) — this is the only place the
               # pointcloud product reads zed_pc, so color image and depth map
               # are unaffected.
-              stride = self.pointcloud_decimation_stride
+              # Derive the integer stride getPointcloud() applies to the shared XYZRGBA
+              # grab from this ratio: ratio 1.0 -> stride 1 (full res), 0.5 -> stride 2,
+              # 0.3 -> stride 3, etc. (approximate fraction of full resolution kept per axis).
+              stride = max(1, round(1.0 / (0.1 + self.pointcloud_rez_ratio * 0.9)))
               if stride > 1:
                   zed_pc = zed_pc[::stride, ::stride, :]
+              acquire_dict['reduce'] = round(nepi_utils.get_time() - start_time, 3)
+
               # Extract the XYZ data
               xyz_data = zed_pc[:, :, :3].reshape(-1,3)
+              acquire_dict['reshape'] = round(nepi_utils.get_time() - start_time, 3)
+
               # Create an Open3D point cloud
               o3d_pc = o3d.geometry.PointCloud()
               o3d_pc.points = o3d.utility.Vector3dVector(xyz_data)
+              acquire_dict['convert'] = round(nepi_utils.get_time() - start_time, 3)
+
               # Unpack the packed-float RGBA 4th channel into per-point RGB colors.
               # ZED stores color as a float32 whose bytes are R,G,B,A (little-endian);
               # reinterpret the bits as uint32 and split out the channels. If red and
@@ -932,6 +954,12 @@ class ZedCamNode(object):
               g = ((rgba_u32 & 0x0000FF00) >> 8).astype(np.float64)
               b = ((rgba_u32 & 0x00FF0000) >> 16).astype(np.float64)
               o3d_pc.colors = o3d.utility.Vector3dVector(np.stack([r, g, b], axis=1) / 255.0)
+              acquire_dict['color'] = round(nepi_utils.get_time() - start_time, 3)
+
+              if self.print_pc_stats == True:
+                 self.msg_if.pub_warn("Pointcloud Acquire times: " + str(acquire_dict), throttle_s = 5)
+              self.print_pc_stats = False
+
           return status, msg, o3d_pc, timestamp, frame_id
 
 

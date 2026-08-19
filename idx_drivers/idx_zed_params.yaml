@@ -35,7 +35,7 @@ driver:
           - 'color_image'
           - 'color_image,depth_map'
           - 'color_image,depth_map,pointcloud'
-        default: 'color_image,depth_map'
+        default: 'color_image,depth_map,pointcloud'
       navpose_enabled:
         type: Bool
         default: 'False'
