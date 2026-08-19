@@ -232,8 +232,9 @@ class HNavNode(object):
                         buf.extend(chunk)
                         self._process_buffer(buf)
             except Exception as e:
-                self.msg_if.pub_warn(
-                    f"TCP reconnect in 2 s after: {type(e).__name__}: {e}")
+                # self.msg_if.pub_warn(
+                #     f"TCP reconnect in 2 s after: {type(e).__name__}: {e}")
+                pass
             self._clear_navpose()
             time.sleep(2.0)
 
