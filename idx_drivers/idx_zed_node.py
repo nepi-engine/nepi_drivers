@@ -327,6 +327,12 @@ class ZedCamNode(object):
                 break
             self.msg_if.pub_warn("Camera Open (attempt " + str(attempt + 1) + "/" +
                                  str(OPEN_MAX_TRIES) + ") : " + str(err))
+            # A failed open() leaves the Camera object holding partial state, and
+            # calling open() on it again returns INVALID FUNCTION CALL regardless of
+            # what is actually wrong with the hardware. That masks the real error
+            # from attempt 1 and makes every later retry meaningless, so reset the
+            # object before retrying. close() is safe on a camera that never opened.
+            self.zed.close()
             if nepi_sdk.is_shutdown():
                 return
             nepi_sdk.sleep(OPEN_RETRY_DELAY_SEC)
