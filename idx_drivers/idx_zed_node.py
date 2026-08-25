@@ -214,7 +214,7 @@ class ZedCamNode(object):
     # scales with point count, so striding by N cuts that cost by ~N^2.
     # Derived from pointcloud_rez_ratio via setPointRezRatio() - this class
     # default is only a placeholder until __init__ calls it.
-    pointcloud_rez_ratio = 0.3
+    pointcloud_rez_ratio = 0.5
 
     cap_settings = CAP_SETTINGS
 
