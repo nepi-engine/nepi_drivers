@@ -39,6 +39,7 @@ driver:
         type: Discrete
         options:
           - 'Standard'
+          - 'HighTorque'
           - 'HighSpeed'
         default: 'Standard'
         value: 'Standard'

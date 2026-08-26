@@ -100,6 +100,7 @@ class SidusSS109SerialPTXNode:
 
     CONFIGS_DICT = {
          'Standard' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 0.5, 'max_degpsec': 20, 'hasjogspeed': False},
+         'HighTorque' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 0.5, 'max_degpsec': 10, 'hasjogspeed': False},
          'HighSpeed' : {'data_len': 4, 'home':5000, 'deg_per_count':0.0879, 'degpsec_per_count': 0.5, 'max_degpsec': 40, 'hasjogspeed': True},
     }
     config_dict = CONFIGS_DICT['Standard']
