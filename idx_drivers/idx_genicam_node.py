@@ -26,7 +26,7 @@ import cv2
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_img
-from nepi_sdk import nepi_settings
+from nepi_sdk import nepi_controls
 from nepi_sdk import nepi_drvs
 
 from nepi_api.device_if_idx import IDXDeviceIF
@@ -315,7 +315,7 @@ class GenicamCamNode:
     def settingUpdateFunction(self,setting):
         success = False
         setting_str = str(setting)
-        [setting_name, setting_type, data] = nepi_settings.get_data_from_setting(setting)
+        [setting_name, setting_type, data] = nepi_controls.get_data_from_setting(setting)
         #self.msg_if.pub_warn("Updating Setting: " + setting_str)
         if data is not None:
             setting_data = data

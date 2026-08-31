@@ -18,7 +18,7 @@
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
-from nepi_sdk import nepi_settings
+from nepi_sdk import nepi_controls
 from nepi_sdk import nepi_nav
 
 from nepi_api.device_if_ptx import PTXActuatorIF
@@ -313,13 +313,13 @@ class OnvifPanTiltNode:
 
 
     def getCapSettings(self):
-        return nepi_settings.NONE_CAP_SETTINGS
+        return nepi_controls.NONE_CAP_SETTINGS
 
     def getFactorySettings(self):
-        return nepi_settings.NONE_SETTINGS
+        return nepi_controls.NONE_SETTINGS
 
     def getSettings(self):
-        return nepi_settings.NONE_SETTINGS
+        return nepi_controls.NONE_SETTINGS
 
     def setSetting(self,setting_name,setting_data):
         return True

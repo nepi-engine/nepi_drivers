@@ -26,7 +26,7 @@ from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_img
-from nepi_sdk import nepi_settings
+from nepi_sdk import nepi_controls
 
 from nepi_api.device_if_idx import IDXDeviceIF
 from nepi_api.messages_if import MsgIF
@@ -412,7 +412,7 @@ class V4l2CamNode:
         success = False
         setting_str = str(setting)
         
-        [setting_name, setting_type, data] = nepi_settings.get_data_from_setting(setting)
+        [setting_name, setting_type, data] = nepi_controls.get_data_from_setting(setting)
         msg = ''
         if data is not None:
             self.msg_if.pub_warn("Update Setting:" + setting_str + " with value: " + str(data))
@@ -475,7 +475,7 @@ class V4l2CamNode:
                                 #             if setting_name != "resolution" and setting_name != "framerate":
                                 #                 nepi_sdk.sleep(1)
 
-                                #                 [setting_name, setting_type, data] = nepi_settings.get_data_from_setting(setting)
+                                #                 [setting_name, setting_type, data] = nepi_controls.get_data_from_setting(setting)
                                 #                 ret = self.driver.setCameraControl(setting_name,data)
                                 #                 if ret[0]:
                                 #                     self.msg_if.pub_warn("Updated setting: " + setting_name + " : "  + str(data) )

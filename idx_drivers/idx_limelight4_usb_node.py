@@ -24,7 +24,7 @@ from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_nav
-from nepi_sdk import nepi_settings
+from nepi_sdk import nepi_controls
 
 from nepi_api.device_if_idx import IDXDeviceIF
 from nepi_api.device_if_npx import NPXDeviceIF
@@ -257,7 +257,7 @@ class Limelight4UsbCamNode:
 
     def settingUpdateFunction(self, setting):
         success = False
-        ret = nepi_settings.get_data_from_setting(setting)
+        ret = nepi_controls.get_data_from_setting(setting)
         [setting_name, _, data] = ret
         msg = "Unknown setting: " + str(setting_name)
 

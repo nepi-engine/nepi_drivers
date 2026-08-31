@@ -77,7 +77,7 @@ import cv2
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_nav
 from nepi_sdk import nepi_utils
-from nepi_sdk import nepi_settings
+from nepi_sdk import nepi_controls
 from nepi_sdk import nepi_img
 
 from std_msgs.msg import UInt32, String
@@ -460,7 +460,7 @@ class GazeboNode:
     setting_str = str(setting)
     setting_name = setting['name']
     msg = ""
-    if nepi_settings.check_valid_setting(setting, self.cap_settings):
+    if nepi_controls.check_valid_setting(setting, self.cap_settings):
       if setting_name in self.settings_dict.keys():
         self.settings_dict[setting_name]['value'] = setting['value']
         success = True

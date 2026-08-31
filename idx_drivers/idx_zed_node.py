@@ -28,7 +28,7 @@ from nepi_sdk import nepi_nav
 # nepi_sdk import nepi_img
 # from nepi_sdk import nepi_pc
 #from nepi_sdk import nepi_drvs
-from nepi_sdk import nepi_settings
+from nepi_sdk import nepi_controls
 
 
 from nepi_api.device_if_idx import IDXDeviceIF
@@ -62,7 +62,7 @@ class ZedCamNode(object):
 
 
 
-    #CAP_SETTINGS = nepi_settings.NONE_CAP_SETTINGS
+    #CAP_SETTINGS = nepi_controls.NONE_CAP_SETTINGS
     CAP_SETTINGS = dict(
       #pub_frame_rate = {"type":"Float","name":"pub_frame_rate","options":["0.1","15"]},
       #depth_confidence = {"type":"Int","name":"depth_confidence","options":["0","100"]},
@@ -486,7 +486,7 @@ class ZedCamNode(object):
 
 
     def getSettings(self):
-      #settings = nepi_settings.NONE_SETTINGS
+      #settings = nepi_controls.NONE_SETTINGS
       purge_settings = []
       settings = dict()
       camera_settings = sl.VIDEO_SETTINGS
@@ -535,7 +535,7 @@ class ZedCamNode(object):
       success = False
       msg = ""
       setting_str = str(setting)
-      [s_name, s_type, data] = nepi_settings.get_data_from_setting(setting)
+      [s_name, s_type, data] = nepi_controls.get_data_from_setting(setting)
       if data is not None:
         setting_name = setting['name']
         setting_data = data

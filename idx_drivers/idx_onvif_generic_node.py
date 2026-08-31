@@ -27,7 +27,7 @@ from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_img
 from nepi_sdk import nepi_drvs
-from nepi_sdk import nepi_settings
+from nepi_sdk import nepi_controls
 
 from nepi_api.device_if_idx import IDXDeviceIF
 from nepi_api.messages_if import MsgIF
@@ -349,7 +349,7 @@ class OnvifCamNode:
     def settingUpdateFunction(self,setting):
         success = False
         setting_str = str(setting)
-        ret = nepi_settings.get_data_from_setting(setting)
+        ret = nepi_controls.get_data_from_setting(setting)
         [setting_name, setting_type, data] = ret
         if data is not None:
             setting_data = data

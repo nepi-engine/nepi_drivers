@@ -26,7 +26,7 @@ import sys
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
-from nepi_sdk import nepi_settings
+from nepi_sdk import nepi_controls
 
 from nepi_interfaces.msg import DeviceLSXStatus
 
@@ -263,7 +263,7 @@ class SealiteNode(object):
   def settingUpdateFunction(self,setting):
       success = False
       setting_str = str(setting)
-      [setting_name, s_type, data] = nepi_settings.get_data_from_setting(setting)
+      [setting_name, s_type, data] = nepi_controls.get_data_from_setting(setting)
       if data is not None:
           setting_data = data
           found_setting = False

@@ -30,7 +30,7 @@ import copy
 from nepi_sdk import nepi_sdk 
 from nepi_sdk import nepi_nav
 from nepi_sdk import nepi_utils
-from nepi_sdk import nepi_settings
+from nepi_sdk import nepi_controls
 
 from std_msgs.msg import Empty, Int8, UInt8, UInt32, Bool, String, Float32, Float64
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3, PoseStamped
@@ -392,7 +392,7 @@ class ArdupilotNode:
     success = False
     setting_str = str(setting)
     setting_name = setting['name']
-    if nepi_settings.check_valid_setting(setting,self.cap_settings):
+    if nepi_controls.check_valid_setting(setting,self.cap_settings):
       if setting_name in self.settings_dict.keys():
         self.settings_dict[setting_name]['value'] = setting['value']
         success = True
