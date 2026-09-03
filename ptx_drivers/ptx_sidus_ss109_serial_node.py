@@ -106,23 +106,6 @@ class SidusSS109SerialPTXNode:
     config_dict = CONFIGS_DICT['Standard']
 
 
-    CAP_SETTINGS = {
-        'None' : {"type":"None","name":"None","options":[""]}
-    }
-
-    FACTORY_SETTINGS = {
-        'None' : {"type":"None","name":"None","options":[""]}
-    }
-
-    FACTORY_SETTINGS_OVERRIDES = dict()
-
-    settingFunctions = {
-        'None' : {'get':'getNone', 'set': 'setNone'}
-    }
-
-
-    FACTORY_SETTINGS_OVERRIDES = dict( )
-
     PT_DIRECTION_POSITIVE = 1
     PT_DIRECTION_NEGATIVE = -1
 
@@ -224,10 +207,7 @@ class SidusSS109SerialPTXNode:
             self.msg_if.pub_info("... Connected!")
             self.dev_info = self.driver_getDeviceInfo()
             self.logDeviceInfo()
-            # Initialize settings
-            self.cap_settings = self.getCapSettings()
-            self.factory_settings = self.getFactorySettings()
-              
+        
 
             # Launch the PTX interface --  this takes care of initializing all the ptx settings from config. file, subscribing and advertising topics and services, etc.
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
@@ -263,10 +243,6 @@ class SidusSS109SerialPTXNode:
 
             
             self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict,
-                                        capSettings = self.cap_settings,
-                                        factorySettings = self.factory_settings,
-                                        settingUpdateFunction=self.settingUpdateFunction,
-                                        getSettingsFunction=self.getSettings,
                                         factoryControls = self.FACTORY_CONTROLS,
                                         factoryLimits = self.LIMITS_DICT,
                                         stopMovingCb = None, #self.stopMoving,
@@ -346,89 +322,6 @@ class SidusSS109SerialPTXNode:
         navpose_dict['yaw_deg'] = pan_deg * self.PAN_DEG_DIR
         navpose_dict['pitch_deg'] = tilt_deg * self.TILT_DEG_DIR
         return navpose_dict
-
-
-    #**********************
-    # Device setting functions
-
-
-    def getCapSettings(self):
-        return self.CAP_SETTINGS
-
-    def getFactorySettings(self):
-        settings = self.getSettings()
-        #Apply factory setting overides
-        for setting_name in settings.keys():
-            if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
-                    settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
-        return settings
-
-
-
-    def getSettings(self):
-        settings = dict()
-        for setting_name in self.cap_settings.keys():
-            cap_setting = self.cap_settings[setting_name]
-            setting = dict()
-            setting["name"] = setting_name
-            setting["type"] = cap_setting['type']
-            val = None
-            if setting_name in self.settingFunctions.keys():
-                function_str_name = self.settingFunctions[setting_name]['get']
-                #self.msg_if.pub_info("Calling get setting function " + function_str_name)
-                get_function = globals()[function_str_name]
-                val = get_function(self)
-                if val is not None:
-                    setting["value"] = str(val)
-                    settings[setting_name] = setting
-        return settings
-
-
-
-    def setSetting(self,setting_name,val):
-        success = False
-        if setting_name in self.settingFunctions.keys():
-            function_str_name = self.settingFunctions[setting_name]['set']
-            #self.msg_if.pub_info("Calling set setting function " + function_str_name)
-            set_function = globals()[function_str_name]
-            success = set_function(self,val)
-        return success
-
-
-    def settingUpdateFunction(self,setting):
-        success = False
-        setting_str = str(setting)
-        [setting_name, s_type, data] = nepi_controls.get_data_from_setting(setting)
-        if data is not None:
-            setting_data = data
-            found_setting = False
-            if setting_name in self.cap_settings.keys():
-                found_setting = True
-                success, msg = self.setSetting(setting_name,setting_data)
-                if success:
-                    msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-            if found_setting is False:
-                msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                 
-        else:
-            msg = (self.node_name  + " Setting data" + setting_str + " is None")
-        return success, msg
-
-    ##############
-    ### Settings Functions
-
-    global getNone
-    def getNone(self):
-        success = False
-        val = '-999'
-        success = True
-        return val
-
-    global setNone
-    def setNone(self,val):
-        success = False
-
-        success = True
-        return success
 
 
     #######################

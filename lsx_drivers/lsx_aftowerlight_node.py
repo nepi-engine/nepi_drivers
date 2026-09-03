@@ -146,10 +146,6 @@ class AfTowerLightNode(object):
         nepi_sdk.signal_shutdown("Serial port not available")  
 
 
-      # Initialize settings
-      self.cap_settings = self.getCapSettings()
-      self.factory_settings = self.getFactorySettings()
-
       #Start with off. IF will set to saved value
       self.turnOnOff(False)
 
@@ -167,10 +163,6 @@ class AfTowerLightNode(object):
 
                   device_info = self.device_info_dict, 
                   getStatusFunction = self.getStatus,
-                  capSettings = self.cap_settings,
-                  factorySettings = self.factory_settings,
-                  settingUpdateFunction=self.settingUpdateFunction,
-                  getSettingsFunction=self.getSettings,
                   factoryControls = self.FACTORY_CONTROLS,
                   standbyEnableFunction = None, #self.setStandby,
                   turnOnOffFunction = self.turnOnOff,
@@ -192,42 +184,6 @@ class AfTowerLightNode(object):
       # Spin forever (until object is detected)
       nepi_sdk.spin() 
 
-
-  #**********************
-  # Device setting functions
-
-
-  def getCapSettings(self):
-      return nepi_controls.NONE_CAP_SETTINGS
-
-  def getFactorySettings(self):
-      return nepi_controls.NONE_SETTINGS
-
-  def getSettings(self):
-      return nepi_controls.NONE_SETTINGS
-
-  def setSetting(self,setting_name,setting_data):
-    return True
-
-
-  def settingUpdateFunction(self,setting):
-      success = False
-      setting_str = str(setting)
-      [setting_name, s_type, data] = nepi_sdk.get_data_from_setting(setting)
-      if data is not None:
-          setting_data = data
-          found_setting = False
-          for cap_setting in self.cap_settings:
-              if setting_name in cap_setting:
-                  found_setting = True
-                  success, msg = self.setSetting(setting_name,setting_data)
-                  if success:
-                      msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-          if found_setting is False:
-              msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                 
-      else:
-          msg = (self.node_name  + " Setting data" + setting_str + " is None")
-      return success, msg
 
 
 

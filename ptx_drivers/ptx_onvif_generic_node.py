@@ -34,7 +34,7 @@ class OnvifPanTiltNode:
 
     DEFAULT_DRIVER_PATHS = ["/opt/nepi/nepi_engine/lib/nepi_drivers/"]
 
-    FACTORY_SETTINGS_OVERRIDES = dict( )
+
 
 
     device_info_dict = dict(device_name = "",
@@ -245,25 +245,12 @@ class OnvifPanTiltNode:
                 self.default_settings['max_tilt_softstop_deg'] = 59.0
                 self.default_settings['min_tilt_softstop_deg'] = -59.0
 
-            # Initialize settings
-            self.cap_settings = self.getCapSettings()
-            self.msg_if.pub_info("" +"CAPS SETTINGS")
-            #for setting in self.cap_settings:
-                #self.msg_if.pub_info("" +setting)
-            self.factory_settings = self.getFactorySettings()
-            self.msg_if.pub_info("" +"FACTORY SETTINGS")
-            #for setting in self.factory_settings:
-                #self.msg_if.pub_info("" +setting)
-
+        
             self.speed_ratio = 0.5
             self.home_pan_deg = 0.0
             self.home_tilt_deg = 0.0
 
             self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict, 
-                                        capSettings = self.cap_settings,
-                                        factorySettings = self.factory_settings,
-                                        settingUpdateFunction=self.settingUpdateFunction,
-                                        getSettingsFunction=self.getSettings,
                                         factoryControls = self.FACTORY_CONTROLS,
                                         factoryLimits = self.default_settings,
                                         stopMovingCb = ptx_callback_names["StopMoving"],
@@ -307,43 +294,6 @@ class OnvifPanTiltNode:
         dev_info_string += ("Serial Number: " + self.dev_info["HardwareId"] + "\n")
         self.msg_if.pub_info(dev_info_string)
 
-
-    #**********************
-    # Device setting functions
-
-
-    def getCapSettings(self):
-        return nepi_controls.NONE_CAP_SETTINGS
-
-    def getFactorySettings(self):
-        return nepi_controls.NONE_SETTINGS
-
-    def getSettings(self):
-        return nepi_controls.NONE_SETTINGS
-
-    def setSetting(self,setting_name,setting_data):
-        return True
-
-
-    def settingUpdateFunction(self,setting):
-        success = False
-        setting_str = str(setting)
-        [setting_name, s_type, data] = nepi_sdk.get_data_from_setting(setting)
-        print("Onvif PT updating setting: " + str(setting_str))
-        if data is not None and data != "None":
-            setting_data = data
-            found_setting = False
-            for cap_setting in self.cap_settings:
-                if setting_name in cap_setting:
-                    found_setting = True
-                    success, msg = self.setSetting(setting_name,setting_data)
-                    if success:
-                        msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-            if found_setting is False:
-                msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                 
-        else:
-            msg = (self.node_name  + " Setting data" + setting_str + " is None")
-        return success, msg
 
 
     #######################

@@ -101,22 +101,6 @@ class IqrPanTiltNode:
     data_len = 4
 
 
-    CAP_SETTINGS = {
-        'None' : {"type":"None","name":"None","options":[""]}
-    }
-
-    FACTORY_SETTINGS = {
-        'None' : {"type":"None","name":"None","options":[""]}
-    }
-
-    FACTORY_SETTINGS_OVERRIDES = dict()
-
-    settingFunctions = {
-        'None' : {'get':'getNone', 'set': 'setNone'}
-    }
-
-
-    FACTORY_SETTINGS_OVERRIDES = dict( )
 
     PT_DIRECTION_POSITIVE = 1
     PT_DIRECTION_NEGATIVE = -1
@@ -262,10 +246,6 @@ class IqrPanTiltNode:
             self.home_tilt_deg = 0.0
 
             self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict, 
-                                        capSettings = self.cap_settings,
-                                        factorySettings = self.factory_settings,
-                                        settingUpdateFunction=self.settingUpdateFunction,
-                                        getSettingsFunction=self.getSettings,
                                         factoryControls = self.FACTORY_CONTROLS,
                                         factoryLimits = self.FACTORY_LIMITS_DICT,
                                         stopMovingCb = self.stopMoving,
@@ -326,67 +306,6 @@ class IqrPanTiltNode:
 
     #**********************
     # Device setting functions
-
-
-    def getCapSettings(self):
-        return self.CAP_SETTINGS
-
-    def getFactorySettings(self):
-        settings = self.getSettings()
-        for setting_name in settings.keys():
-            if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
-                settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
-        return settings
-
-    def getSettings(self):
-        settings = dict()
-        for setting_name in self.cap_settings.keys():
-            cap_setting = self.cap_settings[setting_name]
-            setting = dict()
-            setting["name"] = setting_name
-            setting["type"] = cap_setting['type']
-            val = None
-            if setting_name in self.settingFunctions.keys():
-                function_str_name = self.settingFunctions[setting_name]['get']
-                get_function = globals()[function_str_name]
-                val = get_function(self)
-                if val is not None:
-                    setting["value"] = str(val)
-                    settings[setting_name] = setting
-        return settings
-
-
-
-    def setSetting(self, setting_name, val):
-        success = False
-        if setting_name in self.settingFunctions.keys():
-            function_str_name = self.settingFunctions[setting_name]['set']
-            # look up the method on this instance
-            set_function = getattr(self, function_str_name, None)
-            if set_function is None:
-                self.msg_if.pub_warn("Missing set function: " + function_str_name)
-            else:
-                success = set_function(val)
-        return success
-
-
-    def settingUpdateFunction(self,setting):
-        success = False
-        setting_str = str(setting)
-        [setting_name, s_type, data] = nepi_controls.get_data_from_setting(setting)
-        if data is not None:
-            setting_data = data
-            found_setting = False
-            if setting_name in self.cap_settings.keys():
-                found_setting = True
-                success, msg = self.setSetting(setting_name,setting_data)
-                if success:
-                    msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-            if found_setting is False:
-                msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                 
-        else:
-            msg = (self.node_name  + " Setting data" + setting_str + " is None")
-        return success, msg
 
 
     ##############
