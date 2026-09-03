@@ -203,12 +203,6 @@ class IqrPanTiltNode:
         else:
             ################################################
             self.msg_if.pub_info("... Connected!")
-            # Initialize settings
-            self.cap_settings = self.getCapSettings()
-            self.factory_settings = self.getFactorySettings()
-
-
-               
 
             # Launch the PTX interface --  this takes care of initializing all the ptx settings from config. file, subscribing and advertising topics and services, etc.
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
@@ -232,15 +226,14 @@ class IqrPanTiltNode:
             }
             
 
-            # Initialize settings
-            self.cap_settings = self.getCapSettings()
-            self.msg_if.pub_info("" +"CAPS SETTINGS")
-            #for setting in self.cap_settings:
-                #self.msg_if.pub_info("" +setting)
-            self.factory_settings = self.getFactorySettings()
-            self.msg_if.pub_info("" +"FACTORY SETTINGS")
-            #for setting in self.factory_settings:
-                #self.msg_if.pub_info("" +setting)
+            # This device exposes no device settings, so it registers no
+            # getSettingsFunction/setSettingFunction with PTXActuatorIF. Its
+            # adjustable values (speed ratios, soft limits, home position) are
+            # PTX controls, not settings. PTXActuatorIF also accepts a
+            # getCapSettingsFunction argument, but that argument is inert --
+            # it is never forwarded to SettingsIF, which has no such parameter;
+            # a control's type, bounds and options now ride in the controls
+            # dict itself.
 
             self.home_pan_deg = 0.0
             self.home_tilt_deg = 0.0

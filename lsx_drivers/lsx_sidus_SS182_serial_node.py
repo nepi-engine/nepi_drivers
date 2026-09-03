@@ -18,6 +18,7 @@
 
 ### Set the namespace before importing nepi_sdk
 import os
+import copy
 import serial
 import serial.tools.list_ports
 import time
@@ -90,7 +91,8 @@ class SidusSS182SerialNode(object):
                         hw_version = "",
                         sw_version = "")
 
-  settings_dict = FACTORY_SETTINGS
+  init_settings_dict = dict()
+  settings_dict = dict()
   
   # Initialize some parameters
   serial_num = ""
@@ -183,8 +185,8 @@ class SidusSS182SerialNode(object):
         self.dev_info = self.driver_getDeviceInfo()
         self.logDeviceInfo()
         # Initialize settings
-        self.cap_settings = self.getCapSettings()
-        self.factory_settings = self.getFactorySettings()
+        self.settings_dict = self.initSettingsDict()
+        self.settings_dict = self.refreshSettingsDict()
           
         # Launch the LSX interface --  this takes care of initializing all the camera settings from config. file
         self.msg_if.pub_info("Launching NEPI LSX () interface...")
@@ -199,10 +201,8 @@ class SidusSS182SerialNode(object):
         self.lsx_if = LSXDeviceIF(
                     device_info = self.device_info_dict, 
                     getStatusFunction = self.getStatus,
-                    capSettings = self.cap_settings,
-                    factorySettings = self.factory_settings,
-                    settingUpdateFunction=self.settingUpdateFunction,
-                    getSettingsFunction=self.getSettings,
+                    getSettingsFunction=self.getSettingsFunction,
+                    setSettingFunction=self.setSettingFunction,
                     factoryControls = self.FACTORY_CONTROLS,
                     standbyEnableFunction = None,
                     turnOnOffFunction = self.turnOnOff,
@@ -243,68 +243,92 @@ class SidusSS182SerialNode(object):
       self.msg_if.pub_info(dev_info_string)
 
 
-  def getCapSettings(self):
-      return self.CAP_SETTINGS
+  def initSettingsDict(self):
+      init_settings_dict = dict()
+      for setting_name in self.CAP_SETTINGS.keys():
+        cap_setting = self.CAP_SETTINGS[setting_name]
+        setting_dict = dict()
+        setting_dict['type'] = cap_setting['type']
+        # The retired cap-settings form carried an Int control's min and max in
+        # an 'options' pair. The controls contract calls that 'bounds'.
+        if 'options' in cap_setting.keys():
+          try:
+            setting_dict['bounds'] = [int(cap_setting['options'][0]),int(cap_setting['options'][1])]
+          except Exception as e:
+            self.msg_if.pub_warn("Invalid bounds for setting: " + setting_name + " : " + str(e))
+        default = None
+        if setting_name in self.FACTORY_SETTINGS.keys():
+          try:
+            default = int(self.FACTORY_SETTINGS[setting_name]['value'])
+          except Exception as e:
+            self.msg_if.pub_warn("Invalid factory value for setting: " + setting_name + " : " + str(e))
+        if setting_name in self.FACTORY_SETTINGS_OVERRIDES.keys():
+          default = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
+        if default is None:
+          continue
+        setting_dict['default'] = default
+        init_settings_dict[setting_name] = setting_dict
 
-  def getFactorySettings(self):
-      settings = self.getSettings()
-      #Apply factory setting overides
-      for setting_name in settings.keys():
-          if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
-                  settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
-      return settings
-
-
-  def getSettings(self):
-      settings = dict()
-      for setting_name in self.cap_settings.keys():
-          cap_setting = self.cap_settings[setting_name]
-          setting = dict()
-          setting["name"] = setting_name
-          setting["type"] = cap_setting['type']
-          val = None
-          if setting_name in self.settingFunctions.keys():
-              function_str_name = self.settingFunctions[setting_name]['get']
-              # look up the method on *this instance*, not in globals
-              get_function = getattr(self, function_str_name, None)
-              if get_function is None:
-                  self.msg_if.pub_warn("Missing get function: " + function_str_name)
-              else:
-                  val = get_function()
-          if val is not None:
-              setting["value"] = str(val)
-              settings[setting_name] = setting
-      return settings
-
+      self.init_settings_dict = init_settings_dict
+      settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
+      settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+      self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
+      return settings_dict
 
 
-  def setSetting(self,setting_name,val):
+  def refreshSettingsDict(self):
+      # This is a serial device whose settings are held on the device rather
+      # than reported as a live capability report, so this only reads current
+      # values back. Bounds and options do not move.
+      settings_dict = copy.deepcopy(self.settings_dict)
+      for setting_name in settings_dict.keys():
+        if setting_name not in self.settingFunctions.keys():
+          continue
+        try:
+          get_function = globals()[self.settingFunctions[setting_name]['get']]
+          val = get_function(self)
+        except Exception as e:
+          self.msg_if.pub_warn("Failed to read setting " + setting_name + " : " + str(e))
+          continue
+        if val is None:
+          continue
+        try:
+          settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, int(val))
+        except Exception as e:
+          self.msg_if.pub_warn("Failed to apply read setting " + setting_name + " : " + str(e))
+      return settings_dict
+
+
+  def getSettingsFunction(self):
+      return self.settings_dict
+
+
+  def setSettingFunction(self,setting_name,setting_value):
+      setting_str = setting_name + ":" + str(setting_value)
       success = False
-      if setting_name in self.settingFunctions.keys():
-          function_str_name = self.settingFunctions[setting_name]['set']
-          #self.msg_if.pub_info("Calling set setting function " + function_str_name)
-          set_function = globals()[function_str_name]
-          success = set_function(self,val)
-      return success
+      msg = 'Success'
+      if setting_name not in self.settings_dict.keys():
+        msg = (self.node_name + " Setting name " + setting_str + " is not supported")
+        return False, msg, self.settings_dict
+      if setting_name not in self.settingFunctions.keys():
+        msg = (self.node_name + " Setting name " + setting_str + " has no set function")
+        return False, msg, self.settings_dict
 
+      try:
+        set_function = globals()[self.settingFunctions[setting_name]['set']]
+        # The device set functions return a bare success flag, not a
+        # (success, msg) pair, and return None on the reject path.
+        success = (set_function(self,setting_value) == True)
+        if success == True:
+          msg = ( self.node_name + " UPDATED SETTINGS " + setting_str)
+        else:
+          msg = ( self.node_name + " device rejected setting " + setting_str)
+      except Exception as e:
+        msg = "Failed to set " + setting_str + " : " + str(e)
+        self.msg_if.pub_warn(msg)
 
-  def settingUpdateFunction(self,setting):
-      success = False
-      setting_str = str(setting)
-      [setting_name, s_type, data] = nepi_controls.get_data_from_setting(setting)
-      if data is not None:
-          setting_data = data
-          found_setting = False
-          if setting_name in self.cap_settings.keys():
-              found_setting = True
-              success, msg = self.setSetting(setting_name,setting_data)
-              if success:
-                  msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-          if found_setting is False:
-              msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                 
-      else:
-          msg = (self.node_name  + " Setting data" + setting_str + " is None")
-      return success, msg
+      self.settings_dict = self.refreshSettingsDict()
+      return success, msg, self.settings_dict
 
     ##############
     ### Settings Functions

@@ -300,9 +300,8 @@ class GazeboNode:
 
     ##############################
     # Initialize RBX Settings
-    self.settings_dict = copy.deepcopy(self.FACTORY_SETTINGS)
-    self.cap_settings = self.getCapSettings()
-    self.factory_settings = self.getFactorySettings()
+    self.settings_dict = self.initSettingsDict()
+    self.settings_dict = self.refreshSettingsDict()
 
     # A ground robot moves in the plane: x, y and yaw are commandable, z, roll
     # and pitch are not.
@@ -338,10 +337,8 @@ class GazeboNode:
     self.msg_if.pub_info(str(self.device_info_dict))
 
     self.rbx_if = RBXRobotIF(device_info = self.device_info_dict,
-                             capSettings = self.cap_settings,
-                             factorySettings = self.factory_settings,
-                             settingUpdateFunction = self.settingUpdateFunction,
-                             getSettingsFunction = self.getSettings,
+                             getSettingsFunction = self.getSettingsFunction,
+                             setSettingFunction = self.setSettingFunction,
                              axisControls = self.axis_controls,
                              getBatteryPercentFunction = None,
                              states = self.RBX_STATES,
@@ -441,40 +438,83 @@ class GazeboNode:
   #**********************
   # Setting functions
 
-  def getCapSettings(self):
-    return self.CAP_SETTINGS
+  def initSettingsDict(self):
+    init_settings_dict = dict()
+    for setting_name in self.CAP_SETTINGS.keys():
+      cap_setting = self.CAP_SETTINGS[setting_name]
+      setting_type = cap_setting['type']
+      if setting_type == 'Discrete':
+        # The retired cap-settings form called a named option list 'Discrete'.
+        # The controls contract calls it a Selection.
+        setting_type = 'Selection'
+      setting_dict = dict()
+      setting_dict['type'] = setting_type
+      if 'options' in cap_setting.keys():
+        try:
+          if setting_type == 'Int':
+            # An Int/Float control's min and max used to ride in the same
+            # 'options' pair. The controls contract calls that 'bounds'.
+            setting_dict['bounds'] = [int(cap_setting['options'][0]),int(cap_setting['options'][1])]
+          elif setting_type == 'Float':
+            setting_dict['bounds'] = [float(cap_setting['options'][0]),float(cap_setting['options'][1])]
+          else:
+            setting_dict['options'] = [str(option) for option in cap_setting['options']]
+        except Exception as e:
+          self.msg_if.pub_warn("Invalid options for setting: " + setting_name + " : " + str(e))
 
-  def getFactorySettings(self):
-    settings = self.getSettings()
-    #Apply factory setting overides
-    for setting_name in settings.keys():
-      if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
-        settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
-    return settings
+      default = None
+      if setting_name in self.FACTORY_SETTINGS.keys():
+        default = self.FACTORY_SETTINGS[setting_name]['value']
+      if setting_name in self.FACTORY_SETTINGS_OVERRIDES.keys():
+        default = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
+      if default is None:
+        continue
+      try:
+        if setting_type == 'Int':
+          default = int(float(default))
+        elif setting_type == 'Float':
+          default = float(default)
+        elif setting_type == 'Bool':
+          default = (str(default) == 'True' or str(default) == 'true')
+        else:
+          default = str(default)
+      except Exception as e:
+        self.msg_if.pub_warn("Invalid factory value for setting: " + setting_name + " : " + str(e))
+        continue
+      setting_dict['default'] = default
+      init_settings_dict[setting_name] = setting_dict
 
-  def getSettings(self):
+    self.init_settings_dict = init_settings_dict
+    settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
+    settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+    self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
+    return settings_dict
+
+  def refreshSettingsDict(self):
+    # These are software settings held by this node and pushed to the Gazebo
+    # bridge; the simulator reports no capability set to read them back from.
+    # Kept for contract consistency with the other drivers.
+    return copy.deepcopy(self.settings_dict)
+
+  def getSettingsFunction(self):
     return self.settings_dict
 
-  def settingUpdateFunction(self, setting):
-    success = False
-    setting_str = str(setting)
-    setting_name = setting['name']
-    msg = ""
-    if nepi_controls.check_valid_setting(setting, self.cap_settings):
-      if setting_name in self.settings_dict.keys():
-        self.settings_dict[setting_name]['value'] = setting['value']
-        success = True
-      else:
-        msg = (self.node_name + " Setting name" + setting_str + " is not supported")
-      if success == True:
-        msg = (self.node_name + " UPDATED SETTINGS " + setting_str)
-        if setting_name in self.CAMERA_SETTING_NAMES:
-          self.sendCameraSettings()
-        if setting_name in self.ENVIRONMENT_SETTING_NAMES:
-          self.setEnvironmentAction(setting['value'])
-    else:
-      msg = (self.node_name + " Setting data" + setting_str + " is not valid")
-    return success, msg
+  def setSettingFunction(self, setting_name, setting_value):
+    setting_str = setting_name + ":" + str(setting_value)
+    if setting_name not in self.settings_dict.keys():
+      msg = (self.node_name + " Setting name " + setting_str + " is not supported")
+      return False, msg, self.settings_dict
+    if nepi_controls.check_valid_value(self.settings_dict, setting_name, setting_value) == False:
+      msg = (self.node_name + " Setting data " + setting_str + " is not valid")
+      return False, msg, self.settings_dict
+
+    self.settings_dict = nepi_controls.set_control_value(self.settings_dict, setting_name, setting_value)
+    msg = (self.node_name + " UPDATED SETTINGS " + setting_str)
+    if setting_name in self.CAMERA_SETTING_NAMES:
+      self.sendCameraSettings()
+    if setting_name in self.ENVIRONMENT_SETTING_NAMES:
+      self.setEnvironmentAction(nepi_controls.get_control_value(self.settings_dict, setting_name))
+    return True, msg, self.settings_dict
 
 
   ##########################
@@ -684,8 +724,8 @@ class GazeboNode:
       cur_y = self.navpose_dict['y_m']
       cur_yaw_rad = math.radians(self.navpose_dict['yaw_deg'])
 
-      max_lin = float(self.settings_dict['max_linear_speed_mps']['value'])
-      max_ang = math.radians(float(self.settings_dict['max_angular_rate_dps']['value']))
+      max_lin = float(nepi_controls.get_control_value(self.settings_dict,'max_linear_speed_mps'))
+      max_ang = math.radians(float(nepi_controls.get_control_value(self.settings_dict,'max_angular_rate_dps')))
       tol_m = self.FACTORY_GOTO_TOL_M
       tol_rad = self.FACTORY_GOTO_TOL_RAD
       if self.rbx_if is not None:
@@ -762,7 +802,7 @@ class GazeboNode:
       # while the Gazebo side keeps whatever it last had, so an explicit push
       # avoids relying on both sides coincidentally matching factory defaults.
       self.sendCameraSettings()
-      self.setEnvironmentAction(self.settings_dict['environment']['value'])
+      self.setEnvironmentAction(nepi_controls.get_control_value(self.settings_dict,'environment'))
       buf = b''
       while not nepi_sdk.is_shutdown():
         try:
@@ -872,7 +912,7 @@ class GazeboNode:
     # exposes for now (see the two-camera note at the top of this file).
     cmd = {
       'type': 'camera_settings',
-      'view_mode': self.settings_dict['camera_view_mode']['value'],
+      'view_mode': nepi_controls.get_control_value(self.settings_dict,'camera_view_mode'),
     }
     self.sendLineToBridge(cmd, "Camera settings")
 

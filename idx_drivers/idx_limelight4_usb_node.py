@@ -50,6 +50,9 @@ class Limelight4UsbCamNode:
 
     idx_if = None
     npx_if = None
+
+    init_settings_dict = dict()
+    settings_dict = dict()
     ai_if = None
     AI_DEFAULT_CONFIG = {'threshold': 0.3, 'max_rate': 5}
     driver_navpose_dict = None
@@ -131,8 +134,8 @@ class Limelight4UsbCamNode:
             self.current_controls = self.factory_controls
             self.current_fps = self.DEFAULT_CURRENT_FPS
 
-            self.cap_settings = self.getCapSettings()
-            self.factory_settings = self.getFactorySettings()
+            self.settings_dict = self.initSettingsDict()
+            self.settings_dict = self.refreshSettingsDict()
 
             # Launch the IDX interface
             self.msg_if.pub_info("Launching NEPI IDX interface...")
@@ -142,10 +145,8 @@ class Limelight4UsbCamNode:
                 device_info=self.device_info_dict,
                 data_source_description='camera',
                 data_ref_description='camera_lense',
-                capSettings=self.cap_settings,
-                factorySettings=self.factory_settings,
-                settingUpdateFunction=self.settingUpdateFunction,
-                getSettingsFunction=self.getSettings,
+                getSettingsFunction=self.getSettingsFunction,
+                setSettingFunction=self.setSettingFunction,
                 factoryControls=self.factory_controls,
                 setMaxFramerate=self.setMaxFramerate,
                 getFramerate=self.driver.get_framerate,
@@ -210,78 +211,83 @@ class Limelight4UsbCamNode:
             info_str += "  " + str(k) + ": " + str(v) + "\n"
         self.msg_if.pub_info(info_str)
 
-    def getCapSettings(self):
-        cap_settings = dict()
+    def initSettingsDict(self):
+        init_settings_dict = dict()
 
-        # Pipeline: discrete, indices 0-9
-        pipeline_setting = dict()
-        pipeline_setting['name'] = 'Pipeline'
-        pipeline_setting['type'] = 'Discrete'
-        pipeline_setting['options'] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-        cap_settings['Pipeline'] = pipeline_setting
-
-        # Resolution: discrete, built from driver-reported fixed set
-        resolution_setting = dict()
-        resolution_setting['name'] = 'Resolution'
-        resolution_setting['type'] = 'Discrete'
-        resolutions = self.driver.get_available_resolutions()
-        resolution_setting['options'] = [
-            str(r['width']) + 'x' + str(r['height']) for r in resolutions
-        ]
-        cap_settings['Resolution'] = resolution_setting
-
-        return cap_settings
-
-    def getFactorySettings(self):
-        settings = dict()
-
-        # Pipeline default from device
+        # Pipeline: indices 0-9. The retired cap-settings form called this
+        # 'Discrete'; the controls contract calls a named option list a
+        # Selection.
         ret, pipeline_idx = self.driver.get_pipeline()
         pipeline_val = str(pipeline_idx) if ret else '0'
-        settings['Pipeline'] = {'name': 'Pipeline', 'type': 'Discrete', 'value': pipeline_val}
+        init_settings_dict['Pipeline'] = {
+            'type': 'Selection',
+            'options': ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+            'default': pipeline_val
+        }
 
-        # Resolution default
-        settings['Resolution'] = {'name': 'Resolution', 'type': 'Discrete', 'value': '640x480'}
+        # Resolution: built from the driver-reported fixed set
+        try:
+            resolutions = self.driver.get_available_resolutions()
+            options = [str(r['width']) + 'x' + str(r['height']) for r in resolutions]
+        except Exception as e:
+            self.msg_if.pub_warn("Driver returned invalid resolution options: " + str(e))
+            options = []
+        if '640x480' not in options:
+            options.append('640x480')
+        init_settings_dict['Resolution'] = {
+            'type': 'Selection',
+            'options': options,
+            'default': '640x480'
+        }
 
-        return settings
+        self.init_settings_dict = init_settings_dict
+        settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
+        settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+        self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
+        return settings_dict
 
-    def getSettings(self):
-        settings = dict()
 
-        ret, pipeline_idx = self.driver.get_pipeline()
-        pipeline_val = str(pipeline_idx) if ret else '0'
-        settings['Pipeline'] = {'name': 'Pipeline', 'type': 'Discrete', 'value': pipeline_val}
-        settings['Resolution'] = {'name': 'Resolution', 'type': 'Discrete', 'value': '640x480'}
+    def refreshSettingsDict(self):
+        settings_dict = copy.deepcopy(self.settings_dict)
+        try:
+            ret, pipeline_idx = self.driver.get_pipeline()
+            if ret:
+                settings_dict = nepi_controls.set_control_value(settings_dict, 'Pipeline', str(pipeline_idx))
+        except Exception as e:
+            self.msg_if.pub_debug("Failed to refresh Pipeline setting: " + str(e))
+        # Resolution is fixed by the active pipeline on the Limelight device,
+        # so there is nothing live to read back for it.
+        return settings_dict
 
-        return settings
 
-    def settingUpdateFunction(self, setting):
+    def getSettingsFunction(self):
+        return self.settings_dict
+
+
+    def setSettingFunction(self, setting_name, setting_value):
         success = False
-        ret = nepi_controls.get_data_from_setting(setting)
-        [setting_name, _, data] = ret
         msg = "Unknown setting: " + str(setting_name)
+        if setting_name not in self.settings_dict.keys():
+            msg = self.node_name + " setting " + str(setting_name) + " is not supported"
+            return False, msg, self.settings_dict
 
-        if data is not None:
-            if setting_name == 'Pipeline':
-                try:
-                    success, msg = self.driver.set_pipeline(int(data))
-                except Exception as e:
-                    msg = "Failed to set pipeline: " + str(e)
-            elif setting_name == 'Resolution':
-                # MJPEG resolution is controlled by the active pipeline on the Limelight device;
-                # we acknowledge the setting but cannot change it independently
-                self.msg_if.pub_info(
-                    "Resolution changes require a pipeline switch on the Limelight device; "
-                    "acknowledging setting update only"
-                )
-                success = True
-                msg = "Resolution noted; actual resolution is controlled by the active Limelight pipeline"
-            else:
-                msg = self.node_name + " setting " + str(setting_name) + " is not supported"
-        else:
-            msg = self.node_name + " setting data for " + str(setting_name) + " is None"
+        if setting_name == 'Pipeline':
+            try:
+                success, msg = self.driver.set_pipeline(int(setting_value))
+            except Exception as e:
+                msg = "Failed to set pipeline: " + str(e)
+        elif setting_name == 'Resolution':
+            # MJPEG resolution is controlled by the active pipeline on the Limelight device;
+            # we acknowledge the setting but cannot change it independently
+            self.msg_if.pub_info(
+                "Resolution changes require a pipeline switch on the Limelight device; "
+                "acknowledging setting update only"
+            )
+            self.settings_dict = nepi_controls.set_control_value(self.settings_dict, setting_name, setting_value)
+            return True, "Resolution noted; actual resolution is controlled by the active Limelight pipeline", self.settings_dict
 
-        return success, msg
+        self.settings_dict = self.refreshSettingsDict()
+        return success, msg, self.settings_dict
 
     #**********************
     # Node driver functions

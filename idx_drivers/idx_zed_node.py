@@ -216,7 +216,8 @@ class ZedCamNode(object):
     # default is only a placeholder until __init__ calls it.
     pointcloud_rez_ratio = 0.5
 
-    cap_settings = CAP_SETTINGS
+    init_settings_dict = dict()
+    settings_dict = dict()
 
     navpose_enabled = False
     navpose_pub_rate = 10
@@ -380,7 +381,7 @@ class ZedCamNode(object):
 
         # Default the pointcloud rate cap to the camera framerate so the pointcloud
         # runs as fast as the hardware/pipeline allow (matching color/depth), instead
-        # of the old fixed 1 Hz. Set before getFactorySettings() below so the
+        # of the old fixed 1 Hz. Set before initSettingsDict() below so the
         # pointcloud_max_rate factory/default value reflects the full camera rate. Users
         # can still throttle it at runtime via the pointcloud_max_rate setting.
         self.max_pointcloud_framerate = self.framerate
@@ -394,8 +395,8 @@ class ZedCamNode(object):
             self.grab_interval = 0.0
 
         # Initialize settings
-        # self.cap_settings = self.getCapSettings()
-        self.factory_settings = self.getFactorySettings()
+        self.settings_dict = self.initSettingsDict()
+        self.settings_dict = self.refreshSettingsDict()
           
 
 
@@ -407,10 +408,8 @@ class ZedCamNode(object):
                                     data_products =  self.data_products,
                                     data_source_description = self.data_source_description,
                                     data_ref_description = self.data_ref_description,
-                                    capSettings = self.cap_settings,
-                                    factorySettings = self.factory_settings,
-                                    settingUpdateFunction=self.settingUpdateFunction,
-                                    getSettingsFunction=self.getSettings,
+                                    getSettingsFunction=self.getSettingsFunction,
+                                    setSettingFunction=self.setSettingFunction,
                                     factoryControls = self.factory_controls,
                                     setMaxFramerate =self.setMaxFramerate, 
                                     getFramerate = self.getFramerate,
@@ -470,106 +469,126 @@ class ZedCamNode(object):
 
     #**********************
     # Sensor setting functions
-    def getCapSettings(self):
-      setting = self.getSettings()
-      return self.cap_settings
 
-    def getFactorySettings(self):
-      settings = self.getSettings()
-      #Apply factory setting overides
-      for setting_name in settings.keys():
-        if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
-              setting = settings[setting_name]
-              setting['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
-              settings[setting_name] = setting
-      return settings
-
-
-    def getSettings(self):
-      #settings = nepi_controls.NONE_SETTINGS
-      purge_settings = []
-      settings = dict()
-      camera_settings = sl.VIDEO_SETTINGS
-      for setting_name in self.cap_settings.keys():
-        cap_setting = self.cap_settings[setting_name]
-        setting = dict()
-        setting["name"] = cap_setting['name']
-        setting["type"] = cap_setting['type']
-        if setting_name in self.CAP_ZED_DICT.keys():
-
+    def initSettingsDict(self):
+      init_settings_dict = dict()
+      for setting_name in self.CAP_SETTINGS.keys():
+        cap_setting = self.CAP_SETTINGS[setting_name]
+        setting_dict = dict()
+        setting_dict['type'] = cap_setting['type']
+        # The retired cap-settings form carried an Int/Float control's min and
+        # max in an 'options' pair. The controls contract calls that 'bounds'.
+        if 'options' in cap_setting.keys():
           try:
-            zed_name = setting_name.upper()
-            zed_setting = self.CAP_ZED_DICT[setting_name]
-            value = self.zed.get_camera_settings(zed_setting)[1]
-            if zed_name == "WHITEBALANCE_AUTO":
-              value = value == 1
-            elif zed_name == "AEC_AGC_ROI":
-              value = value == 1 
-            
-            setting["value"] = str(value)
-            settings[setting_name] = setting
-
+            if cap_setting['type'] == 'Int':
+              setting_dict['bounds'] = [int(cap_setting['options'][0]),int(cap_setting['options'][1])]
+            elif cap_setting['type'] == 'Float':
+              setting_dict['bounds'] = [float(cap_setting['options'][0]),float(cap_setting['options'][1])]
+            else:
+              setting_dict['options'] = [str(option) for option in cap_setting['options']]
           except Exception as e:
-              purge_settings.append(setting_name)
-              self.msg_if.pub_warn("Failed to get setting: " + str(zed_name) + " : " + str(e))
-        elif setting_name == "pointcloud_max_rate":
-            value = self.max_pointcloud_framerate
-            setting["value"] = str(value)
-            settings[setting_name] = setting
-        elif setting_name == "pointcloud_rez_ratio":
-            value = self.pointcloud_rez_ratio
-            setting["value"] = str(value)
-            settings[setting_name] = setting
-      for setting_name in purge_settings:
-         del self.cap_settings[setting_name]
+            self.msg_if.pub_warn("Invalid bounds for setting: " + setting_name + " : " + str(e))
 
-      #self.msg_if.pub_warn("got settings: " + str(settings))
+        value = self.readSettingValue(setting_name)
+        if value is None:
+          continue
+        setting_dict['default'] = value
+        init_settings_dict[setting_name] = setting_dict
 
-      # Get the pose of the left eye of the camera with reference to the world frame
+      # Apply factory setting overrides
+      for setting_name in self.FACTORY_SETTINGS_OVERRIDES.keys():
+        if setting_name in init_settings_dict.keys():
+          init_settings_dict[setting_name]['default'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
+
+      self.init_settings_dict = init_settings_dict
+      settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
+      settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+      self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
+      return settings_dict
 
 
+    def refreshSettingsDict(self):
+      settings_dict = copy.deepcopy(self.settings_dict)
+      for setting_name in settings_dict.keys():
+        value = self.readSettingValue(setting_name)
+        if value is None:
+          continue
+        settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, value)
+      return settings_dict
 
-      return settings
 
-    def settingUpdateFunction(self,setting):
+    def readSettingValue(self, setting_name):
+      # Returns the device's live value for one setting, already typed for the
+      # control, or None if the device could not report it.
+      setting_type = self.CAP_SETTINGS[setting_name]['type'] if setting_name in self.CAP_SETTINGS.keys() else 'String'
+      value = None
+      if setting_name in self.CAP_ZED_DICT.keys():
+        zed_name = setting_name.upper()
+        zed_setting = self.CAP_ZED_DICT[setting_name]
+        try:
+          value = self.zed.get_camera_settings(zed_setting)[1]
+          if zed_name == "WHITEBALANCE_AUTO" or zed_name == "AEC_AGC_ROI":
+            value = (value == 1)
+        except Exception as e:
+          self.msg_if.pub_warn("Failed to get setting: " + str(zed_name) + " : " + str(e))
+          return None
+      elif setting_name == "pointcloud_max_rate":
+        value = self.max_pointcloud_framerate
+      elif setting_name == "pointcloud_rez_ratio":
+        value = self.pointcloud_rez_ratio
+      else:
+        return None
+
+      try:
+        if setting_type == 'Int':
+          value = int(value)
+        elif setting_type == 'Float':
+          value = float(value)
+        elif setting_type == 'Bool':
+          value = (value == True)
+      except Exception as e:
+        self.msg_if.pub_warn("Failed to convert setting: " + setting_name + " : " + str(e))
+        return None
+      return value
+
+
+    def getSettingsFunction(self):
+      return self.settings_dict
+
+
+    def setSettingFunction(self,setting_name, setting_value):
+      setting_str = setting_name + ":" + str(setting_value)
       success = False
       msg = ""
-      setting_str = str(setting)
-      [s_name, s_type, data] = nepi_controls.get_data_from_setting(setting)
-      if data is not None:
-        setting_name = setting['name']
-        setting_data = data
+      if setting_name not in self.settings_dict.keys():
+        msg = (self.node_name + " Setting name " + setting_str + " is not supported")
+        return False, msg, self.settings_dict
 
-        if setting_name in self.CAP_ZED_DICT.keys():
-          zed_name = setting_name.upper()
-          zed_setting = self.CAP_ZED_DICT[setting_name]  
-          if zed_name == "WHITEBALANCE_AUTO":
-              if data == True:
-                data = 1
-              elif data == False:
-                 data = 0
-          elif zed_name == "AEC_AGC_ROI":
-              if data == True:
-                data = 1
-              elif data == False:
-                 data = 0        
-          try:
-            self.zed.set_camera_settings(zed_setting, data)
-            success = True
-            msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-
-          except Exception as e:
-            self.msg_if.pub_warn("Failed to set setting: " + str(zed_name) + " : " + str(e))
-        elif setting_name == "pointcloud_max_rate":
-          success, msg = self.setPointcloudFramerate(data)
-        elif setting_name == "pointcloud_rez_ratio":
-          success, msg = self.setPointRezRatio(data)
-        else:
-          msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                   
+      data = setting_value
+      if setting_name in self.CAP_ZED_DICT.keys():
+        zed_name = setting_name.upper()
+        zed_setting = self.CAP_ZED_DICT[setting_name]
+        if zed_name == "WHITEBALANCE_AUTO" or zed_name == "AEC_AGC_ROI":
+          if data == True:
+            data = 1
+          elif data == False:
+            data = 0
+        try:
+          self.zed.set_camera_settings(zed_setting, data)
+          success = True
+          msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
+        except Exception as e:
+          msg = "Failed to set setting: " + str(zed_name) + " : " + str(e)
+          self.msg_if.pub_warn(msg)
+      elif setting_name == "pointcloud_max_rate":
+        success, msg = self.setPointcloudFramerate(setting_value)
+      elif setting_name == "pointcloud_rez_ratio":
+        success, msg = self.setPointRezRatio(setting_value)
       else:
-        msg = (self.node_name  + " Setting data" + setting_str + " is None")
-      return success, msg
+        msg = (self.node_name  + " Setting name " + setting_str + " is not supported")
 
+      self.settings_dict = self.refreshSettingsDict()
+      return success, msg, self.settings_dict
 
     #**********************
     # Zed camera data callbacks

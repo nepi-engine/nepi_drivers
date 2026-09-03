@@ -173,6 +173,9 @@ class SvxServoMaestroNode:
 
     FACTORY_SETTINGS_OVERRIDES = dict()
 
+    init_settings_dict = dict()
+    settings_dict = dict()
+
     settingFunctions = {
         'pulse_min_us' : {'get':'getPulseMinUs', 'set': 'setPulseMinUs'},
         'pulse_max_us' : {'get':'getPulseMaxUs', 'set': 'setPulseMaxUs'},
@@ -281,8 +284,8 @@ class SvxServoMaestroNode:
         self.msg_if.pub_info("... Connected!")
 
         # Initialize settings
-        self.cap_settings = self.getCapSettings()
-        self.factory_settings = self.getFactorySettings()
+        self.settings_dict = self.initSettingsDict()
+        self.settings_dict = self.refreshSettingsDict()
 
         self.device_info_dict["device_name"] = self.device_name
         self.device_info_dict["path"] = self.device_path
@@ -309,10 +312,8 @@ class SvxServoMaestroNode:
         # driver declares nothing about it.
         self.msg_if.pub_info("Launching NEPI SVX interface...")
         self.svx_if = SVXActuatorIF(device_info = self.device_info_dict,
-                                    capSettings = self.cap_settings,
-                                    factorySettings = self.factory_settings,
-                                    settingUpdateFunction = self.settingUpdateFunction,
-                                    getSettingsFunction = self.getSettings,
+                                    getSettingsFunction = self.getSettingsFunction,
+                                    setSettingFunction = self.setSettingFunction,
                                     factoryControls = self.FACTORY_CONTROLS,
                                     factoryLimits = self.FACTORY_LIMITS_DICT,
                                     stopMovingCb = self.stopMoving,
@@ -366,67 +367,107 @@ class SvxServoMaestroNode:
     #**********************
     # Device setting functions
 
-    def getCapSettings(self):
-        return self.CAP_SETTINGS
+    def initSettingsDict(self):
+        init_settings_dict = dict()
+        for setting_name in self.CAP_SETTINGS.keys():
+            cap_setting = self.CAP_SETTINGS[setting_name]
+            setting_type = cap_setting['type']
+            setting_dict = dict()
+            setting_dict['type'] = setting_type
+            # The retired cap-settings form carried an Int/Float control's min
+            # and max in an 'options' pair. The controls contract calls that
+            # 'bounds'.
+            if 'options' in cap_setting.keys():
+                try:
+                    if setting_type == 'Int':
+                        setting_dict['bounds'] = [int(cap_setting['options'][0]),int(cap_setting['options'][1])]
+                    elif setting_type == 'Float':
+                        setting_dict['bounds'] = [float(cap_setting['options'][0]),float(cap_setting['options'][1])]
+                    else:
+                        setting_dict['options'] = [str(option) for option in cap_setting['options']]
+                except Exception as e:
+                    self.msg_if.pub_warn("Invalid bounds for setting: " + setting_name + " : " + str(e))
 
-    def getFactorySettings(self):
-        settings = self.getSettings()
-        for setting_name in settings.keys():
-            if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
-                settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
-        return settings
+            default = self.readSettingValue(setting_name)
+            if setting_name in self.FACTORY_SETTINGS_OVERRIDES.keys():
+                default = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
+            if default is None:
+                continue
+            setting_dict['default'] = default
+            init_settings_dict[setting_name] = setting_dict
 
-    def getSettings(self):
-        settings = dict()
-        for setting_name in self.cap_settings.keys():
-            cap_setting = self.cap_settings[setting_name]
-            setting = dict()
-            setting["name"] = setting_name
-            setting["type"] = cap_setting['type']
-            val = None
-            if setting_name in self.settingFunctions.keys():
-                function_str_name = self.settingFunctions[setting_name]['get']
-                get_function = globals()[function_str_name]
-                val = get_function(self)
-                if val is not None:
-                    setting["value"] = str(val)
-                    settings[setting_name] = setting
-        return settings
+        self.init_settings_dict = init_settings_dict
+        settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
+        settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+        self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
+        return settings_dict
 
-    def setSetting(self, setting_name, val):
-        # Returns [success, msg]. settingUpdateFunction below unpacks both, so a
-        # bare bool here raises on every settings write.
+    def refreshSettingsDict(self):
+        # These are per-servo calibration values held by this node, so this only
+        # reads the current values back. Bounds do not move.
+        settings_dict = copy.deepcopy(self.settings_dict)
+        for setting_name in settings_dict.keys():
+            value = self.readSettingValue(setting_name)
+            if value is None:
+                continue
+            settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, value)
+        return settings_dict
+
+    def readSettingValue(self, setting_name):
+        # Returns the node's current value for one setting, typed for the
+        # control, or None if it could not be read.
+        if setting_name not in self.settingFunctions.keys():
+            return None
+        setting_type = self.CAP_SETTINGS[setting_name]['type'] if setting_name in self.CAP_SETTINGS.keys() else 'String'
+        try:
+            get_function = globals()[self.settingFunctions[setting_name]['get']]
+            val = get_function(self)
+        except Exception as e:
+            self.msg_if.pub_warn("Failed to read setting " + setting_name + " : " + str(e))
+            return None
+        if val is None:
+            return None
+        try:
+            if setting_type == 'Int':
+                val = int(float(val))
+            elif setting_type == 'Float':
+                val = float(val)
+            elif setting_type == 'Bool':
+                val = (val == True)
+            else:
+                val = str(val)
+        except Exception as e:
+            self.msg_if.pub_warn("Failed to convert setting " + setting_name + " : " + str(e))
+            return None
+        return val
+
+    def getSettingsFunction(self):
+        return self.settings_dict
+
+    def setSettingFunction(self, setting_name, setting_value):
+        setting_str = setting_name + ":" + str(setting_value)
         success = False
         msg = ""
-        if setting_name in self.settingFunctions.keys():
-            function_str_name = self.settingFunctions[setting_name]['set']
-            set_function = getattr(self, function_str_name, None)
-            if set_function is None:
-                msg = "Missing set function: " + function_str_name
-                self.msg_if.pub_warn(msg)
-            else:
-                [success, msg] = set_function(val)
-        else:
+        if setting_name not in self.settings_dict.keys():
+            msg = (self.node_name + " Setting name " + setting_str + " is not supported")
+            return False, msg, self.settings_dict
+        if setting_name not in self.settingFunctions.keys():
             msg = "No set function registered for setting: " + str(setting_name)
-        return success, msg
+            return False, msg, self.settings_dict
 
-    def settingUpdateFunction(self, setting):
-        success = False
-        setting_str = str(setting)
-        [setting_name, s_type, data] = nepi_controls.get_data_from_setting(setting)
-        if data is not None:
-            setting_data = data
-            found_setting = False
-            if setting_name in self.cap_settings.keys():
-                found_setting = True
-                success, msg = self.setSetting(setting_name,setting_data)
-                if success:
-                    msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-            if found_setting is False:
-                msg = (self.node_name  + " Setting name" + setting_str + " is not supported")
+        function_str_name = self.settingFunctions[setting_name]['set']
+        set_function = getattr(self, function_str_name, None)
+        if set_function is None:
+            msg = "Missing set function: " + function_str_name
+            self.msg_if.pub_warn(msg)
         else:
-            msg = (self.node_name  + " Setting data" + setting_str + " is None")
-        return success, msg
+            # Every setter returns [success, msg].
+            [success, msg] = set_function(setting_value)
+            if success:
+                msg = ( self.node_name + " UPDATED SETTINGS " + setting_str)
+
+        self.settings_dict = self.refreshSettingsDict()
+        return success, msg, self.settings_dict
 
 
     ##############
@@ -436,7 +477,7 @@ class SvxServoMaestroNode:
     # the next one on the same board. Kept here rather than in the driver's
     # discovery OPTIONS because these describe the servo, not the controller.
     #
-    # Convention: getSettings() above resolves getters through globals(), so each
+    # Convention: readSettingValue() above resolves getters through globals(), so each
     # getter needs the 'global' line in front of it. Setters resolve through
     # getattr(self, ...) and do not. Every setter returns [success, msg].
     #

@@ -42,11 +42,9 @@ FILE_TYPE = 'NODE'
 
 class AfTowerLightNode(object):
 
-  ### LXS Driver Settings
-  # Set driver capability parameters
-
-  #######################
-  FACTORY_SETTINGS_OVERRIDES = dict( )
+  # This device exposes no device settings, so it registers no
+  # getSettingsFunction/setSettingFunction with LSXDeviceIF. Its adjustable
+  # values are LSX controls, not settings.
 
   #Factory Control Values 
   FACTORY_CONTROLS = dict( standby_enabled = False,

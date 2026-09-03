@@ -18,6 +18,7 @@
 
 import os
 import sys
+import copy
 import time
 import math
 import threading
@@ -52,6 +53,9 @@ class OnvifCamNode:
     )
 
     DEFAULT_CURRENT_FPS = 20 # Will be update later with actual
+
+    init_settings_dict = dict()
+    settings_dict = dict()
     
     device_info_dict = dict(device_name = "",
                             path = "",
@@ -168,8 +172,8 @@ class OnvifCamNode:
             self.current_fps = self.DEFAULT_CURRENT_FPS # Should be updateded when settings read
 
             # Initialize settings
-            self.cap_settings = self.getCapSettings()
-            self.factory_settings = self.getFactorySettings()
+            self.settings_dict = self.initSettingsDict()
+            self.settings_dict = self.refreshSettingsDict()
 
             # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
             self.msg_if.pub_info("Launching NEPI IDX () interface...")
@@ -178,10 +182,8 @@ class OnvifCamNode:
             self.idx_if = IDXDeviceIF(device_info = self.device_info_dict,
                                     data_source_description = 'camera',
                                     data_ref_description = 'camera_lense',
-                                    capSettings = self.cap_settings,
-                                    factorySettings = self.factory_settings,
-                                    settingUpdateFunction= self.settingUpdateFunction,
-                                    getSettingsFunction=self.getSettings,
+                                    getSettingsFunction=self.getSettingsFunction,
+                                    setSettingFunction= self.setSettingFunction,
                                     factoryControls = self.factory_controls,
                                     setMaxFramerate =self.setMaxFramerate, 
                                     getFramerate = self.driver.getFramerate,
@@ -207,94 +209,18 @@ class OnvifCamNode:
         return url, username, password
 
 
-    def getCapSettings(self):
-        cap_settings = dict()
-        controls_dict = self.driver.getCameraControls()
-        for cap_setting_name in controls_dict.keys():
-            if 'type' in controls_dict[cap_setting_name]:
-                cap_setting = dict()
-                cap_setting['name'] = cap_setting_name
-                info = controls_dict[cap_setting_name]
-                cap_setting_type = info['type']
-                if cap_setting_type == 'int':
-                    cap_setting_type = 'Int'
-                elif cap_setting_type == 'float':
-                    cap_setting_type = 'Float'
-                elif cap_setting_type == 'bool':
-                    cap_setting_type = 'Bool'
-                elif cap_setting_type == 'discrete':
-                    cap_setting_type = 'Discrete'
-                cap_setting['type'] = cap_setting_type
-                if cap_setting_type == 'Float' or cap_setting_type == 'Int':
-                    cap_setting_min = str(info['min'])
-                    cap_setting_max = str(info['max'])
-                    cap_setting['options'] = [cap_setting_min,cap_setting_max]
-                elif cap_setting_type == 'Discrete':
-                    cap_setting['options'] = info['options']
-                cap_settings[cap_setting_name] = cap_setting
-        # Add Resolution Cap Settting
-        try:
-            [success,resolutions,encoder_cfg] = self.driver.getAvailableResolutions()
-            self.msg_if.pub_info(" " + "Driver returned resolution options: " + str(resolutions))
-            if success:
-                cap_setting = dict()
-                cap_setting['name'] = 'Resolution'
-                cap_setting['type'] = 'Discrete'
-                options = []
-                for res_dict in resolutions:
-                    width = str(res_dict['Width'])
-                    height = str(res_dict['Height'])
-                    cap_setting_option = (width + ":" + height)
-                    options.append(cap_setting_option)
-                cap_setting['options'] = options
-                cap_settings['Resolution'] = cap_setting
-        except Exception as e:
-            self.msg_if.pub_warn(" " + "Driver returned invalid resolution options: " + str(e))
-        # Add Framerate Cap cap_setting
-        try:
-            [success,framerates,encoder_cfg] = self.driver.getFramerateRange()
-            self.msg_if.pub_info(" " + "Driver returned framerate options: " + str(framerates))
-            if success:
-                cap_setting = dict()
-                cap_setting['name'] = 'Framerate'
-                cap_setting['type'] = 'Int'
-                options = [str(framerates['Min']),str(framerates['Max'])]
-                cap_setting['options'] = options
-                cap_settings['Framerate'] = cap_setting
-        except Exception as e:
-            self.msg_if.pub_warn(" " + "Driver returned invalid framerate options: " + str(e))
-        return cap_settings
-
-
-    def getFactorySettings(self):
-        settings = self.getSettings()
-        #Apply factory setting overides
-        purge_list = []
-        for setting_name in settings.keys():
-            setting = settings[setting_name]
-            if setting['value'] == 'Not Supported':
-                purge_list.append(setting_name)
-        for setting_name in purge_list:
-            del setting[setting_name]
-        for setting_name in settings.keys():
-            if setting_name in self.FACTORY_SETTINGS_OVERRIDES.keys():
-                settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
-        return settings
-
-
-    def getSettings(self):
-        settings = dict()
+    def initSettingsDict(self):
+        init_settings_dict = dict()
         try:
             controls_dict = self.driver.getCameraControls()
         except Exception as e:
             self.msg_if.pub_warn("Failed to get camera controls (camera may be disconnected): " + str(e))
-            nepi_sdk.signal_shutdown(self.node_name + ": Camera connection lost, shutting down")
-            return settings
+            controls_dict = dict()
+
         for setting_name in controls_dict.keys():
-            if 'type' in controls_dict[setting_name]:
-                setting = dict()
-                setting['name'] = setting_name
-                info = controls_dict[setting_name]
+            info = controls_dict[setting_name]
+            setting_dict = dict()
+            if 'type' in info:
                 setting_type = info['type']
                 if setting_type == 'int':
                     setting_type = 'Int'
@@ -303,100 +229,198 @@ class OnvifCamNode:
                 elif setting_type == 'bool':
                     setting_type = 'Bool'
                 elif setting_type == 'discrete':
-                    setting_type = 'Discrete'
-                setting['type'] = setting_type
-                setting['value'] = str(info['value'])
-                settings[setting_name] = setting
-            elif 'value' in controls_dict[setting_name]:
-                setting_value = controls_dict[setting_name]['value']
+                    # The retired cap-settings form called this 'Discrete'.
+                    # The controls contract calls a named option list a Selection.
+                    setting_type = 'Selection'
+                setting_dict['type'] = setting_type
+                setting_current = str(info['value'])
+                if setting_current == 'Not Supported':
+                    continue
+                if setting_type == 'Int':
+                    try:
+                        setting_dict['bounds'] = [int(info['min']),int(info['max'])]
+                        setting_dict['default'] = int(float(setting_current))
+                    except:
+                        continue
+                elif setting_type == 'Float':
+                    try:
+                        setting_dict['bounds'] = [float(info['min']),float(info['max'])]
+                        setting_dict['default'] = float(setting_current)
+                    except:
+                        continue
+                elif setting_type == 'Selection':
+                    try:
+                        setting_dict['options'] = [str(option) for option in info['options']]
+                        setting_dict['default'] = setting_current
+                    except:
+                        continue
+                elif setting_type == 'Bool':
+                    setting_dict['default'] = (setting_current == 'True' or setting_current == 'true')
+                else:
+                    setting_dict['default'] = setting_current
+                init_settings_dict[setting_name] = setting_dict
+            elif 'value' in info:
+                setting_value = info['value']
                 if setting_value != "Not Supported":
-                    setting['value'] = setting_value
-                    setting['type'] = "String"
-                    settings[setting_name] = setting
-        # Add Resolution Cap Settting
+                    setting_dict['type'] = 'String'
+                    setting_dict['default'] = str(setting_value)
+                    init_settings_dict[setting_name] = setting_dict
+
+        # Add Resolution Setting
         try:
-            [success,res_dict] = self.driver.getResolution()
-            setting = dict()
-            setting['name'] = 'Resolution'
-            setting['type'] = 'Discrete'
-            width = str(res_dict['Width'])
-            height = str(res_dict['Height'])
-            setting_value = (width + ":" + height)
-            setting['value'] = setting_value
-            settings['Resolution'] = setting
+            [success,resolutions,encoder_cfg] = self.driver.getAvailableResolutions()
+            if success:
+                options = []
+                for res_dict in resolutions:
+                    setting_option = str(res_dict['Width']) + ":" + str(res_dict['Height'])
+                    if setting_option not in options:
+                        options.append(setting_option)
+                if len(options) > 0:
+                    setting_dict = dict()
+                    setting_dict['type'] = 'Selection'
+                    setting_dict['options'] = options
+                    [success,res_dict] = self.driver.getResolution()
+                    setting_dict['default'] = str(res_dict['Width']) + ":" + str(res_dict['Height'])
+                    init_settings_dict['Resolution'] = setting_dict
         except Exception as e:
-            self.msg_if.pub_warn("Failed to get resolution (camera may be disconnected): " + str(e))
-            nepi_sdk.signal_shutdown(self.node_name + ": Camera connection lost, shutting down")
-            return settings
+            self.msg_if.pub_warn(" " + "Driver returned invalid resolution options: " + str(e))
 
-        # Add Framerate Cap Setting
+        # Add Framerate Setting
         try:
-            [success,framerate] = self.driver.getFramerate()
-            setting = dict()
-            setting['name'] = 'Framerate'
-            setting['type'] = 'Int'
-            setting_value = (str(round(framerate,2)))
-            setting['value'] = setting_value
-            settings['Framerate'] = setting
-            self.current_fps = framerate
+            [success,framerates,encoder_cfg] = self.driver.getFramerateRange()
+            if success:
+                setting_dict = dict()
+                setting_dict['type'] = 'Int'
+                setting_dict['bounds'] = [int(framerates['Min']),int(framerates['Max'])]
+                [success,framerate] = self.driver.getFramerate()
+                setting_dict['default'] = int(round(float(framerate)))
+                self.current_fps = framerate
+                init_settings_dict['Framerate'] = setting_dict
         except Exception as e:
-            self.msg_if.pub_warn("Failed to get framerate (camera may be disconnected): " + str(e))
-            nepi_sdk.signal_shutdown(self.node_name + ": Camera connection lost, shutting down")
-            return settings
-        return settings
+            self.msg_if.pub_warn(" " + "Driver returned invalid framerate options: " + str(e))
+
+        # Apply factory setting overrides
+        for setting_name in self.FACTORY_SETTINGS_OVERRIDES.keys():
+            if setting_name in init_settings_dict.keys():
+                init_settings_dict[setting_name]['default'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
+
+        self.init_settings_dict = init_settings_dict
+        settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
+        settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+        self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
+        return settings_dict
 
 
-    def settingUpdateFunction(self,setting):
+    def refreshSettingsDict(self):
+        settings_dict = copy.deepcopy(self.settings_dict)
+        try:
+            controls_dict = self.driver.getCameraControls()
+        except Exception as e:
+            self.msg_if.pub_warn("Failed to get camera controls (camera may be disconnected): " + str(e))
+            return settings_dict
+
+        for setting_name in controls_dict.keys():
+            if setting_name not in settings_dict.keys():
+                continue
+            info = controls_dict[setting_name]
+            if 'value' not in info:
+                continue
+            setting_current = str(info['value'])
+            if setting_current == 'Not Supported':
+                continue
+            setting_type = settings_dict[setting_name]['type']
+            try:
+                if setting_type == 'Int':
+                    settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name,
+                                        min_bound = int(info['min']), max_bound = int(info['max']))
+                    settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, int(float(setting_current)))
+                elif setting_type == 'Float':
+                    settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name,
+                                        min_bound = float(info['min']), max_bound = float(info['max']))
+                    settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, float(setting_current))
+                elif setting_type == 'Selection':
+                    settings_dict = nepi_controls.set_control_options(settings_dict, setting_name,
+                                        [str(option) for option in info['options']])
+                    settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, setting_current)
+                else:
+                    settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, setting_current)
+            except Exception as e:
+                self.msg_if.pub_debug("Failed to refresh setting " + setting_name + " : " + str(e))
+
+        # Refresh Resolution
+        if 'Resolution' in settings_dict.keys():
+            try:
+                [success,res_dict] = self.driver.getResolution()
+                settings_dict = nepi_controls.set_control_value(settings_dict, 'Resolution',
+                                    str(res_dict['Width']) + ":" + str(res_dict['Height']))
+            except Exception as e:
+                self.msg_if.pub_warn("Failed to get resolution (camera may be disconnected): " + str(e))
+
+        # Refresh Framerate
+        if 'Framerate' in settings_dict.keys():
+            try:
+                [success,framerate] = self.driver.getFramerate()
+                settings_dict = nepi_controls.set_control_value(settings_dict, 'Framerate', int(round(float(framerate))))
+                self.current_fps = framerate
+            except Exception as e:
+                self.msg_if.pub_warn("Failed to get framerate (camera may be disconnected): " + str(e))
+
+        return settings_dict
+
+
+    def getSettingsFunction(self):
+        return self.settings_dict
+
+
+    def setSettingFunction(self,setting_name, setting_value):
+        setting_str = setting_name + ":" + str(setting_value)
         success = False
-        setting_str = str(setting)
-        ret = nepi_controls.get_data_from_setting(setting)
-        [setting_name, setting_type, data] = ret
-        if data is not None:
-            setting_data = data
-            found_setting = False
-            for cap_setting in self.cap_settings.keys():
-                if setting_name in cap_setting:
-                    found_setting = True
-                    if setting_name != "Resolution" and setting_name != "Framerate":
-                        success, msg = self.driver.setCameraControl(setting_name,setting_data)
-                        if success:
-                            msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
-                    elif setting_name == "Resolution":
-                        data_split = data.split(":")
-                        try:
-                            width = int(data_split[0])
-                            height = int(data_split[1])
-                        except Exception as e:
-                            self.msg_if.pub_info("Resoluton setting: " + data + " could not be parsed to int " + str(e)) 
-                        try:
-                            [success,framerate] = self.driver.getFramerate()
-                            res_dict = {'Width': width, 'Height': height}
-                            success, msg = self.driver.setResolution(res_dict)
-                            # reset framerate if needed
-                            if 'framerate' in self.cap_settings.keys():
-                                nepi_sdk.sleep(1)
-                                try:
-                                    framerate = float(framerate)
-                                    success, msg = self.driver.setFramerate(framerate)
-                                    self.msg_if.pub_warn("Updated Framerate: " + str(framerate))
-                                except Exception as e:
-                                    self.msg_if.pub_warn("Framerate setting: " + data + " could not be parsed to float " + str(e))
+        msg = 'Success'
+        if setting_name not in self.settings_dict.keys():
+            msg = (self.node_name + " Setting name " + setting_str + " is not supported")
+            return False, msg, self.settings_dict
 
-                        except Exception as e:
-                            self.msg_if.pub_info("setResolution function failed " + str(e))                            
-                        break     
-                    elif setting_name == "Framerate":
-                        try:
-                            framerate = int(data)
-                            success, msg = self.driver.setFramerate(framerate)
-                        except Exception as e:
-                            self.msg_if.pub_info("Framerate setting: " + data + " could not be parsed to float " + str(e))
-                        break    
-            if found_setting is False:
-                msg = (self.node_name  + " Setting name" + setting_str + " is not supported")                   
-        else:
-            msg = (self.node_name  + " Setting data" + setting_str + " is None")
-        return success, msg
+        cur_val = nepi_controls.get_control_value(self.settings_dict, setting_name)
+        if str(cur_val) == str(setting_value):
+            return True, 'Already set', self.settings_dict
+
+        if setting_name != "Resolution" and setting_name != "Framerate":
+            success, msg = self.driver.setCameraControl(setting_name,setting_value)
+            if success:
+                msg = (self.node_name + " UPDATED SETTINGS " + setting_str)
+        elif setting_name == "Resolution":
+            try:
+                data_split = str(setting_value).split(":")
+                width = int(data_split[0])
+                height = int(data_split[1])
+            except Exception as e:
+                msg = "Resolution setting: " + str(setting_value) + " could not be parsed to int " + str(e)
+                self.msg_if.pub_info(msg)
+                return False, msg, self.settings_dict
+            try:
+                [fr_success,framerate] = self.driver.getFramerate()
+                res_dict = {'Width': width, 'Height': height}
+                success, msg = self.driver.setResolution(res_dict)
+                # reset framerate if needed
+                if success == True and 'Framerate' in self.settings_dict.keys():
+                    nepi_sdk.sleep(1)
+                    try:
+                        self.driver.setFramerate(float(framerate))
+                        self.msg_if.pub_info("Updated Framerate: " + str(framerate))
+                    except Exception as e:
+                        self.msg_if.pub_warn("Failed to restore framerate " + str(framerate) + " : " + str(e))
+            except Exception as e:
+                msg = "setResolution function failed " + str(e)
+                self.msg_if.pub_info(msg)
+        elif setting_name == "Framerate":
+            try:
+                success, msg = self.driver.setFramerate(int(setting_value))
+            except Exception as e:
+                msg = "Framerate setting: " + str(setting_value) + " could not be parsed to int " + str(e)
+                self.msg_if.pub_info(msg)
+
+        self.settings_dict = self.refreshSettingsDict()
+        return success, msg, self.settings_dict
 
     #**********************
     # Node driver functions

@@ -113,7 +113,8 @@ class ArdupilotNode:
   navpose_dict = copy.deepcopy(nepi_nav.BLANK_NAVPOSE_DICT)
 
 
-  settings_dict = FACTORY_SETTINGS
+  init_settings_dict = dict()
+  settings_dict = dict()
 
   axis_controls = AxisControls()
   axis_controls.x = True
@@ -274,24 +275,12 @@ class ArdupilotNode:
 
 
     # Initialize RBX Settings
-    self.cap_settings = self.getCapSettings()
-    '''
-    self.msg_if.pub_warn("CAPS SETTINGS")
-    for setting_name in self.cap_settings.keys():
-        setting = self.cap_settings[setting_name]
-        self.msg_if.pub_warn(str(setting))
-    '''
-    self.factory_settings = self.getFactorySettings()
-    '''
-    self.msg_if.pub_warn("FACTORY SETTINGS")
-    for setting_name in self.factory_settings.keys():
-        setting = self.factory_settings[setting_name]
-        self.msg_if.pub_warn(str(setting))
-    '''
+    self.settings_dict = self.initSettingsDict()
+    self.settings_dict = self.refreshSettingsDict()
 
     # Per-motor commanded speed ratios (0-1), tracked locally since ArduPilot's
     # DO_MOTOR_TEST is fire-and-forget and reports no ongoing per-motor state.
-    self.motor_ratios = [0.0] * int(self.settings_dict['motor_count']['value'])
+    self.motor_ratios = [0.0] * int(nepi_controls.get_control_value(self.settings_dict,'motor_count'))
 
 
     # Define fake gps namespace and create fake_gps publishers.
@@ -323,10 +312,8 @@ class ArdupilotNode:
 
 
     self.rbx_if = RBXRobotIF(device_info = self.device_info_dict,
-                                  capSettings = self.cap_settings,
-                                  factorySettings = self.factory_settings,
-                                  settingUpdateFunction = self.settingUpdateFunction,
-                                  getSettingsFunction=self.getSettings,
+                                  getSettingsFunction=self.getSettingsFunction,
+                                  setSettingFunction=self.setSettingFunction,
                                   axisControls = self.axis_controls,
                                   getBatteryPercentFunction = self.getBatteryPercent,
                                   states = self.RBX_STATES,
@@ -373,36 +360,79 @@ class ArdupilotNode:
 
   #**********************
   # Setting functions
-  def getCapSettings(self):
-    return self.CAP_SETTINGS
 
-  def getFactorySettings(self):
-    settings = self.getSettings()
-    #Apply factory setting overides
-    for setting_name in settings.keys():
-      if setting_name in self.FACTORY_SETTINGS_OVERRIDES:
-            settings[setting_name]['value'] = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
-    return settings
+  def initSettingsDict(self):
+    init_settings_dict = dict()
+    for setting_name in self.CAP_SETTINGS.keys():
+      cap_setting = self.CAP_SETTINGS[setting_name]
+      setting_type = cap_setting['type']
+      setting_dict = dict()
+      setting_dict['type'] = setting_type
+      # The retired cap-settings form carried an Int/Float control's min and
+      # max in an 'options' pair. The controls contract calls that 'bounds'.
+      if 'options' in cap_setting.keys():
+        try:
+          if setting_type == 'Int':
+            setting_dict['bounds'] = [int(cap_setting['options'][0]),int(cap_setting['options'][1])]
+          elif setting_type == 'Float':
+            setting_dict['bounds'] = [float(cap_setting['options'][0]),float(cap_setting['options'][1])]
+          else:
+            setting_dict['options'] = [str(option) for option in cap_setting['options']]
+        except Exception as e:
+          self.msg_if.pub_warn("Invalid bounds for setting: " + setting_name + " : " + str(e))
 
+      default = None
+      if setting_name in self.FACTORY_SETTINGS.keys():
+        default = self.FACTORY_SETTINGS[setting_name]['value']
+      if setting_name in self.FACTORY_SETTINGS_OVERRIDES.keys():
+        default = self.FACTORY_SETTINGS_OVERRIDES[setting_name]
+      if default is None:
+        continue
+      try:
+        if setting_type == 'Int':
+          default = int(float(default))
+        elif setting_type == 'Float':
+          default = float(default)
+        elif setting_type == 'Bool':
+          default = (str(default) == 'True' or str(default) == 'true')
+        else:
+          default = str(default)
+      except Exception as e:
+        self.msg_if.pub_warn("Invalid factory value for setting: " + setting_name + " : " + str(e))
+        continue
+      setting_dict['default'] = default
+      init_settings_dict[setting_name] = setting_dict
 
-  def getSettings(self):  
+    self.init_settings_dict = init_settings_dict
+    settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
+    settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+    self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
+    return settings_dict
+
+  def refreshSettingsDict(self):
+    # These are software settings held by this node -- the autopilot has no
+    # capability report to read them back from -- so there is nothing live to
+    # refresh. Kept for contract consistency with the other drivers.
+    return copy.deepcopy(self.settings_dict)
+
+  def getSettingsFunction(self):
     return self.settings_dict
 
-  def settingUpdateFunction(self,setting):
-    success = False
-    setting_str = str(setting)
-    setting_name = setting['name']
-    if nepi_controls.check_valid_setting(setting,self.cap_settings):
-      if setting_name in self.settings_dict.keys():
-        self.settings_dict[setting_name]['value'] = setting['value']
-        success = True
-      else:
-        msg = (self.node_name  + " Setting name" + setting_str + " is not supported") 
-      if success == True:
-        msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)                  
-    else:
-      msg = (self.node_name  + " Setting data" + setting_str + " is not valid")
-    return success, msg
+  def setSettingFunction(self,setting_name, setting_value):
+    setting_str = setting_name + ":" + str(setting_value)
+    if setting_name not in self.settings_dict.keys():
+      msg = (self.node_name + " Setting name " + setting_str + " is not supported")
+      return False, msg, self.settings_dict
+    if nepi_controls.check_valid_value(self.settings_dict, setting_name, setting_value) == False:
+      msg = (self.node_name + " Setting data " + setting_str + " is not valid")
+      return False, msg, self.settings_dict
+
+    self.settings_dict = nepi_controls.set_control_value(self.settings_dict, setting_name, setting_value)
+    if setting_name == 'motor_count':
+      # motor_ratios is sized from motor_count, so it has to be resized with it.
+      self.motor_ratios = [0.0] * int(nepi_controls.get_control_value(self.settings_dict,'motor_count'))
+    msg = ( self.node_name + " UPDATED SETTINGS " + setting_str)
+    return True, msg, self.settings_dict
 
   ##########################
   # RBX Interface Functions
@@ -471,9 +501,9 @@ class ArdupilotNode:
     # rather than straight onto [0,100] -- e.g. a 20% max throttle setting
     # means the slider's 100% only ever commands 20% actual throttle, so the
     # cap integrates with the slider UI instead of silently overriding it.
-    max_throttle_percent = float(self.settings_dict['motor_test_max_throttle_percent']['value'])
+    max_throttle_percent = float(nepi_controls.get_control_value(self.settings_dict,'motor_test_max_throttle_percent'))
     throttle_percent = speed_ratio * max_throttle_percent
-    timeout_s = float(self.settings_dict['motor_test_timeout_s']['value'])
+    timeout_s = float(nepi_controls.get_control_value(self.settings_dict,'motor_test_timeout_s'))
     test_cmd = CommandLongRequest()
     test_cmd.broadcast = False
     test_cmd.command = self.MAV_CMD_DO_MOTOR_TEST
@@ -888,8 +918,8 @@ class ArdupilotNode:
     self.rbx_if.update_current_errors( [0,0,0,0,0,0,0] )
     cmd_success = False
     if self.state_current == "ARM":
-      takeoff_height_m = float(self.settings_dict['takeoff_height_m']['value'])
-      takeoff_min_pitch_deg = float(self.settings_dict['takeoff_min_pitch_deg']['value'])
+      takeoff_height_m = float(nepi_controls.get_control_value(self.settings_dict,'takeoff_height_m'))
+      takeoff_min_pitch_deg = float(nepi_controls.get_control_value(self.settings_dict,'takeoff_min_pitch_deg'))
       self.msg_if.pub_info("Sending Takeoff Command to altitude to " + str(takeoff_height_m) + " meters")
       takeoff_cmd = CommandTOLRequest()
       takeoff_cmd.min_pitch = takeoff_min_pitch_deg

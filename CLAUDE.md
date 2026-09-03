@@ -129,6 +129,82 @@ def discoveryFunction(available_paths_list, active_paths_list, base_namespace, d
     return active_paths_list
 ```
 
+## Driver Settings Pattern
+
+All driver nodes expose device settings through four private methods and register
+two of them with their device interface class. `idx_drivers/idx_v4l2_node.py` is
+the reference implementation — copy its shape, adapted to the device's hardware.
+
+```python
+def initSettingsDict(self):        # build the settings once, at startup
+def refreshSettingsDict(self):     # read live values (and bounds/options) back
+def getSettingsFunction(self):     # return the current settings dict
+def setSettingFunction(self, setting_name, setting_value):
+```
+
+Wire the last two into the device IF constructor:
+
+```python
+self.idx_if = IDXDeviceIF(device_info = self.device_info_dict,
+                          getSettingsFunction = self.getSettingsFunction,
+                          setSettingFunction = self.setSettingFunction,
+                          ...)
+```
+
+All six device IF classes (`IDXDeviceIF`, `LSXDeviceIF`, `NPXDeviceIF`,
+`PTXActuatorIF`, `RBXRobotIF`, `SVXActuatorIF`) accept exactly these two
+arguments and build a `SettingsIF` only when both are non-`None`. A device with
+no settings passes neither — that is the correct state, not an omission
+(`npx_*`, `ptx_onvif_generic`, `lsx_aftowerlight`).
+
+**Contract.** `getSettingsFunction()` takes no arguments and returns a
+`nepi_controls` controls dict. `setSettingFunction(name, value)` returns
+`[success, msg, settings_dict]` — all three, since `SettingsIF` replaces its own
+dict with the third element. It is also called as a bare statement during
+`SettingsIF.init()`, so it must tolerate its return being discarded.
+
+**The settings dict is a controls dict.** Build the plain init dict, then hand it
+to `nepi_controls.create_controls_dict()`. Each init entry is keyed by the
+setting name and carries:
+
+| key | applies to |
+|---|---|
+| `type` | required; must be in `nepi_controls.CONTROL_TYPES` |
+| `default` | required; typed to match `type` |
+| `bounds` | `Int`, `Float`, `FloatSlider(s)` |
+| `options` | `Menu`, `Selection`, `Selections` |
+
+Read and write values through `nepi_controls.get_control_value()` /
+`set_control_value()` / `set_control_bounds()` / `set_control_options()` — never
+by indexing the control dict directly. This applies to a node's own internal
+reads too (see `rbx_ardupilot_node.py`, which reads `motor_count` and the
+takeoff parameters out of its settings dict).
+
+**Two traps when converting an old driver:**
+
+- `'Discrete'` is *not* a `CONTROL_TYPE`. `create_controls_dict()` wraps every
+  entry in a bare `except: pass`, so a `'Discrete'` setting is silently dropped
+  and simply never appears in the RUI. A named option list is a `'Selection'`.
+- The retired cap-settings form carried an `Int`/`Float` control's min and max in
+  an `'options'` pair. Those are `'bounds'` now; `'options'` on a numeric control
+  is ignored.
+
+### Retired pattern
+
+These no longer exist and no device IF accepts them. Any driver still using them
+raises `TypeError` at construction:
+
+```
+getCapSettings()  getFactorySettings()  getSettings()  setSetting()  settingUpdateFunction()
+capSettings=      factorySettings=      settingUpdateFunction=
+nepi_controls.get_data_from_setting()   nepi_controls.check_valid_setting()
+```
+
+`device_if_ptx.py` still accepts a `getCapSettingsFunction` constructor argument,
+but it is inert — it is never forwarded to `SettingsIF`, which has no such
+parameter. Capability data (type, bounds, options) rides in the controls dict
+itself. Do not pass it.
+
 ## Known Constraints and Fragile Areas
 
 **GenICam requires Baumer libraries.** The `idx_genicam` driver loads `.cti` producer files (`libbgapi2_usb.cti`, `libbgapi2_gige.cti`). These must be present on the system at the paths expected by Harvester. Missing files cause silent failures during discovery.
@@ -149,3 +225,4 @@ def discoveryFunction(available_paths_list, active_paths_list, base_namespace, d
 
 - 2026-03 — CLAUDE.md created — Initial developer reference, Claude Code authoring pass.
 - 2026-07 — Corrected stale RBX content — `rbx_drivers/` is no longer empty; documented the `rbx_ardupilot` driver (mavros subprocess launch, connection-agnostic node), fixed the RBX interface class name to `RBXRobotIF`, and noted `scripts/fake_gps_node.py` is superseded by the `nepi_app_fake_gps` app.
+- 2026-09 — Converted all drivers to the new settings functions — Every driver family (idx, lsx, ptx, rbx, svx) now uses `initSettingsDict`/`refreshSettingsDict`/`getSettingsFunction`/`setSettingFunction`, with `idx_v4l2_node.py` as the reference. The old `capSettings`/`factorySettings`/`settingUpdateFunction` arguments had already been dropped from every `device_if_*` constructor, so every unconverted driver was raising `TypeError` at startup; `ptx_iqr` and `ptx_sidus_ss109` were additionally calling settings methods that did not exist on their own classes. See the Driver Settings Pattern section above.
