@@ -288,11 +288,11 @@ class GenicamCamNode:
             try:
                 if setting_type == 'Int':
                     settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name,
-                                        min_bound = int(info['min']), max_bound = int(info['max']))
+                                        [int(info['min']), int(info['max'])])
                     settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, int(float(setting_current)))
                 elif setting_type == 'Float':
                     settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name,
-                                        min_bound = float(info['min']), max_bound = float(info['max']))
+                                        [int(info['min']), int(info['max'])])
                     settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, float(setting_current))
                 elif setting_type == 'Selection':
                     settings_dict = nepi_controls.set_control_options(settings_dict, setting_name,
@@ -327,7 +327,7 @@ class GenicamCamNode:
                 if len(framerates) > 0:
                     rates = [float(rate) for rate in framerates]
                     settings_dict = nepi_controls.set_control_bounds(settings_dict, 'Framerate',
-                                        min_bound = min(rates), max_bound = max(rates))
+                                       [int(info['min']), int(info['max'])])
                 [success,framerate] = self.driver.getFramerate()
                 settings_dict = nepi_controls.set_control_value(settings_dict, 'Framerate', round(float(framerate),2))
                 self.current_fps = framerate

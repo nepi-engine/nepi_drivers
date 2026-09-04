@@ -321,14 +321,10 @@ class SettingsTestNode(object):
           if value is not None:
             settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, value)
 
-        # Bounds do not move on this fixture, but refresh them anyway so the
-        # two-argument form is exercised. set_control_bounds() is
-        # (dict, name, min_bound, max_bound) -- passing [min,max] as the single
-        # min_bound argument throws inside its own except and refreshes nothing.
+
         bounds = entry.get('bounds')
         if bounds is not None and len(bounds) == 2:
-          settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name,
-                                                           bounds[0], bounds[1])
+          settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name, bounds)
       return settings_dict
 
 

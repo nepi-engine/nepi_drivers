@@ -1,5 +1,5 @@
 driver:
-  pkg_name: LSX_SETTINGS_TEST
+  pkg_name: SETTINGS_TEST
   display_name: Settings Test Driver
   description: Temporary test fixture. Exposes one setting of every nepi_controls
     control type, connects to no hardware, and serves a live read-back page so a
@@ -7,13 +7,13 @@ driver:
   type: LSX
   group_id: None
   NODE_DICT:
-    file_name: lsx_settings_test_node.py
+    file_name: settings_test_node.py
     class_name: SettingsTestNode
   DRIVER_DICT:
     file_name: None
     class_name: None
   DISCOVERY_DICT:
-    file_name: lsx_settings_test_discovery.py
+    file_name: settings_test_discovery.py
     class_name: SettingsTestDiscovery
     process: CALL
     OPTIONS:
