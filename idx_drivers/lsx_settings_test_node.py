@@ -18,10 +18,10 @@
 # TEMPORARY TEST FIXTURE. Delete with the two sibling lsx_settings_test_* files.
 #
 # This driver connects to no hardware and produces no data. It declares one
-# setting of every nepi_controls control type, plus one 'Discrete' setting, and
-# serves its own small page with a live read-back box per setting so that a
-# setting which is silently dropped on the way to the controls dict is visible
-# rather than being an absence nobody notices.
+# setting of every nepi_controls control type and serves its own small page with
+# a live read-back box per setting so that a setting which is silently dropped
+# on the way to the controls dict is visible rather than being an absence nobody
+# notices.
 #
 # It declares device type LSX because LSX is the cheapest device interface to
 # stub -- on/off and intensity, held in memory -- and because declaring an
@@ -56,9 +56,9 @@ PAGE_POLL_MS = 1000
 # unmistakable in a read-back text box.
 TEST_OPTIONS = ['option_a', 'option_b', 'option_c']
 
-# SelectionsDD gets a longer list on purpose. The dropdown exists because a row
-# of per-option toggles stops being readable once the list runs long, so probing
-# it with three options would not exercise the thing it is for.
+# 'Selections' (the dropdown) gets a longer list on purpose. The dropdown exists
+# because a row of per-option toggles stops being readable once the list runs
+# long, so probing it with three options would not exercise the thing it is for.
 TEST_OPTIONS_LONG = ['option_a', 'option_b', 'option_c',
                      'option_d', 'option_e', 'option_f']
 
@@ -75,31 +75,34 @@ class SettingsTestNode(object):
   DECLARED_SETTINGS = dict(
     test_menu        = {'type': 'Menu',         'default': 0,                'options': TEST_OPTIONS},
     test_selection   = {'type': 'Selection',    'default': 'option_a',       'options': TEST_OPTIONS},
-    test_selections  = {'type': 'Selections',   'default': ['option_a'],     'options': TEST_OPTIONS},
+    # The row of per-option toggles. This is what the retired name 'Selections'
+    # used to mean; the plural toggle row is 'Toggles' now, and 'Selections' was
+    # reused for what 'SelectionsDD' used to be. Both still carry the identical
+    # value shape (a list of chosen option strings), so a stale 'Selections'
+    # does not fail -- it silently draws as a dropdown instead. The setting key
+    # keeps its old name so saved configs still load.
+    test_selections  = {'type': 'Toggles',      'default': ['option_a'],     'options': TEST_OPTIONS},
     # Same value shape as test_selections above (a list of chosen option
     # strings) under the dropdown widget rather than a row of toggles. Declared
     # right beside it so the two can be compared side by side in one panel.
-    test_selections_dd = {'type': 'SelectionsDD', 'default': ['option_a'],   'options': TEST_OPTIONS_LONG},
+    test_selections_dd = {'type': 'Selections', 'default': ['option_a'],     'options': TEST_OPTIONS_LONG},
     test_trigger     = {'type': 'Trigger',      'default': 0},
-    test_bool        = {'type': 'Bool',         'default': False},
+    test_bool        = {'type': 'Toggle',       'default': False},
     test_string      = {'type': 'String',       'default': 'option_a'},
     test_int         = {'type': 'Int',          'default': 25,               'bounds': [0, 100]},
     test_float       = {'type': 'Float',        'default': 2.5,              'bounds': [0.0, 10.0]},
     test_float_slider  = {'type': 'FloatSlider',  'default': 0.5,            'bounds': [0.0, 1.0]},
-    test_float_sliders = {'type': 'FloatSliders', 'default': [0.25, 0.75],   'bounds': [0.0, 1.0]},
+    test_float_sliders = {'type': 'RangeSlider',  'default': [0.25, 0.75],   'bounds': [0.0, 1.0]},
 
-    # DELIBERATE PROBE, DO NOT DELETE AS A MISTAKE.
-    # 'Discrete' means exactly what 'Selection' means: a named list of options,
-    # one of which is current. It is declared here exactly as the Selection
-    # above is declared, changing only the type string, so this fixture answers
-    # one question directly -- does a type that behaves identically to Selection
-    # survive registration? It used to vanish silently: 'Discrete' was not a
-    # member of nepi_controls.CONTROL_TYPES and create_controls_dict() wrapped
-    # each entry in a bare except:pass, so the entry disappeared with no error
-    # and no log line. 'Discrete' is now in CONTROL_TYPES and this entry is
-    # expected to REGISTER. If it shows up in the dropped table again, that is a
-    # regression in nepi_controls, not a problem with this declaration.
-    test_discrete    = {'type': 'Discrete',     'default': 'option_a',       'options': TEST_OPTIONS},
+    # The probe this entry used to be is answered and retired. 'Discrete' was
+    # the old name for a named option list and is NOT a member of
+    # nepi_controls.CONTROL_TYPES; only create_controls_dict()'s legacy rewrite
+    # at nepi_controls.py:110 let one survive at all. No driver in this repo
+    # authors it any more, so the entry declares the current name. It is left in
+    # place, deliberately identical to test_selection above, as the witness that
+    # the retired name is gone -- if 'Discrete' ever reappears in this fixture's
+    # dropped table, something re-introduced it.
+    test_discrete    = {'type': 'Selection',    'default': 'option_a',       'options': TEST_OPTIONS},
   )
 
   # Factory control values for the stub light. Nothing behind them.
@@ -227,9 +230,12 @@ class SettingsTestNode(object):
       for option_name in options_dict.keys():
         entry = options_dict[option_name]
         declared = entry.get('type', 'None')
-        # drivers_mgr translates Discrete to Selection before building the
-        # control (drivers_mgr.py:885), so the type the panel renders is not
-        # always the type declared in the yaml. Show both.
+        # DELIBERATE BACKWARD-COMPATIBILITY PATH, display only. This driver's
+        # own yaml no longer declares the retired 'Discrete', but drivers_mgr
+        # still rewrites it to Selection before building the control
+        # (drivers_mgr.py:885), so a yaml that does declare it renders as a type
+        # it never declared. Showing both columns is how that gets caught. This
+        # line formats a report; it converts, validates and applies nothing.
         rendered = 'Selection' if declared == 'Discrete' else declared
         supported = declared in nepi_controls.CONTROL_TYPES
         options.append({
@@ -387,12 +393,12 @@ class SettingsTestNode(object):
           return [False, "menu index out of range 0.." + str(len(options) - 1)]
         return [True, '']
 
-      if setting_type == 'Selection' or setting_type == 'Discrete':
+      if setting_type == 'Selection':
         if str(setting_value) not in options:
           return [False, "not in options " + str(options)]
         return [True, '']
 
-      if setting_type == 'Selections':
+      if setting_type == 'Selections' or setting_type == 'Toggles':
         values = setting_value
         if isinstance(values, (list, tuple)) == False:
           values = [values]
@@ -401,7 +407,7 @@ class SettingsTestNode(object):
             return [False, str(value) + " not in options " + str(options)]
         return [True, '']
 
-      if setting_type == 'Bool' or setting_type == 'String':
+      if setting_type == 'Toggle' or setting_type == 'String':
         return [True, '']
 
       if setting_type == 'Int':
@@ -422,7 +428,7 @@ class SettingsTestNode(object):
           return [False, "out of bounds " + str(bounds)]
         return [True, '']
 
-      if setting_type == 'FloatSliders':
+      if setting_type == 'RangeSlider':
         try:
           low = float(setting_value[0])
           high = float(setting_value[1])
@@ -444,11 +450,11 @@ class SettingsTestNode(object):
           return int(setting_value)
         if setting_type == 'Float' or setting_type == 'FloatSlider':
           return float(setting_value)
-        if setting_type == 'FloatSliders':
+        if setting_type == 'RangeSlider':
           return [float(setting_value[0]), float(setting_value[1])]
-        if setting_type == 'Bool':
+        if setting_type == 'Toggle':
           return (setting_value == True or str(setting_value).lower() == 'true')
-        if setting_type == 'Selections':
+        if setting_type == 'Selections' or setting_type == 'Toggles':
           if isinstance(setting_value, (list, tuple)):
             return [str(item) for item in setting_value]
           return [str(setting_value)]

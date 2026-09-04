@@ -16,5 +16,5 @@ driver:
     process: None
     OPTIONS:
       auto_restart:
-        type: Bool
+        type: Toggle
         default: 'True'

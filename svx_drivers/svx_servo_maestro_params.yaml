@@ -21,7 +21,7 @@ driver:
         default: 'all'
         value: 'all'
       protocol:
-        type: Discrete
+        type: Selection
         description: 'Serial command protocol. Compact works for a single controller; Pololu adds a device number for daisy-chained boards.'
         options:
           - 'Compact'
@@ -39,7 +39,7 @@ driver:
         default: '0'
         value: '0'
       baud_rate:
-        type: Discrete
+        type: Selection
         description: 'Serial baud rate. Ignored for the USB Command Port (USB is not rate-limited); kept for TTL/UART use.'
         options:
           - '9600'

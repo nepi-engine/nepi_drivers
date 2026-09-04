@@ -2,8 +2,8 @@ driver:
   pkg_name: LSX_SETTINGS_TEST
   display_name: Settings Test Driver
   description: Temporary test fixture. Exposes one setting of every nepi_controls
-    control type plus one Discrete setting, connects to no hardware, and serves a
-    live read-back page so a silently dropped setting is visible. Delete after use.
+    control type, connects to no hardware, and serves a live read-back page so a
+    silently dropped setting is visible. Delete after use.
   type: LSX
   group_id: None
   NODE_DICT:
@@ -31,8 +31,8 @@ driver:
       # For Int and Float, 'options' is a [min, max] pair that drivers_mgr turns
       # into control bounds via set_control_bounds() at line 978 -- it is NOT a
       # choice list. That conversion is applied to Int and Float only, so the
-      # FloatSlider entries below deliberately test what happens to a slider type
-      # that never gets its bounds installed.
+      # FloatSlider and RangeSlider entries below deliberately test what happens
+      # to a slider type that never gets its bounds installed.
       page_port:
         type: 'Int'
         options:
@@ -57,7 +57,7 @@ driver:
         default: 'option_a'
         value: 'option_a'
       opt_discrete:
-        type: 'Discrete'
+        type: 'Selection'
         options:
           - 'option_a'
           - 'option_b'
@@ -65,7 +65,7 @@ driver:
         default: 'option_a'
         value: 'option_a'
       opt_selections:
-        type: 'Selections'
+        type: 'Toggles'
         options:
           - 'option_a'
           - 'option_b'
@@ -75,7 +75,7 @@ driver:
         value:
           - 'option_a'
       opt_selections_dd:
-        type: 'SelectionsDD'
+        type: 'Selections'
         options:
           - 'option_a'
           - 'option_b'
@@ -93,7 +93,7 @@ driver:
         default: 'None'
         value: 'None'
       opt_bool:
-        type: 'Bool'
+        type: 'Toggle'
         options: []
         default: 'False'
         value: 'False'
@@ -124,7 +124,7 @@ driver:
         default: '0.25'
         value: '0.25'
       opt_float_sliders:
-        type: 'FloatSliders'
+        type: 'RangeSlider'
         options:
           - '0.0'
           - '1.0'

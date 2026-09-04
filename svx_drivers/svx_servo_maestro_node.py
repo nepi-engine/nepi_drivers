@@ -432,7 +432,7 @@ class SvxServoMaestroNode:
                 val = int(float(val))
             elif setting_type == 'Float':
                 val = float(val)
-            elif setting_type == 'Bool':
+            elif setting_type == 'Toggle':
                 val = (val == True)
             else:
                 val = str(val)

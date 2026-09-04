@@ -16,7 +16,7 @@ driver:
     process: LAUNCH
     OPTIONS:
       resolution:
-        type: Discrete
+        type: Selection
         options:
           - HD2K
           - HD1080
@@ -30,14 +30,14 @@ driver:
           - '30'
         default: '15'
       data_products:
-        type: Discrete
+        type: Selection
         options:
           - 'color_image'
           - 'color_image,depth_map'
           - 'color_image,depth_map,pointcloud'
         default: 'color_image,depth_map,pointcloud'
       navpose_enabled:
-        type: Bool
+        type: Toggle
         default: 'False'
       navpose_pub_rate:
         type: Int

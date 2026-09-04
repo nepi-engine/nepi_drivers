@@ -235,7 +235,7 @@ class V4l2CamNode:
             elif setting_type == 'float':
                 setting_type = 'Float'
             elif setting_type == 'bool':
-                setting_type = 'Bool'
+                setting_type = 'Toggle'
             elif setting_type == 'menu':
                 setting_type = 'Menu'
             setting_dict['type'] = setting_type
@@ -278,7 +278,7 @@ class V4l2CamNode:
         try:
             [success,available_resolutions] = self.driver.getCurrentFormatAvailableResolutions()
             setting_dict = dict()
-            setting_dict['type'] = 'Discrete'
+            setting_dict['type'] = 'Selection'
             options = []
             if len(available_resolutions) > 0:
                 for res_dict in available_resolutions:
@@ -306,7 +306,7 @@ class V4l2CamNode:
             [success,framerates] = self.driver.getCurrentResolutionAvailableFramerates()
           
             setting_dict = dict()
-            setting_dict['type'] = 'Discrete'
+            setting_dict['type'] = 'Selection'
             options = []
             if len(framerates) > 0:
                 for rate in framerates:

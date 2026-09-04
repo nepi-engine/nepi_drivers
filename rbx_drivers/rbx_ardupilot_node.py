@@ -393,7 +393,7 @@ class ArdupilotNode:
           default = int(float(default))
         elif setting_type == 'Float':
           default = float(default)
-        elif setting_type == 'Bool':
+        elif setting_type == 'Toggle':
           default = (str(default) == 'True' or str(default) == 'true')
         else:
           default = str(default)
@@ -423,7 +423,10 @@ class ArdupilotNode:
     if setting_name not in self.settings_dict.keys():
       msg = (self.node_name + " Setting name " + setting_str + " is not supported")
       return False, msg, self.settings_dict
-    if nepi_controls.check_valid_value(self.settings_dict, setting_name, setting_value) == False:
+    # check_valid_value() was removed from nepi_controls; get_clean_value()
+    # returns None for an invalid value. Test 'is None', not falsiness -- a
+    # Toggle cleans to a legitimate False.
+    if nepi_controls.get_clean_value(self.settings_dict, setting_name, setting_value) is None:
       msg = (self.node_name + " Setting data " + setting_str + " is not valid")
       return False, msg, self.settings_dict
 

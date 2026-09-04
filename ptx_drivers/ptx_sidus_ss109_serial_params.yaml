@@ -16,7 +16,7 @@ driver:
     process: CALL
     OPTIONS:
       baud_rate:
-        type: Discrete
+        type: Selection
         options:
           - All
           - '2400'
@@ -36,7 +36,7 @@ driver:
         default: 'B'
         value: 'B'
       system_config:
-        type: Discrete
+        type: Selection
         options:
           - 'Standard'
           - 'HighTorque'

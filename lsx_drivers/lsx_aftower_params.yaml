@@ -16,7 +16,7 @@ driver:
     process: CALL
     OPTIONS:
       baud_rate:
-        type: Discrete
+        type: Selection
         options:
           - '9600'
         default: '9600'

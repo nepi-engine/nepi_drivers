@@ -25,12 +25,12 @@ driver:
         default: '50000'
         value: 'NEPI_NAV_PORT_NMEA'
       serial_port:
-        type: Discrete
+        type: Selection
         options: ['Auto']
         default: 'Auto'
         value: 'Auto'
       baud_rate:
-        type: Discrete
+        type: Selection
         options: ['9600','19200','38400','57600','115200']
         default: '115200'
         value: '115200'

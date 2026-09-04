@@ -128,15 +128,15 @@ class GazeboNode:
   CAP_SETTINGS = dict(
     max_linear_speed_mps = {"type":"Float","name":"max_linear_speed_mps","options":["0.05","5.0"]},
     max_angular_rate_dps = {"type":"Float","name":"max_angular_rate_dps","options":["5.0","180.0"]},
-    camera_view_mode = {"type":"Discrete","name":"camera_view_mode","options":CAMERA_VIEW_MODES},
-    environment = {"type":"Discrete","name":"environment","options":ENVIRONMENT_OPTIONS}
+    camera_view_mode = {"type":"Selection","name":"camera_view_mode","options":CAMERA_VIEW_MODES},
+    environment = {"type":"Selection","name":"environment","options":ENVIRONMENT_OPTIONS}
   )
 
   FACTORY_SETTINGS = dict(
     max_linear_speed_mps = {"type":"Float","name":"max_linear_speed_mps","value":"0.5"},
     max_angular_rate_dps = {"type":"Float","name":"max_angular_rate_dps","value":"45.0"},
-    camera_view_mode = {"type":"Discrete","name":"camera_view_mode","value":ROBOT_CAMERA_NAME.upper()},
-    environment = {"type":"Discrete","name":"environment","value":ENVIRONMENT_OPTIONS[0]}
+    camera_view_mode = {"type":"Selection","name":"camera_view_mode","value":ROBOT_CAMERA_NAME.upper()},
+    environment = {"type":"Selection","name":"environment","value":ENVIRONMENT_OPTIONS[0]}
   )
 
   FACTORY_SETTINGS_OVERRIDES = dict()
@@ -443,10 +443,6 @@ class GazeboNode:
     for setting_name in self.CAP_SETTINGS.keys():
       cap_setting = self.CAP_SETTINGS[setting_name]
       setting_type = cap_setting['type']
-      if setting_type == 'Discrete':
-        # The retired cap-settings form called a named option list 'Discrete'.
-        # The controls contract calls it a Selection.
-        setting_type = 'Selection'
       setting_dict = dict()
       setting_dict['type'] = setting_type
       if 'options' in cap_setting.keys():
@@ -474,7 +470,7 @@ class GazeboNode:
           default = int(float(default))
         elif setting_type == 'Float':
           default = float(default)
-        elif setting_type == 'Bool':
+        elif setting_type == 'Toggle':
           default = (str(default) == 'True' or str(default) == 'true')
         else:
           default = str(default)
@@ -504,7 +500,10 @@ class GazeboNode:
     if setting_name not in self.settings_dict.keys():
       msg = (self.node_name + " Setting name " + setting_str + " is not supported")
       return False, msg, self.settings_dict
-    if nepi_controls.check_valid_value(self.settings_dict, setting_name, setting_value) == False:
+    # check_valid_value() was removed from nepi_controls; get_clean_value()
+    # returns None for an invalid value. Test 'is None', not falsiness -- a
+    # Toggle cleans to a legitimate False.
+    if nepi_controls.get_clean_value(self.settings_dict, setting_name, setting_value) is None:
       msg = (self.node_name + " Setting data " + setting_str + " is not valid")
       return False, msg, self.settings_dict
 

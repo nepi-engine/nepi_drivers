@@ -227,7 +227,7 @@ class OnvifCamNode:
                 elif setting_type == 'float':
                     setting_type = 'Float'
                 elif setting_type == 'bool':
-                    setting_type = 'Bool'
+                    setting_type = 'Toggle'
                 elif setting_type == 'discrete':
                     # The retired cap-settings form called this 'Discrete'.
                     # The controls contract calls a named option list a Selection.
@@ -254,7 +254,7 @@ class OnvifCamNode:
                         setting_dict['default'] = setting_current
                     except:
                         continue
-                elif setting_type == 'Bool':
+                elif setting_type == 'Toggle':
                     setting_dict['default'] = (setting_current == 'True' or setting_current == 'true')
                 else:
                     setting_dict['default'] = setting_current

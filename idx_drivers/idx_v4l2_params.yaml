@@ -22,7 +22,7 @@ driver:
           - '10'
         default: '2'
       data_products:
-          type: Discrete
+          type: Selection
           options:
             - 'color_image'
           default: 'color_image'

@@ -75,10 +75,10 @@ class ZedCamNode(object):
       saturation ={"type":"Int","name":"saturation","options":["0","8"]},
       sharpness ={"type":"Int","name":"sharpness","options":["0","8"]},
       gamma ={"type":"Int","name":"gamma","options":["1","9"]},
-      auto_exposure_gain = {"type":"Bool","name":"auto_exposure_gain"},
+      auto_exposure_gain = {"type":"Toggle","name":"auto_exposure_gain"},
       gain = {"type":"Int","name":"gain","options":["0","100"]},
       exposure = {"type":"Int","name":"exposure","options":["0","100"]},
-      auto_whitebalance = {"type":"Bool","name":"auto_whitebalance"},
+      auto_whitebalance = {"type":"Toggle","name":"auto_whitebalance"},
       whitebalance_temperature = {"type":"Int","name":"whitebalance_temperature","options":["2800","6500"]}
     )
 
@@ -544,7 +544,7 @@ class ZedCamNode(object):
           value = int(value)
         elif setting_type == 'Float':
           value = float(value)
-        elif setting_type == 'Bool':
+        elif setting_type == 'Toggle':
           value = (value == True)
       except Exception as e:
         self.msg_if.pub_warn("Failed to convert setting: " + setting_name + " : " + str(e))
