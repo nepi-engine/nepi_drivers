@@ -482,12 +482,6 @@ class SettingsTestNode(object):
           if value is not None:
             settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, value)
 
-<<<<<<< HEAD:resources/settings_test_node.py
-
-        bounds = entry.get('bounds')
-        if bounds is not None and len(bounds) == 2:
-          settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name, bounds)
-=======
         # Bounds do not move on this fixture, but refresh them anyway so the
         # call is exercised. set_control_bounds() is
         # (dict, name, bounds) where bounds is the [min, max] PAIR, not two
@@ -496,9 +490,7 @@ class SettingsTestNode(object):
         # call, not a silent no-op, because the function takes only three.
         bounds = entry.get('bounds')
         if bounds is not None and len(bounds) == 2:
-          settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name,
-                                                           bounds)
->>>>>>> 69ff1f9bbd0bd09ebbfff350bfdfbd1e4a8a4298:idx_drivers/lsx_settings_test_node.py
+          settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name, bounds)
       return settings_dict
 
 
