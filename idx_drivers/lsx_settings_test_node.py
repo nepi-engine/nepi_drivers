@@ -23,6 +23,13 @@
 # on the way to the controls dict is visible rather than being an absence nobody
 # notices.
 #
+# It also builds a ControlsIF set of its own -- one String data box per driver
+# discovery option, holding the value that reached the node. That is the third
+# and last of the three surfaces a control value can be rendered on (Driver
+# Options in the Drivers Manager panel, Device Settings via SettingsIF, custom
+# controls via ControlsIF), and the only one nothing else in the device tree
+# exercises: ControlsIF has only ever been consumed by apps.
+#
 # It declares device type LSX because LSX is the cheapest device interface to
 # stub -- on/off and intensity, held in memory -- and because declaring an
 # existing type means the stock RUI settings panel renders for it with no RUI
@@ -44,6 +51,7 @@ from nepi_interfaces.msg import DeviceLSXStatus
 
 from nepi_api.device_if_lsx import LSXDeviceIF
 from nepi_api.messages_if import MsgIF
+from nepi_api.system_if import ControlsIF
 
 
 PKG_NAME = 'LSX_SETTINGS_TEST'
@@ -51,6 +59,13 @@ FILE_TYPE = 'NODE'
 
 DEFAULT_PAGE_PORT = 5010
 PAGE_POLL_MS = 1000
+
+# Name of the ControlsIF set this node builds for the driver options. It becomes
+# the last element of the controls namespace (<node_namespace>/driver_options)
+# and the name reported in ControlsStatus, so the RUI mount and this string must
+# agree -- see NepiDeviceLSX-Controls.js, which mounts Nepi_IF_Controls on
+# <node namespace>/driver_options for this fixture only.
+CONTROLS_NAME = 'driver_options'
 
 # Every option-bearing setting gets the same three options, named so they are
 # unmistakable in a read-back text box.
@@ -135,6 +150,10 @@ class SettingsTestNode(object):
   intensity_ratio = 0.0
 
   lsx_if = None
+  controls_if = None
+  # option name -> value string this node received at launch, kept so the page
+  # can show the launch value beside the (editable) control value.
+  option_launch_values = dict()
   page_port = DEFAULT_PAGE_PORT
   page_server = None
   page_thread = None
@@ -174,6 +193,8 @@ class SettingsTestNode(object):
       self.settings_dict = self.refreshSettingsDict()
 
       self.launchDeviceIf()
+
+      self.launchDriverOptionControls()
 
       self.startPageServer()
 
@@ -251,6 +272,146 @@ class SettingsTestNode(object):
 
 
   #**********************
+  # Custom controls set built from the driver options
+
+  def launchDriverOptionControls(self):
+      # Third rendering surface, and the reason this method exists.
+      #
+      #   Driver Options  -> drivers_mgr builds the controls dict, Drivers
+      #                      Manager panel renders it. The node only receives
+      #                      the chosen values, at launch.
+      #   Device Settings -> this node's SettingsIF, Device Settings panel.
+      #   Custom Controls -> a ControlsIF this node owns outright, rendered by
+      #                      Nepi_IF_Controls. THIS.
+      #
+      # One String control -- a plain data box -- per driver option, holding the
+      # value that reached the node. That makes every driver option readable from
+      # the RUI without opening this fixture's own page, and it exercises
+      # ControlsIF on a *device* node, which nothing else in the tree does:
+      # ControlsIF has only ever been consumed by apps, through
+      # Nepi_IF_ConnectProcess.
+      #
+      # Every box is a String regardless of the option's declared type. That is
+      # deliberate: the point of this set is to show the value that arrived, and
+      # a String box shows it verbatim -- an Int box on an option whose value
+      # arrived as '65535' would silently reformat or reject it. Type rendering
+      # is what the Driver Options panel and the settings set test.
+      #
+      # The boxes are editable and writing one changes nothing on the driver.
+      # Discovery options are owned by drivers_mgr and only read at launch, so a
+      # write here cannot travel back; it round-trips through ControlsIF and lands
+      # in driverOptionUpdatedCb, which is the check that the write path works at
+      # all.
+      options_dict = dict()
+      try:
+        options_dict = self.drv_dict['DISCOVERY_DICT']['OPTIONS']
+      except Exception as e:
+        self.msg_if.pub_warn("No discovery OPTIONS in drv_dict, no custom controls set: " + str(e))
+        return
+
+      controls_init_dict = dict()
+      for option_name in options_dict.keys():
+        entry = options_dict[option_name]
+        declared = str(entry.get('type', 'None'))
+        value = entry.get('value', entry.get('default'))
+        value_str = str(value)
+        self.option_launch_values[option_name] = value_str
+        controls_init_dict[option_name] = {
+          'type': 'String',
+          'default': value_str,
+          # The declared type rides in the display name because the RUI shows
+          # display_name as the box label and nothing else, so a box that is not
+          # labelled with the option's real type reads as if the option were a
+          # String option.
+          'display_name': option_name + '  [' + declared + ']',
+          'description': ('driver discovery option, declared type ' + declared +
+                          ', options ' + str([str(item) for item in entry.get('options', [])]) +
+                          ', default ' + str(entry.get('default')) +
+                          '. Read only in effect -- writing this box does not change'
+                          ' the driver option.')
+        }
+
+      if len(controls_init_dict) == 0:
+        self.msg_if.pub_warn("Discovery OPTIONS block is empty, no custom controls set")
+        return
+
+      self.msg_if.pub_info("Launching custom controls set '" + CONTROLS_NAME + "' with " +
+                           str(len(controls_init_dict)) + " data boxes")
+      self.controls_if = ControlsIF(
+                  controls_name = CONTROLS_NAME,
+                  controls_display_name = 'Driver Options',
+                  controls_description = ('One data box per driver discovery option, holding'
+                                          ' the value this node received at launch.'),
+                  controls_init_dict = controls_init_dict,
+                  controls_updated_callback = self.driverOptionUpdatedCb,
+                  # -1 disables the updater thread. There is nothing to poll --
+                  # discovery options do not move while the node runs.
+                  controls_updater_max_rate = -1,
+                  log_name = self.class_name,
+                  # node_if=None makes ControlsIF build its own NodeClassIF.
+                  # Sharing this node's is not worth the registry-key collision
+                  # risk on a fixture.
+                  node_if = None
+                  )
+      self.controls_if.wait_for_controls_ready(timeout = 10)
+
+      built = list(self.controls_if.get_controls_dict().keys())
+      dropped = [name for name in controls_init_dict.keys() if name not in built]
+      self.msg_if.pub_info("Custom controls namespace: " + str(self.controls_if.get_namespace()))
+      if len(dropped) > 0:
+        # create_controls_dict() drops what it cannot build. Every entry here is
+        # a String with a string default, so a drop means a defect in
+        # nepi_controls, not a bad declaration.
+        self.msg_if.pub_error("Custom controls DROPPED: " + str(dropped))
+
+
+  def driverOptionUpdatedCb(self, control_name):
+      if self.controls_if is None:
+        return
+      value = self.controls_if.get_control_value(control_name)
+      self.msg_if.pub_info("Custom control " + str(control_name) + " written from the RUI, now " +
+                           str(value) + " (launch value was " +
+                           str(self.option_launch_values.get(control_name, 'unknown')) + ")")
+
+
+  def buildCustomControls(self):
+      # Live read-back of the ControlsIF set, so the page and the RUI panel can be
+      # compared directly. A row present here but missing from the RUI panel is a
+      # break between ControlsIF and Nepi_IF_Controls; a row missing from both was
+      # dropped by create_controls_dict().
+      controls = []
+      if self.controls_if is None:
+        return controls
+      try:
+        controls_dict = self.controls_if.get_controls_dict()
+      except Exception as e:
+        self.msg_if.pub_warn("Could not read the custom controls dict: " + str(e))
+        return controls
+
+      for control_name in controls_dict.keys():
+        try:
+          value = self.controls_if.get_control_value(control_name)
+        except Exception as e:
+          value = 'READ FAILED: ' + str(e)
+        controls.append({
+          'name': control_name,
+          'type': str(controls_dict[control_name].get('type', 'None')),
+          'launch': str(self.option_launch_values.get(control_name, '')),
+          'value': str(value)
+        })
+      return controls
+
+
+  def getControlsNamespace(self):
+      if self.controls_if is None:
+        return 'NOT RUNNING'
+      try:
+        return str(self.controls_if.get_namespace())
+      except Exception as e:
+        return 'UNKNOWN: ' + str(e)
+
+
+  #**********************
   # Device setting functions
 
   def initSettingsDict(self):
@@ -322,13 +483,15 @@ class SettingsTestNode(object):
             settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, value)
 
         # Bounds do not move on this fixture, but refresh them anyway so the
-        # two-argument form is exercised. set_control_bounds() is
-        # (dict, name, min_bound, max_bound) -- passing [min,max] as the single
-        # min_bound argument throws inside its own except and refreshes nothing.
+        # call is exercised. set_control_bounds() is
+        # (dict, name, bounds) where bounds is the [min, max] PAIR, not two
+        # scalar arguments -- it unpacks the pair itself at nepi_controls.py:493.
+        # Splitting the pair into two positional arguments is a TypeError at the
+        # call, not a silent no-op, because the function takes only three.
         bounds = entry.get('bounds')
         if bounds is not None and len(bounds) == 2:
           settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name,
-                                                           bounds[0], bounds[1])
+                                                           bounds)
       return settings_dict
 
 
@@ -572,6 +735,8 @@ class SettingsTestNode(object):
         'present': present,
         'dropped': dropped,
         'options': self.buildDriverOptions(),
+        'controls': self.buildCustomControls(),
+        'controls_namespace': self.getControlsNamespace(),
         'control_types': nepi_controls.CONTROL_TYPES,
         'stamp': nepi_utils.get_time()
       }
@@ -626,6 +791,22 @@ class SettingsTestNode(object):
         "<table border='1' cellpadding='4' id='options_tbl'>"
         "<tr><th>name</th><th>type</th><th>rendered as</th><th>options</th>"
         "<th>default</th><th>value at launch</th><th>type supported</th></tr></table>"
+        "<h3>Custom controls: one data box per driver option</h3>"
+        "<p>A ControlsIF set this node owns, holding one String data box per"
+        " driver option. This is the third rendering surface and the only one"
+        " that puts the driver option values on the device page in the RUI"
+        " (DEVICE &rarr; LSX &rarr; this device &rarr; DRIVER OPTIONS), beside"
+        " Device Settings. Unlike the snapshot table above, these boxes are"
+        " live: type into one in the RUI and the 'control value' column here"
+        " follows it, which is the round-trip check on ControlsIF. The 'launch"
+        " value' column does not move, so the two columns differing is a write"
+        " that worked, not an error. Writing a box does NOT change the driver"
+        " option itself -- discovery options belong to drivers_mgr and are only"
+        " read at launch.</p>"
+        "<p id='ctl_ns'></p>"
+        "<table border='1' cellpadding='4' id='controls_tbl'>"
+        "<tr><th>name</th><th>control type</th><th>launch value</th>"
+        "<th>control value</th></tr></table>"
         "<p id='foot'></p>"
         "<script>"
         "function cell(t){var d=document.createElement('td');d.textContent=t;return d;}"
@@ -651,6 +832,10 @@ class SettingsTestNode(object):
         "        ['name','type','range','default','reason']);"
         "   fill(document.getElementById('options_tbl'),d.options,"
         "        ['name','type','rendered_as','range','default','value','supported']);"
+        "   fill(document.getElementById('controls_tbl'),d.controls,"
+        "        ['name','type','launch','value']);"
+        "   document.getElementById('ctl_ns').textContent="
+        "    'controls namespace: '+d.controls_namespace+'   boxes: '+d.controls.length;"
         "   document.getElementById('foot').textContent="
         "    'CONTROL_TYPES: '+d.control_types.join(', ');"
         "  }};"
@@ -731,6 +916,14 @@ class SettingsTestNode(object):
   def cleanupActions(self):
       self.msg_if.pub_info("Shutting down: Executing script cleanup actions")
       self.stopPageServer()
+      # Safe to call now -- unregister() used to call an undefined
+      # self.unsubscribe_topic() and raise before releasing anything.
+      if self.controls_if is not None:
+        try:
+          self.controls_if.unregister()
+        except Exception as e:
+          self.msg_if.pub_warn("Failed to unregister the custom controls set: " + str(e))
+        self.controls_if = None
 
 
 if __name__ == '__main__':
