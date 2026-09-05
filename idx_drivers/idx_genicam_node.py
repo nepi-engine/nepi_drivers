@@ -183,6 +183,7 @@ class GenicamCamNode:
         for setting_name in controls_dict.keys():
             setting_dict = dict()
             info = controls_dict[setting_name]
+            # self.msg_if.pub_info("Got Init Camera Setting: " + str(info))
             setting_type = info['type']
             if setting_type == 'int':
                 setting_type = 'Int'
@@ -198,8 +199,8 @@ class GenicamCamNode:
             else:
                 setting_type = 'String'
             setting_dict['type'] = setting_type
-
             setting_current = str(info.get('value',''))
+            
             if setting_type == 'Int':
                 try:
                     setting_dict['default'] = int(float(setting_current))
@@ -220,7 +221,7 @@ class GenicamCamNode:
                 except:
                     continue
             elif setting_type == 'Toggle':
-                setting_dict['default'] = (setting_current == 'True' or setting_current == 'true')
+                setting_dict['default'] = (setting_current == True or setting_current == 'True' or setting_current == 'true')
             else:
                 setting_dict['default'] = setting_current
             init_settings_dict[setting_name] = setting_dict
