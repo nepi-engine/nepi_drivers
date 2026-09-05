@@ -229,7 +229,7 @@ class V4l2CamNode:
             setting_current = None
             setting_dict['name'] = setting_name
             info = device_controls_dict[setting_name]
-            # self.msg_if.pub_info("Got Init Camera Setting: " + str(info))
+            #self.msg_if.pub_info("Got Init Camera Setting: " + str([setting_name,info]))
             setting_type = info['type']
             if setting_type == 'int':
                 setting_type = 'Int'
@@ -266,12 +266,7 @@ class V4l2CamNode:
                 try:
                     setting_dict['default'] = int(setting_current)
                     legend = info['legend']
-                    options = []
-                    for option_name in legend.keys():
-                        option_ind = legend[option_name]
-                        option_entry = option_name + ":" + str(option_ind)
-                        if option_entry not in options:
-                            options.append(option_entry)
+                    options = list(legend.keys())
                     setting_dict['options'] = options
                 except:
                     pass
@@ -344,7 +339,7 @@ class V4l2CamNode:
             if setting_name in settings_dict.keys():
                 ###############
                 info = device_controls_dict[setting_name]
-                #self.msg_if.pub_info("Got Refresh Camera Setting: " + str(info))
+                #self.msg_if.pub_info("Got Refresh Camera Setting: " + str([setting_name,info]))
                 setting_current = str(info['value'])
                 setting_type = settings_dict[setting_name]['type']
                 if setting_type == 'Int':
@@ -370,53 +365,53 @@ class V4l2CamNode:
                     try:
                         settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, int(setting_current))
                         legend = info['legend']
-                        options = []
-                        for option_name in legend.keys():
-                            option_ind = legend[option_name]
-                            option_entry = option_name + ":" + str(option_ind)
-                            if option_entry not in options:
-                                options.append(option_entry)
+                        options = list(legend.keys())
                         settings_dict = nepi_controls.set_control_options(settings_dict, setting_name, options)
                     except:
                         pass
                 else:
                     settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, str(setting_current))
-                
+                #self.msg_if.pub_warn("Refreshed Current Controls: " + str([setting_name,settings_dict[setting_name]]))
         # Add Resolution Settting
-        try:
-            [success,available_resolutions] = self.driver.getCurrentFormatAvailableResolutions()
-            options = []
-            if len(available_resolutions) > 0:
-                for res_dict in available_resolutions:
-                    width = str(res_dict['width'])
-                    height = str(res_dict['height'])
-                    setting_option = (width + ":" + height)
-                    if setting_option not in options:
-                        options.append(setting_option)
-                settings_dict = nepi_controls.set_control_options(settings_dict, setting_name, options)
+        if 'resolution' in settings_dict.keys():
+            try:
+                setting_name = 'resolution'
+                [success,available_resolutions] = self.driver.getCurrentFormatAvailableResolutions()
+                options = []
+                if len(available_resolutions) > 0:
+                    for res_dict in available_resolutions:
+                        width = str(res_dict['width'])
+                        height = str(res_dict['height'])
+                        setting_option = (width + ":" + height)
+                        if setting_option not in options:
+                            options.append(setting_option)
+                    settings_dict = nepi_controls.set_control_options(settings_dict, setting_name, options)
 
-            [success,res_dict] = self.driver.getCurrentResolution()
-            width = str(res_dict['width'])
-            height = str(res_dict['height'])
-            setting_value = (width + ":" + height)
-            settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, setting_value)
-        except Exception as e:
-            self.msg_if.pub_info(" " + "Driver returned invalid resolution options: " + str(e))
+                [success,res_dict] = self.driver.getCurrentResolution()
+                width = str(res_dict['width'])
+                height = str(res_dict['height'])
+                setting_value = (width + ":" + height)
+                settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, setting_value)
+            except Exception as e:
+                self.msg_if.pub_info(" " + "Driver returned invalid resolution options: " + str(e))
         # Add Framerate setting_dict
-        try:
-            [success,framerates] = self.driver.getCurrentResolutionAvailableFramerates()
-            options = []
-            if len(framerates) > 0:
-                for rate in framerates:
-                    setting_option = (str(round(rate,2)))
-                    if setting_option not in options:
-                        options.append(setting_option)
-                settings_dict = nepi_controls.set_control_options(settings_dict, setting_name, options)
-            [success,framerate] = self.driver.getFramerate() 
-            settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, str(framerate))
-            self.current_fps = framerate                 
-        except Exception as e:
-            self.msg_if.pub_info(" " + "Driver returned invalid framerate options: " + str(e))
+        if 'framerate' in settings_dict.keys():
+            try:
+                setting_name = 'framerate'
+                [success,framerates] = self.driver.getCurrentResolutionAvailableFramerates()
+                options = []
+                if len(framerates) > 0:
+                    for rate in framerates:
+                        setting_option = (str(round(rate,2)))
+                        if setting_option not in options:
+                            options.append(setting_option)
+                    settings_dict = nepi_controls.set_control_options(settings_dict, setting_name, options)
+                [success,framerate] = self.driver.getFramerate() 
+                settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, str(framerate))
+                self.current_fps = framerate                 
+            except Exception as e:
+                self.msg_if.pub_info(" " + "Driver returned invalid framerate options: " + str(e))
+        #self.msg_if.pub_warn("Refreshed Current Controls: " + str(settings_dict))
         settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
         self.msg_if.pub_warn("Refreshed Current Settings: " + str(settings_dict_values))
         return settings_dict
