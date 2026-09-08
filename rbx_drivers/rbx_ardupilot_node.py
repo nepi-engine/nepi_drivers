@@ -280,7 +280,7 @@ class ArdupilotNode:
 
     # Per-motor commanded speed ratios (0-1), tracked locally since ArduPilot's
     # DO_MOTOR_TEST is fire-and-forget and reports no ongoing per-motor state.
-    self.motor_ratios = [0.0] * int(nepi_controls.get_control_value(self.settings_dict,'motor_count'))
+    self.motor_ratios = [0.0] * int(nepi_controls.get_value(self.settings_dict,'motor_count'))
 
 
     # Define fake gps namespace and create fake_gps publishers.
@@ -405,7 +405,7 @@ class ArdupilotNode:
 
     self.init_settings_dict = init_settings_dict
     settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
-    settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+    settings_dict_values = nepi_controls.get_values_dict(settings_dict)
     self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
     return settings_dict
 
@@ -430,10 +430,10 @@ class ArdupilotNode:
       msg = (self.node_name + " Setting data " + setting_str + " is not valid")
       return False, msg, self.settings_dict
 
-    self.settings_dict = nepi_controls.set_control_value(self.settings_dict, setting_name, setting_value)
+    self.settings_dict = nepi_controls.set_value(self.settings_dict, setting_name, setting_value)
     if setting_name == 'motor_count':
       # motor_ratios is sized from motor_count, so it has to be resized with it.
-      self.motor_ratios = [0.0] * int(nepi_controls.get_control_value(self.settings_dict,'motor_count'))
+      self.motor_ratios = [0.0] * int(nepi_controls.get_value(self.settings_dict,'motor_count'))
     msg = ( self.node_name + " UPDATED SETTINGS " + setting_str)
     return True, msg, self.settings_dict
 
@@ -504,9 +504,9 @@ class ArdupilotNode:
     # rather than straight onto [0,100] -- e.g. a 20% max throttle setting
     # means the slider's 100% only ever commands 20% actual throttle, so the
     # cap integrates with the slider UI instead of silently overriding it.
-    max_throttle_percent = float(nepi_controls.get_control_value(self.settings_dict,'motor_test_max_throttle_percent'))
+    max_throttle_percent = float(nepi_controls.get_value(self.settings_dict,'motor_test_max_throttle_percent'))
     throttle_percent = speed_ratio * max_throttle_percent
-    timeout_s = float(nepi_controls.get_control_value(self.settings_dict,'motor_test_timeout_s'))
+    timeout_s = float(nepi_controls.get_value(self.settings_dict,'motor_test_timeout_s'))
     test_cmd = CommandLongRequest()
     test_cmd.broadcast = False
     test_cmd.command = self.MAV_CMD_DO_MOTOR_TEST
@@ -921,8 +921,8 @@ class ArdupilotNode:
     self.rbx_if.update_current_errors( [0,0,0,0,0,0,0] )
     cmd_success = False
     if self.state_current == "ARM":
-      takeoff_height_m = float(nepi_controls.get_control_value(self.settings_dict,'takeoff_height_m'))
-      takeoff_min_pitch_deg = float(nepi_controls.get_control_value(self.settings_dict,'takeoff_min_pitch_deg'))
+      takeoff_height_m = float(nepi_controls.get_value(self.settings_dict,'takeoff_height_m'))
+      takeoff_min_pitch_deg = float(nepi_controls.get_value(self.settings_dict,'takeoff_min_pitch_deg'))
       self.msg_if.pub_info("Sending Takeoff Command to altitude to " + str(takeoff_height_m) + " meters")
       takeoff_cmd = CommandTOLRequest()
       takeoff_cmd.min_pitch = takeoff_min_pitch_deg

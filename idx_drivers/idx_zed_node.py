@@ -502,7 +502,7 @@ class ZedCamNode(object):
 
       self.init_settings_dict = init_settings_dict
       settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
-      settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+      settings_dict_values = nepi_controls.get_values_dict(settings_dict)
       self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
       return settings_dict
 
@@ -513,7 +513,7 @@ class ZedCamNode(object):
         value = self.readSettingValue(setting_name)
         if value is None:
           continue
-        settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, value)
+        settings_dict = nepi_controls.set_value(settings_dict, setting_name, value)
       return settings_dict
 
 

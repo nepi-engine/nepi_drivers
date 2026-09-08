@@ -271,7 +271,7 @@ class SidusSS182SerialNode(object):
 
       self.init_settings_dict = init_settings_dict
       settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
-      settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+      settings_dict_values = nepi_controls.get_values_dict(settings_dict)
       self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
       return settings_dict
 
@@ -293,7 +293,7 @@ class SidusSS182SerialNode(object):
         if val is None:
           continue
         try:
-          settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, int(val))
+          settings_dict = nepi_controls.set_value(settings_dict, setting_name, int(val))
         except Exception as e:
           self.msg_if.pub_warn("Failed to apply read setting " + setting_name + " : " + str(e))
       return settings_dict

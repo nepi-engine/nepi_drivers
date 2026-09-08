@@ -482,7 +482,7 @@ class GazeboNode:
 
     self.init_settings_dict = init_settings_dict
     settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
-    settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+    settings_dict_values = nepi_controls.get_values_dict(settings_dict)
     self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
     return settings_dict
 
@@ -507,12 +507,12 @@ class GazeboNode:
       msg = (self.node_name + " Setting data " + setting_str + " is not valid")
       return False, msg, self.settings_dict
 
-    self.settings_dict = nepi_controls.set_control_value(self.settings_dict, setting_name, setting_value)
+    self.settings_dict = nepi_controls.set_value(self.settings_dict, setting_name, setting_value)
     msg = (self.node_name + " UPDATED SETTINGS " + setting_str)
     if setting_name in self.CAMERA_SETTING_NAMES:
       self.sendCameraSettings()
     if setting_name in self.ENVIRONMENT_SETTING_NAMES:
-      self.setEnvironmentAction(nepi_controls.get_control_value(self.settings_dict, setting_name))
+      self.setEnvironmentAction(nepi_controls.get_value(self.settings_dict, setting_name))
     return True, msg, self.settings_dict
 
 
@@ -723,8 +723,8 @@ class GazeboNode:
       cur_y = self.navpose_dict['y_m']
       cur_yaw_rad = math.radians(self.navpose_dict['yaw_deg'])
 
-      max_lin = float(nepi_controls.get_control_value(self.settings_dict,'max_linear_speed_mps'))
-      max_ang = math.radians(float(nepi_controls.get_control_value(self.settings_dict,'max_angular_rate_dps')))
+      max_lin = float(nepi_controls.get_value(self.settings_dict,'max_linear_speed_mps'))
+      max_ang = math.radians(float(nepi_controls.get_value(self.settings_dict,'max_angular_rate_dps')))
       tol_m = self.FACTORY_GOTO_TOL_M
       tol_rad = self.FACTORY_GOTO_TOL_RAD
       if self.rbx_if is not None:
@@ -801,7 +801,7 @@ class GazeboNode:
       # while the Gazebo side keeps whatever it last had, so an explicit push
       # avoids relying on both sides coincidentally matching factory defaults.
       self.sendCameraSettings()
-      self.setEnvironmentAction(nepi_controls.get_control_value(self.settings_dict,'environment'))
+      self.setEnvironmentAction(nepi_controls.get_value(self.settings_dict,'environment'))
       buf = b''
       while not nepi_sdk.is_shutdown():
         try:
@@ -911,7 +911,7 @@ class GazeboNode:
     # exposes for now (see the two-camera note at the top of this file).
     cmd = {
       'type': 'camera_settings',
-      'view_mode': nepi_controls.get_control_value(self.settings_dict,'camera_view_mode'),
+      'view_mode': nepi_controls.get_value(self.settings_dict,'camera_view_mode'),
     }
     self.sendLineToBridge(cmd, "Camera settings")
 

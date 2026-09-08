@@ -110,7 +110,7 @@ class V4L2CamDiscovery:
     last_drv_dict = copy.deepcopy(self.drv_dict)
     self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
     if len(list(self.drv_dict.keys())) == 0:
-      self.msg_if.pub_warn("Failed to load Driver dict " + str(e))#
+      self.msg_if.pub_warn("Failed to load Driver dict ")#
       return success    
     if 'DISCOVERY_DICT' not in self.drv_dict.keys():
       self.msg_if.pub_warn("Discovery dict missing in Drvier dict discovery dict ")#

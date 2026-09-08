@@ -306,7 +306,7 @@ class OnvifCamNode:
 
         self.init_settings_dict = init_settings_dict
         settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
-        settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+        settings_dict_values = nepi_controls.get_values_dict(settings_dict)
         self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
         return settings_dict
 
@@ -331,19 +331,19 @@ class OnvifCamNode:
             setting_type = settings_dict[setting_name]['type']
             try:
                 if setting_type == 'Int':
-                    settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name,
+                    settings_dict = nepi_controls.set_bounds(settings_dict, setting_name,
                                         [int(info['min']), int(info['max'])])
-                    settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, int(float(setting_current)))
+                    settings_dict = nepi_controls.set_value(settings_dict, setting_name, int(float(setting_current)))
                 elif setting_type == 'Float':
-                    settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name,
+                    settings_dict = nepi_controls.set_bounds(settings_dict, setting_name,
                                         [int(info['min']), int(info['max'])])
-                    settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, float(setting_current))
+                    settings_dict = nepi_controls.set_value(settings_dict, setting_name, float(setting_current))
                 elif setting_type == 'Selection':
-                    settings_dict = nepi_controls.set_control_options(settings_dict, setting_name,
+                    settings_dict = nepi_controls.set_options(settings_dict, setting_name,
                                         [str(option) for option in info['options']])
-                    settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, setting_current)
+                    settings_dict = nepi_controls.set_value(settings_dict, setting_name, setting_current)
                 else:
-                    settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, setting_current)
+                    settings_dict = nepi_controls.set_value(settings_dict, setting_name, setting_current)
             except Exception as e:
                 self.msg_if.pub_debug("Failed to refresh setting " + setting_name + " : " + str(e))
 
@@ -351,7 +351,7 @@ class OnvifCamNode:
         if 'Resolution' in settings_dict.keys():
             try:
                 [success,res_dict] = self.driver.getResolution()
-                settings_dict = nepi_controls.set_control_value(settings_dict, 'Resolution',
+                settings_dict = nepi_controls.set_value(settings_dict, 'Resolution',
                                     str(res_dict['Width']) + ":" + str(res_dict['Height']))
             except Exception as e:
                 self.msg_if.pub_warn("Failed to get resolution (camera may be disconnected): " + str(e))
@@ -360,7 +360,7 @@ class OnvifCamNode:
         if 'Framerate' in settings_dict.keys():
             try:
                 [success,framerate] = self.driver.getFramerate()
-                settings_dict = nepi_controls.set_control_value(settings_dict, 'Framerate', int(round(float(framerate))))
+                settings_dict = nepi_controls.set_value(settings_dict, 'Framerate', int(round(float(framerate))))
                 self.current_fps = framerate
             except Exception as e:
                 self.msg_if.pub_warn("Failed to get framerate (camera may be disconnected): " + str(e))
@@ -380,7 +380,7 @@ class OnvifCamNode:
             msg = (self.node_name + " Setting name " + setting_str + " is not supported")
             return False, msg, self.settings_dict
 
-        cur_val = nepi_controls.get_control_value(self.settings_dict, setting_name)
+        cur_val = nepi_controls.get_value(self.settings_dict, setting_name)
         if str(cur_val) == str(setting_value):
             return True, 'Already set', self.settings_dict
 

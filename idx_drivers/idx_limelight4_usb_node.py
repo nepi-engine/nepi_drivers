@@ -242,7 +242,7 @@ class Limelight4UsbCamNode:
 
         self.init_settings_dict = init_settings_dict
         settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
-        settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+        settings_dict_values = nepi_controls.get_values_dict(settings_dict)
         self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
         return settings_dict
 
@@ -252,7 +252,7 @@ class Limelight4UsbCamNode:
         try:
             ret, pipeline_idx = self.driver.get_pipeline()
             if ret:
-                settings_dict = nepi_controls.set_control_value(settings_dict, 'Pipeline', str(pipeline_idx))
+                settings_dict = nepi_controls.set_value(settings_dict, 'Pipeline', str(pipeline_idx))
         except Exception as e:
             self.msg_if.pub_debug("Failed to refresh Pipeline setting: " + str(e))
         # Resolution is fixed by the active pipeline on the Limelight device,
@@ -283,7 +283,7 @@ class Limelight4UsbCamNode:
                 "Resolution changes require a pipeline switch on the Limelight device; "
                 "acknowledging setting update only"
             )
-            self.settings_dict = nepi_controls.set_control_value(self.settings_dict, setting_name, setting_value)
+            self.settings_dict = nepi_controls.set_value(self.settings_dict, setting_name, setting_value)
             return True, "Resolution noted; actual resolution is controlled by the active Limelight pipeline", self.settings_dict
 
         self.settings_dict = self.refreshSettingsDict()

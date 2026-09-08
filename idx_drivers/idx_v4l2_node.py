@@ -326,7 +326,7 @@ class V4l2CamNode:
 
         self.init_settings_dict = init_settings_dict
         settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
-        settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+        settings_dict_values = nepi_controls.get_values_dict(settings_dict)
         self.msg_if.pub_warn("Initialized Settings: " + str(settings_dict_values))
         return settings_dict
 
@@ -344,33 +344,33 @@ class V4l2CamNode:
                 setting_type = settings_dict[setting_name]['type']
                 if setting_type == 'Int':
                     try:
-                        settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, int(setting_current))
+                        settings_dict = nepi_controls.set_value(settings_dict, setting_name, int(setting_current))
                         setting_min = int(info['min'])
                         setting_max = int(info['max'])
-                        settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name, [setting_min,setting_max])
+                        settings_dict = nepi_controls.set_bounds(settings_dict, setting_name, [setting_min,setting_max])
                     except:
                         pass
                 elif setting_type == 'Float':
                     try:
-                        settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, float(setting_current))
+                        settings_dict = nepi_controls.set_value(settings_dict, setting_name, float(setting_current))
                         setting_min = float(info['min'])
                         setting_max = float(info['max'])
-                        settings_dict = nepi_controls.set_control_bounds(settings_dict, setting_name, [setting_min,setting_max])
+                        settings_dict = nepi_controls.set_bounds(settings_dict, setting_name, [setting_min,setting_max])
                     except:
                         pass
                 elif setting_type == 'Toggle':
                     value = (setting_current == True or setting_current == 'True' or setting_current == 'true')
-                    settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, value)
+                    settings_dict = nepi_controls.set_value(settings_dict, setting_name, value)
                 elif  setting_type == 'Selection' or setting_type == 'Selections' or setting_type == 'Menu':
                     try:
-                        settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, int(setting_current))
+                        settings_dict = nepi_controls.set_value(settings_dict, setting_name, int(setting_current))
                         legend = info['legend']
                         options = list(legend.keys())
-                        settings_dict = nepi_controls.set_control_options(settings_dict, setting_name, options)
+                        settings_dict = nepi_controls.set_options(settings_dict, setting_name, options)
                     except:
                         pass
                 else:
-                    settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, str(setting_current))
+                    settings_dict = nepi_controls.set_value(settings_dict, setting_name, str(setting_current))
                 #self.msg_if.pub_warn("Refreshed Current Controls: " + str([setting_name,settings_dict[setting_name]]))
         # Add Resolution Settting
         if 'resolution' in settings_dict.keys():
@@ -385,13 +385,13 @@ class V4l2CamNode:
                         setting_option = (width + ":" + height)
                         if setting_option not in options:
                             options.append(setting_option)
-                    settings_dict = nepi_controls.set_control_options(settings_dict, setting_name, options)
+                    settings_dict = nepi_controls.set_options(settings_dict, setting_name, options)
 
                 [success,res_dict] = self.driver.getCurrentResolution()
                 width = str(res_dict['width'])
                 height = str(res_dict['height'])
                 setting_value = (width + ":" + height)
-                settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, setting_value)
+                settings_dict = nepi_controls.set_value(settings_dict, setting_name, setting_value)
             except Exception as e:
                 self.msg_if.pub_info(" " + "Driver returned invalid resolution options: " + str(e))
         # Add Framerate setting_dict
@@ -405,14 +405,14 @@ class V4l2CamNode:
                         setting_option = (str(round(rate,2)))
                         if setting_option not in options:
                             options.append(setting_option)
-                    settings_dict = nepi_controls.set_control_options(settings_dict, setting_name, options)
+                    settings_dict = nepi_controls.set_options(settings_dict, setting_name, options)
                 [success,framerate] = self.driver.getFramerate() 
-                settings_dict = nepi_controls.set_control_value(settings_dict, setting_name, str(framerate))
+                settings_dict = nepi_controls.set_value(settings_dict, setting_name, str(framerate))
                 self.current_fps = framerate                 
             except Exception as e:
                 self.msg_if.pub_info(" " + "Driver returned invalid framerate options: " + str(e))
         #self.msg_if.pub_warn("Refreshed Current Controls: " + str(settings_dict))
-        settings_dict_values = nepi_controls.get_controls_values_dict(settings_dict)
+        settings_dict_values = nepi_controls.get_values_dict(settings_dict)
         self.msg_if.pub_warn("Refreshed Current Settings: " + str(settings_dict_values))
         return settings_dict
         
@@ -432,7 +432,7 @@ class V4l2CamNode:
         found_setting = False
         if setting_name in self.settings_dict.keys():
                 found_setting = True
-                cur_val = nepi_controls.get_control_value(self.settings_dict, setting_name)
+                cur_val = nepi_controls.get_value(self.settings_dict, setting_name)
                 if str(cur_val) != str(setting_value):
                     self.msg_if.pub_warn("Update Setting:" + setting_str + " to: " + str(cur_val))
                     needs_update = True
@@ -516,7 +516,7 @@ class V4l2CamNode:
         if found_setting is False:
             success = False
             msg = (self.node_name  + " Setting name" + setting_str + " is not supported")        
-        # settings_values_dict = nepi_controls.get_controls_values_dict(self.settings_dict)
+        # settings_values_dict = nepi_controls.get_values_dict(self.settings_dict)
         # self.msg_if.pub_warn("Returning Updated Settings: "  + str(settings_values_dict) )           
         return success, msg, self.settings_dict
 

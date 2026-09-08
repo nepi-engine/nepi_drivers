@@ -174,7 +174,7 @@ setting name and carries:
 | `bounds` | `Int`, `Float`, `FloatSlider(s)` |
 | `options` | `Menu`, `Selection`, `Selections` |
 
-Read and write values through `nepi_controls.get_control_value()` /
+Read and write values through `nepi_controls.get_value()` /
 `set_control_value()` / `set_control_bounds()` / `set_control_options()` — never
 by indexing the control dict directly. This applies to a node's own internal
 reads too (see `rbx_ardupilot_node.py`, which reads `motor_count` and the
