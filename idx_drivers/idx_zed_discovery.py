@@ -355,7 +355,8 @@ class ZedCamDiscovery:
     success = False
     self.msg_if.pub_info("stopping " + node_namespace)
     purge_paths = []
-    for i, path_str in enumerate(self.device_dict.keys()):
+    device_dict = copy.deepcopy(self.device_dict)
+    for i, path_str in enumerate(device_dict.keys()):
       device = self.device_dict[path_str]
       namespace = device['node_namespace']
       node_name = os.path.basename(namespace)
@@ -366,8 +367,11 @@ class ZedCamDiscovery:
         success = nepi_drvs.killDriverNode(node_name,sub_process)
         # And remove it from the list
         purge_paths.append(path_str)
-      for path_str in purge_paths:
+    for path_str in purge_paths:
+      try:
         del self.device_dict[path_str]
+      except:
+        pass
 
   
   def deviceNodeIsRunning(self, node_namespace):
