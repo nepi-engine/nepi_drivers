@@ -434,7 +434,7 @@ class V4l2CamNode:
                 found_setting = True
                 cur_val = nepi_controls.get_value(self.settings_dict, setting_name)
                 if str(cur_val) != str(setting_value):
-                    self.msg_if.pub_warn("Update Setting:" + setting_str + " to: " + str(cur_val))
+                    self.msg_if.pub_warn("Update Setting: " + setting_name + " from: " + str(cur_val) + " to: " + str(setting_value))
                     needs_update = True
                     if setting_name != "resolution" and setting_name != "framerate":
                             
@@ -445,7 +445,13 @@ class V4l2CamNode:
                             #     msg = (" FAILED to Update Setting: " + setting_str + " : " + str(success) + " : " + str(msg))
                             # self.msg_if.pub_warn(msg)
                     elif setting_name == "resolution":
-                        data = data.split(":")
+                        # The value arrives as this method's setting_value
+                        # argument. `data` was left over from the retired
+                        # nepi_controls.get_data_from_setting() call (still
+                        # visible commented out below), so every resolution and
+                        # framerate update raised UnboundLocalError before it
+                        # touched the camera.
+                        data = str(setting_value).split(":")
                         try:
                             [success,framerate] = self.driver.getFramerate()
                             [success,brightness] = self.driver.getCameraControl('brightness')
@@ -500,13 +506,13 @@ class V4l2CamNode:
                                 #         except Exception as e:
                                 #             self.msg_if.pub_warn("Failed to update setting: " + setting_name + " : "  + setting_str  + " : "  + str(data) + " : " + str(e))
                         except Exception as e:
-                            self.msg_if.pub_info("Resoluton setting: " + data + " could not be parsed to float " + str(e))                               
+                            self.msg_if.pub_info("Resolution setting: " + str(setting_value) + " could not be parsed to width:height " + str(e))
                     elif setting_name == "framerate":
                         try:
-                            framerate = float(data)
+                            framerate = float(setting_value)
                             success, msg = self.driver.setFramerate(framerate)
                         except Exception as e:
-                            self.msg_if.pub_info("Framerate setting: " + data + " could not be parsed to float " + str(e))
+                            self.msg_if.pub_info("Framerate setting: " + str(setting_value) + " could not be parsed to float " + str(e))
                     else:
                         success = False
                         needs_update = False
