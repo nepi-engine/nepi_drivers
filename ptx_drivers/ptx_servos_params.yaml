@@ -1,0 +1,16 @@
+driver:
+  pkg_name: PTX_SERVOS
+  display_name: Servos PanTilt
+  description: PTX pan-tilt assembled from two SVX servo devices. The pan and tilt servos are chosen per-device in the Device Settings panel (pan_servo/tilt_servo), not here, because which servos exist depends on what the SVX drivers discovered at runtime. This node owns the pan/tilt softstop limits, since SVX devices report has_limit_control False.
+  type: PTX
+  group_id: None
+  NODE_DICT:
+    file_name: ptx_servos_node.py
+    class_name: ServosPTXNode
+  DRIVER_DICT:
+    file_name: None
+    class_name: None
+  DISCOVERY_DICT:
+    file_name: ptx_servos_discovery.py
+    class_name: ServosPanTiltDiscovery
+    process: CALL
