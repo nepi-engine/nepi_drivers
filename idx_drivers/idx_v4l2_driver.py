@@ -138,7 +138,9 @@ class V4l2CamDriver(object):
           elif (a['type'] == 'bool'):
             try:
               int_val = int(value)
-              a[key] = True if value == 1 else False
+              # Compare the parsed int, not the raw string: '1' == 1 is never
+              # true, so every bool control used to read back as False.
+              a[key] = True if int_val == 1 else False
             except:
               a[key] = value
           
@@ -244,10 +246,20 @@ class V4l2CamDriver(object):
   def setCameraControl(self, setting_name, val):
     if not setting_name in self.camera_controls:
       return False, "Unavailable setting: " + setting_name
-    if self.camera_controls[setting_name]['type'] == 'bool':
-      new_val = int(val)
-    else:
-      new_val = val
+    # Normalize to the int v4l2-ctl takes and getCameraControl reads back. Values
+    # arrive from the settings IF as strings or ints ('1' for a menu), and the
+    # readback check compared them raw, so a control that DID update was
+    # reported as "did not update from 1 to 1".
+    control = self.camera_controls[setting_name]
+    try:
+      if control['type'] == 'bool':
+        new_val = 1 if str(val).strip().lower() in ('1', 'true') else 0
+      elif control['type'] == 'menu' and str(val) in control.get('legend', {}):
+        new_val = control['legend'][str(val)]
+      else:
+        new_val = int(float(val))
+    except Exception:
+      return False, "Invalid value for " + setting_name + ": " + str(val)
 
     p = subprocess.Popen(self.v4l2ctl_prefix + ['--set-ctrl', setting_name + '=' + str(new_val)],
                            stdout=subprocess.PIPE,
@@ -255,13 +267,15 @@ class V4l2CamDriver(object):
                            text=True)
     stdout,_ = p.communicate()
     if p.returncode != 0:
-      return False, "Failed to set camera control to v4l2 device"
+      # stdout carries v4l2-ctl's reason, e.g. Permission denied for a control
+      # that is inactive because its auto mode is on.
+      return False, "Failed to set camera control to v4l2 device: " + stdout.strip()
     if stdout:
       return False, "v4l2-ctl failed: " + stdout
     [val_check,msg] = self.getCameraControl(setting_name)
-    if val_check != new_val:
-      return False, ( "Control did not update from " + str(val_check) + " to " + str(val) + " with msg " + msg ) 
-    self.camera_controls[setting_name]['value'] = val # Update controls dictionary
+    if int(val_check) != new_val:
+      return False, ( "Control did not update from " + str(val_check) + " to " + str(val) + " with msg " + msg )
+    self.camera_controls[setting_name]['value'] = val_check # Update controls dictionary with the readback, typed as initCameraControlsDict stores it
     return True, "Success"
 
   def getCameraControl(self, setting_name):
