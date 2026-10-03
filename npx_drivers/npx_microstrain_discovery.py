@@ -40,6 +40,8 @@ PARAM_FILE_PATH = '/opt/nepi/nepi_engine/lib/nepi_drivers/npx_microstrain_params
 
 class MicrostrainDiscovery:
 
+    DEVICE_PATH = '/dev/ttyACM_imu'
+
     NODE_LOAD_TIME_SEC = 10
     launch_time_dict = dict()
     retry = True
@@ -112,9 +114,6 @@ class MicrostrainDiscovery:
                     if baudrate != "All":
                         baudrate_list.append(baudrate)
             self.baudrate_list = baudrate_list
-            #self.logger.log_warn("Got selected baudrate list" + str(self.baudrate_list))
-            if 'serial_port' in drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
-                self.serial_port  = drv_dict['DISCOVERY_DICT']['OPTIONS']['serial_port']['value']
         except Exception as e:
             self.logger.log_warn("Failed to load options " + str(e))#
             return None
@@ -153,10 +152,8 @@ class MicrostrainDiscovery:
                 #self.logger.log_warn("Looking for path: " + path_str)
                 #self.logger.log_warn("In path_list: " + str(self.active_paths_list))
                 found = False
-                if self.serial_port == 'Auto' and path_str:
-                    found = self.checkForDevice(path_str)
                     
-                elif self.serial_port == os.path.basename(path_str):
+                if path_str == self.DEVICE_PATH:
                     #self.logger.log_warn("Using set port for to MicroStrain device on : " + str(path_str))
                     found = True
 

@@ -28,12 +28,7 @@ driver:
           - '921600'
         default: '115200'
         value: '115200'
-      serial_port:
-        type: Selection
-        options: 
-          - 'SERIAL_DEVICES'
-        default: 'ttyACM_imu'
-        value: 'ttyACM_imu'
+
       
 
 
