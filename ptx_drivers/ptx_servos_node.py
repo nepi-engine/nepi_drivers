@@ -30,6 +30,8 @@ from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_settings
 from nepi_sdk import nepi_nav
 
+from nepi_interfaces.msg import DeviceSVXStatus
+
 from nepi_api.connect_device_if_svx import ConnectSVXDeviceIF
 from nepi_api.device_if_ptx import PTXActuatorIF
 from nepi_api.messages_if import MsgIF
@@ -64,6 +66,14 @@ class ServosPTXNode:
     tilt_options = ['None']
     tilt_selected = 'None'
     tilt_connected = False
+
+    # Each discovered servo's servo_connected flag, keyed by its SVX namespace (the
+    # form get_available_topics returns). The connect interfaces only subscribe to the
+    # one servo selected on their axis, so the flags of the other candidates come from
+    # one status subscriber per available servo, kept in step by updateServoStatusSubs.
+    # Per-instance dicts made in __init__, for the same aliasing reason as cap_settings.
+    servo_status_subs_dict = None
+    servo_connected_dict = None
 
     PAN_DEG_DIR = -1
     TILT_DEG_DIR = -1
@@ -137,6 +147,8 @@ class ServosPTXNode:
         # Initialize Class Variables
 
         self.cap_settings = copy.deepcopy(self.CAP_SETTINGS)
+        self.servo_status_subs_dict = dict()
+        self.servo_connected_dict = dict()
 
         # Softstop limits are tracked here, not on the servo. The SVX device has no
         # soft-limit command -- SVXCapabilitiesQuery.has_limit_control is always False --
@@ -302,6 +314,14 @@ class ServosPTXNode:
         # copy back in. Pushing back here re-sent the startup default 'None' on the first
         # cycle, which the interface then persisted and save_config()'d.
         # settingUpdateFunction is the only place a new selection is pushed in.
+        available_topics = []
+        for connect_if in [self.pan_connect_if, self.tilt_connect_if]:
+            if connect_if is not None:
+                for topic in connect_if.get_available_topics():
+                    if topic not in available_topics:
+                        available_topics.append(topic)
+        self.updateServoStatusSubs(available_topics)
+
         if self.pan_connect_if is not None:
             # get_available_topics returns the interface's live internal list, so copy
             # before filtering. Editing it in place corrupts the selector state.
@@ -309,7 +329,7 @@ class ServosPTXNode:
             self.pan_selected = self.pan_connect_if.get_selected_topic()
             if self.tilt_selected != None and self.tilt_selected in pan_options:
                 pan_options.remove(self.tilt_selected)
-            self.pan_options = ['None'] + pan_options
+            self.pan_options = ['None'] + self.filterConnectedServos(pan_options, self.pan_selected)
             self.pan_connected = self.pan_connect_if.check_connection()
             if self.pan_connected == True:
                 # Keep the last known max if the device reports nothing usable, and do not
@@ -323,7 +343,7 @@ class ServosPTXNode:
             self.tilt_selected = self.tilt_connect_if.get_selected_topic()
             if self.pan_selected != None and self.pan_selected in tilt_options:
                 tilt_options.remove(self.pan_selected)
-            self.tilt_options = ['None'] + tilt_options
+            self.tilt_options = ['None'] + self.filterConnectedServos(tilt_options, self.tilt_selected)
             self.tilt_connected = self.tilt_connect_if.check_connection()
             if self.tilt_connected == True:
                 tilt_speed_max_dps = self.tilt_connect_if.get_max_speed_dps()
@@ -331,6 +351,37 @@ class ServosPTXNode:
                     self.tilt_speed_max_dps = tilt_speed_max_dps
 
         nepi_sdk.start_timer_process(1, self.updateConnectsHandler, oneshot = True)
+
+
+    def updateServoStatusSubs(self, available_topics):
+        for svx_namespace in available_topics:
+            # A failed create_subscriber returns None; retried on the next cycle.
+            if self.servo_status_subs_dict.get(svx_namespace) is None:
+                # rospy hands callback_args to the callback as the one tuple, unpacked
+                # by servoStatusCb.
+                self.servo_status_subs_dict[svx_namespace] = nepi_sdk.create_subscriber(
+                    svx_namespace + '/status', DeviceSVXStatus, self.servoStatusCb,
+                    queue_size = 1, callback_args = (svx_namespace,))
+        for svx_namespace in list(self.servo_status_subs_dict.keys()):
+            if svx_namespace not in available_topics:
+                sub = self.servo_status_subs_dict.pop(svx_namespace)
+                if sub is not None:
+                    sub.unregister()
+                self.servo_connected_dict.pop(svx_namespace, None)
+
+    def servoStatusCb(self, msg, args):
+        svx_namespace = args[0]
+        # A message already in flight when its servo vanished must not re-add it.
+        if svx_namespace in self.servo_status_subs_dict:
+            self.servo_connected_dict[svx_namespace] = msg.servo_connected
+
+    def filterConnectedServos(self, options, selected):
+        # Only servos marked Servo Connected on the servo device page are offered. An
+        # axis' current selection stays listed even when unmarked, so a saved pairing
+        # is never pulled out from under the operator -- the dropdown would otherwise
+        # show a value it does not contain. It leaves the list once deselected.
+        return [topic for topic in options
+                if self.servo_connected_dict.get(topic, False) == True or topic == selected]
 
 
     def updatePositionHandler(self,timer):

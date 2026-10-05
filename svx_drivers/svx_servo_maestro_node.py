@@ -29,7 +29,10 @@
 # lock (fcntl.flock) on the port, so two channel nodes never interleave bytes.
 #
 # The board is a plug-and-play USB device running Pololu factory firmware, so the
-# whole hardware layer here is USB serial. The Maestro command set is documented
+# hardware layer here is plain serial: the board's USB Command Port by default, or
+# a UART wired to its RX/TX pins when the driver's serial_mode option is UART
+# (discovery has already switched the board's stored mode to match before this
+# node starts). The Maestro command set is documented
 # at https://www.pololu.com/docs/0J40/5.e . This driver speaks the "Compact"
 # protocol by default (works for a single controller regardless of its device
 # number) and can speak the "Pololu" protocol (0xAA + device number) for
@@ -82,6 +85,9 @@ class SvxServoMaestroNode:
     CMD_GET_MOVING = 0x93
     CMD_GET_ERRORS = 0xA1
     CMD_GO_HOME = 0xA2
+    # In UART detect-baud mode the board learns the baud rate from this byte and
+    # ignores everything until it has seen one.
+    BAUD_INDICATOR_BYTE = 0xAA
 
     # Maestro speed units are (0.25 us) / (10 ms) == 25 us/sec per unit.
     US_PER_SPEED_UNIT_PER_SEC = 25.0
@@ -198,6 +204,7 @@ class SvxServoMaestroNode:
 
     # Board link
     serial_port = None
+    serial_mode = 'USB'         # 'USB' Command Port, or 'UART' via the RX/TX pins
     baud_int = 9600
     channel = 0
     device_number = 12          # Maestro factory-default device number
@@ -246,6 +253,7 @@ class SvxServoMaestroNode:
             self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
             self.port_str = self.drv_dict['DEVICE_DICT']['device_path']
 
+            self.serial_mode = str(self.drv_dict['DEVICE_DICT'].get('serial_mode', 'USB')).upper()
             self.channel = int(self.drv_dict['DEVICE_DICT'].get('channel', 0))
             self.baud_int = int(self.drv_dict['DEVICE_DICT'].get('baud_str', '9600'))
             self.device_number = int(self.drv_dict['DEVICE_DICT'].get('device_number', 12))
@@ -850,6 +858,13 @@ class SvxServoMaestroNode:
                                  " (" + str(e) + ")")
             return False
 
+        if self.serial_mode == 'UART':
+            # Harmless when the board already knows the baud (another channel node
+            # on this line sent it first): the handshake below clears any protocol
+            # error flag a stray 0xAA sets.
+            self.transact(bytes([self.BAUD_INDICATOR_BYTE]))
+            nepi_sdk.sleep(0.05)
+
         # Handshake: read (and clear) the error register. A Maestro answers Get
         # Errors with exactly two bytes; anything else means this is not the
         # Command Port (or the Pololu device number is wrong).
@@ -859,8 +874,11 @@ class SvxServoMaestroNode:
             self.hw_version = "Pololu Maestro"
             self.sw_version = "Factory Firmware"
         else:
-            self.msg_if.pub_warn("No valid Maestro response on " + str(self.port_str) +
-                                 "; is this the Maestro Command Port?")
+            if self.serial_mode == 'UART':
+                hint = "is this port wired to the Maestro's RX/TX pins (TX to RX, RX to TX, common ground)?"
+            else:
+                hint = "is this the Maestro Command Port?"
+            self.msg_if.pub_warn("No valid Maestro response on " + str(self.port_str) + "; " + hint)
             try:
                 self.serial_port.close()
             except Exception:
@@ -874,13 +892,18 @@ class SvxServoMaestroNode:
         # read a fixed-length response. Wrapped in an in-process lock AND an
         # advisory file lock on the serial device so that multiple channel nodes
         # sharing one Maestro port never interleave their bytes.
-        if self.serial_port is None:
-            return None
-
         if self.use_pololu_protocol:
             frame = bytes([0xAA, self.device_number & 0x7F, cmd_byte & 0x7F]) + payload
         else:
             frame = bytes([cmd_byte]) + payload
+        return self.transact(frame, read_len)
+
+
+    def transact(self, frame, read_len = 0):
+        # Send pre-framed bytes under the locks described in send_cmd, and read a
+        # fixed-length response when read_len > 0.
+        if self.serial_port is None:
+            return None
 
         response = None
         with self.serial_lock:
