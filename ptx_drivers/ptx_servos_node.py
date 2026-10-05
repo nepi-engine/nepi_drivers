@@ -27,7 +27,7 @@ from std_msgs.msg import Empty, Int8, UInt8, UInt32, Int32, Bool, String, Float3
 
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
-from nepi_sdk import nepi_settings
+from nepi_sdk import nepi_controls
 from nepi_sdk import nepi_nav
 
 from nepi_interfaces.msg import DeviceSVXStatus
@@ -44,17 +44,12 @@ FILE_TYPE = 'NODE'
 class ServosPTXNode:
     MAX_POSITION_UPDATE_RATE = 5
 
-    #CAP_SETTINGS = nepi_settings.NONE_CAP_SETTINGS
-    CAP_SETTINGS = dict(
-      pan_servo = {"type":"Discrete","name":"pan_servo","options":["None"]},
-      pan_connected = {"type":"Bool","name":"pan_connected","disabled":True},
-      tilt_servo = {"type":"Discrete","name":"tilt_servo","options":["None"]},
-      tilt_connected = {"type":"Bool","name":"tilt_connected","disabled":True},
-    )
-    # cap_settings is a per-instance deep copy made in __init__. Binding it to
-    # CAP_SETTINGS here would alias the two names to one dict, so every options
-    # update would mutate the factory table it is supposed to be derived from.
-    cap_settings = None
+    # The nepi_controls settings dict, built by initSettingsDict in __init__ and
+    # rebuilt from the selector state below by refreshSettingsDict.
+    settings_dict = None
+    # The selector state last pushed into the PTX interface's SettingsIF, so
+    # updateConnectsHandler only pushes when it changes. None until the first push.
+    pushed_settings_state = None
 
 
     pan_connect_if = None
@@ -71,7 +66,8 @@ class ServosPTXNode:
     # form get_available_topics returns). The connect interfaces only subscribe to the
     # one servo selected on their axis, so the flags of the other candidates come from
     # one status subscriber per available servo, kept in step by updateServoStatusSubs.
-    # Per-instance dicts made in __init__, for the same aliasing reason as cap_settings.
+    # Per-instance dicts made in __init__: a dict bound here would be one object
+    # shared by every instance of the class.
     servo_status_subs_dict = None
     servo_connected_dict = None
 
@@ -146,7 +142,6 @@ class ServosPTXNode:
         ##############################
         # Initialize Class Variables
 
-        self.cap_settings = copy.deepcopy(self.CAP_SETTINGS)
         self.servo_status_subs_dict = dict()
         self.servo_connected_dict = dict()
 
@@ -189,14 +184,15 @@ class ServosPTXNode:
         ################################################
 
         # Adopt whatever selection each interface restored from its config file
-        # BEFORE building the cap settings. updateConnectsHandler does not run until
+        # BEFORE building the settings dict. updateConnectsHandler does not run until
         # a second after the PTX interface is up, so without this the settings the
-        # PTX interface is constructed with -- and the Discrete options a restored
-        # setting is validated against -- are both still 'None', and SettingsIF.init()
-        # rejects the operator's saved selection as an invalid value on every boot.
+        # PTX interface is constructed with -- and the Selection options a restored
+        # setting is validated against -- are both still 'None'. SettingsIF.init()
+        # then replaces the operator's saved selection with 'None' and pushes that
+        # back through setSettingFunction, deselecting the servo on every boot.
         # The restored topic is added to the options list because it has not been
-        # discovered yet either; updateConnectsHandler replaces both lists with the
-        # discovered ones on its first cycle.
+        # discovered yet either; refreshSettingsDict replaces both lists with the
+        # discovered ones the first time it runs.
         self.pan_selected = self.pan_connect_if.get_selected_topic()
         self.tilt_selected = self.tilt_connect_if.get_selected_topic()
         self.pan_options = ['None']
@@ -207,9 +203,8 @@ class ServosPTXNode:
             self.tilt_options.append(self.tilt_selected)
 
         # Initialize settings
-        cap_settings = self.getCapSettings()
-        factory_settings = self.getFactorySettings()
-            
+        self.settings_dict = self.initSettingsDict()
+
 
         # Launch the PTX interface --  this takes care of initializing all the ptx settings from config. file, subscribing and advertising topics and services, etc.
         # Launch the IDX interface --  this takes care of initializing all the camera settings from config. file
@@ -235,11 +230,8 @@ class ServosPTXNode:
         self.device_info_dict = self.getDeviceInfo()
         
         self.ptx_if = PTXActuatorIF(device_info = self.device_info_dict,
-                                    capSettings = cap_settings,
-                                    factorySettings = factory_settings,
-                                    getCapSettingsFunction= self.getCapSettings,
-                                    settingUpdateFunction=self.settingUpdateFunction,
-                                    getSettingsFunction=self.getSettings,
+                                    getSettingsFunction=self.getSettingsFunction,
+                                    setSettingFunction=self.setSettingFunction,
                                     factoryControls = self.FACTORY_CONTROLS,
                                     factoryLimits = self.LIMITS_DICT,
                                     stopMovingCb = self.stopMoving,
@@ -313,7 +305,7 @@ class ServosPTXNode:
         # not been discovered yet. Adopt what it reports rather than pushing the local
         # copy back in. Pushing back here re-sent the startup default 'None' on the first
         # cycle, which the interface then persisted and save_config()'d.
-        # settingUpdateFunction is the only place a new selection is pushed in.
+        # setSettingFunction is the only place a new selection is pushed in.
         available_topics = []
         for connect_if in [self.pan_connect_if, self.tilt_connect_if]:
             if connect_if is not None:
@@ -322,33 +314,41 @@ class ServosPTXNode:
                         available_topics.append(topic)
         self.updateServoStatusSubs(available_topics)
 
-        if self.pan_connect_if is not None:
-            # get_available_topics returns the interface's live internal list, so copy
-            # before filtering. Editing it in place corrupts the selector state.
-            pan_options = list(self.pan_connect_if.get_available_topics())
-            self.pan_selected = self.pan_connect_if.get_selected_topic()
-            if self.tilt_selected != None and self.tilt_selected in pan_options:
-                pan_options.remove(self.tilt_selected)
-            self.pan_options = ['None'] + self.filterConnectedServos(pan_options, self.pan_selected)
-            self.pan_connected = self.pan_connect_if.check_connection()
-            if self.pan_connected == True:
-                # Keep the last known max if the device reports nothing usable, and do not
-                # wipe it back to the placeholder on a disconnect -- see getPanSpeedMax.
-                pan_speed_max_dps = self.pan_connect_if.get_max_speed_dps()
-                if pan_speed_max_dps is not None and pan_speed_max_dps > 0:
-                    self.pan_speed_max_dps = pan_speed_max_dps
+        # SettingsIF keeps its own copy of the settings dict and re-reads this node's
+        # only in init(), so a changed servo list, selection or connected flag has to
+        # be pushed. refreshSettingsDict re-reads all three from the connect interfaces
+        # every cycle; push on change only, since init() also re-reads and re-applies the
+        # saved params. That re-apply is safe for the selections because SettingsIF
+        # saves after every accepted change, and the connected flags are never saved.
+        # The try keeps a failed refresh or push from skipping the re-arm below, which
+        # would freeze the selectors for the life of the node.
+        if self.settings_dict is not None:
+            try:
+                settings_dict = self.refreshSettingsDict()
+                settings_state = [list(self.pan_options), self.pan_selected, self.pan_connected,
+                                  list(self.tilt_options), self.tilt_selected, self.tilt_connected]
+                if settings_state != self.pushed_settings_state:
+                    self.settings_dict = settings_dict
+                    settings_if = None
+                    if self.ptx_if is not None:
+                        settings_if = self.ptx_if.settings_if
+                    if settings_if is not None:
+                        settings_if.init(do_updates = False)
+                        self.pushed_settings_state = settings_state
+            except Exception as e:
+                self.msg_if.pub_warn("Failed to update servo selector settings: " + str(e), throttle_s = 5)
 
-        if self.tilt_connect_if is not None:
-            tilt_options = list(self.tilt_connect_if.get_available_topics())
-            self.tilt_selected = self.tilt_connect_if.get_selected_topic()
-            if self.pan_selected != None and self.pan_selected in tilt_options:
-                tilt_options.remove(self.pan_selected)
-            self.tilt_options = ['None'] + self.filterConnectedServos(tilt_options, self.tilt_selected)
-            self.tilt_connected = self.tilt_connect_if.check_connection()
-            if self.tilt_connected == True:
-                tilt_speed_max_dps = self.tilt_connect_if.get_max_speed_dps()
-                if tilt_speed_max_dps is not None and tilt_speed_max_dps > 0:
-                    self.tilt_speed_max_dps = tilt_speed_max_dps
+        if self.pan_connect_if is not None and self.pan_connected == True:
+            # Keep the last known max if the device reports nothing usable, and do not
+            # wipe it back to the placeholder on a disconnect -- see getPanSpeedMax.
+            pan_speed_max_dps = self.pan_connect_if.get_max_speed_dps()
+            if pan_speed_max_dps is not None and pan_speed_max_dps > 0:
+                self.pan_speed_max_dps = pan_speed_max_dps
+
+        if self.tilt_connect_if is not None and self.tilt_connected == True:
+            tilt_speed_max_dps = self.tilt_connect_if.get_max_speed_dps()
+            if tilt_speed_max_dps is not None and tilt_speed_max_dps > 0:
+                self.tilt_speed_max_dps = tilt_speed_max_dps
 
         nepi_sdk.start_timer_process(1, self.updateConnectsHandler, oneshot = True)
 
@@ -423,65 +423,137 @@ class ServosPTXNode:
     #**********************
     # Device setting functions
 
+    def initSettingsDict(self):
+        init_settings_dict = dict()
+        init_settings_dict['pan_servo'] = {
+            'type': 'Selection',
+            'options': self.getSelectorOptions(self.pan_options, self.pan_selected),
+            'default': str(self.pan_selected)
+        }
+        # Read-only indicators of the selected servo's connection. 'param': False
+        # keeps them out of the saved settings, so SettingsIF.init() never
+        # re-applies a stale saved value over the live state.
+        init_settings_dict['pan_connected'] = {
+            'type': 'Toggle',
+            'default': (self.pan_connected == True),
+            'display_disabled': True,
+            'param': False
+        }
+        init_settings_dict['tilt_servo'] = {
+            'type': 'Selection',
+            'options': self.getSelectorOptions(self.tilt_options, self.tilt_selected),
+            'default': str(self.tilt_selected)
+        }
+        init_settings_dict['tilt_connected'] = {
+            'type': 'Toggle',
+            'default': (self.tilt_connected == True),
+            'display_disabled': True,
+            'param': False
+        }
 
-    def getCapSettings(self):
-        self.cap_settings['pan_servo']['options'] = self.pan_options
-        self.cap_settings['tilt_servo']['options'] = self.tilt_options
-        return self.cap_settings
+        settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
+        settings_dict_values = nepi_controls.get_values_dict(settings_dict)
+        self.msg_if.pub_info("Initialized Settings: " + str(settings_dict_values))
+        return settings_dict
 
-    def getFactorySettings(self):
-        settings = self.getSettings()
-        return settings
+    def refreshSettingsDict(self):
+        # The servo lists change at runtime as SVX devices come and go, and each axis'
+        # list excludes the other axis' selection, so this re-reads the selections,
+        # lists and connected flags from the connect interfaces and rebuilds the options
+        # as well as the values. Reading them only on the 1 s connects cycle left the
+        # dict setSettingFunction returns offering the servo just taken by one axis to
+        # the other. Both selections are read before either list is built, so each list
+        # excludes the other axis' current selection rather than last cycle's.
+        if self.pan_connect_if is not None:
+            self.pan_selected = self.pan_connect_if.get_selected_topic()
+        if self.tilt_connect_if is not None:
+            self.tilt_selected = self.tilt_connect_if.get_selected_topic()
 
+        if self.pan_connect_if is not None:
+            # get_available_topics returns the interface's live internal list, so copy
+            # before filtering. Editing it in place corrupts the selector state.
+            pan_options = list(self.pan_connect_if.get_available_topics())
+            if self.tilt_selected != None and self.tilt_selected in pan_options:
+                pan_options.remove(self.tilt_selected)
+            self.pan_options = ['None'] + self.filterConnectedServos(pan_options, self.pan_selected)
+            self.pan_connected = self.pan_connect_if.check_connection()
 
+        if self.tilt_connect_if is not None:
+            tilt_options = list(self.tilt_connect_if.get_available_topics())
+            if self.pan_selected != None and self.pan_selected in tilt_options:
+                tilt_options.remove(self.pan_selected)
+            self.tilt_options = ['None'] + self.filterConnectedServos(tilt_options, self.tilt_selected)
+            self.tilt_connected = self.tilt_connect_if.check_connection()
 
-    def getSettings(self):
-        settings = dict()
-        for setting_name in self.cap_settings.keys():
-            cap_setting = self.cap_settings[setting_name]
-            setting = dict()
-            setting["name"] = setting_name
-            setting["type"] = cap_setting['type']
-            val = None
-            if setting_name == 'pan_servo':
-                val = self.pan_selected
-            if setting_name == 'pan_connected':
-                val = self.pan_connected
-            if setting_name == 'tilt_servo':
-                val = self.tilt_selected
-            if setting_name == 'tilt_connected':
-                val = self.tilt_connected
-            setting['value'] = str(val)
-            settings[setting_name] = setting
-        return settings
+        # Options go first: set_value validates a Selection against the options
+        # already in the dict.
+        settings_dict = copy.deepcopy(self.settings_dict)
+        settings_dict = nepi_controls.set_options(settings_dict, 'pan_servo',
+                            self.getSelectorOptions(self.pan_options, self.pan_selected))
+        settings_dict = nepi_controls.set_value(settings_dict, 'pan_servo', str(self.pan_selected))
+        settings_dict = nepi_controls.set_value(settings_dict, 'pan_connected', (self.pan_connected == True))
+        settings_dict = nepi_controls.set_options(settings_dict, 'tilt_servo',
+                            self.getSelectorOptions(self.tilt_options, self.tilt_selected))
+        settings_dict = nepi_controls.set_value(settings_dict, 'tilt_servo', str(self.tilt_selected))
+        settings_dict = nepi_controls.set_value(settings_dict, 'tilt_connected', (self.tilt_connected == True))
+        return settings_dict
 
+    def getSelectorOptions(self, options, selected):
+        # An axis' selection always appears in its own option list. Left out --
+        # which happens while the selected servo is undiscovered, or excluded as
+        # the other axis' selection -- set_value falls back to another option, so
+        # the setting reports a servo the interface does not hold, and the next
+        # save persists that substitute, which SettingsIF.init() then pushes back
+        # through setSettingFunction on the following boot.
+        options = list(options)
+        selected = str(selected)
+        if selected not in options:
+            options.append(selected)
+        return options
 
-    def settingUpdateFunction(self,setting):
+    def getSettingsFunction(self):
+        return self.settings_dict
+
+    def setSettingFunction(self, setting_name, setting_value):
+        setting_str = setting_name + ":" + str(setting_value)
         success = False
-        setting_str = str(setting)
-        [setting_name, s_type, data] = nepi_settings.get_data_from_setting(setting)
-        setting_updated = False
-        msg = "Success"
+        msg = ""
+        if setting_name not in self.settings_dict.keys():
+            msg = (self.node_name + " Setting name " + setting_str + " is not supported")
+            return False, msg, self.settings_dict
+        if setting_name == 'pan_connected' or setting_name == 'tilt_connected':
+            msg = (self.node_name + " Setting " + setting_name + " is read-only. It reports " +
+                   "whether the selected servo is connected and is updated by the node")
+            return False, msg, self.settings_dict
+
         # This is the only place a selection is pushed into a connect interface.
-        # The interface may reject an undiscovered topic, so adopt what it returns.
-        if setting_name in self.cap_settings.keys():
-            if setting_name == 'pan_servo':
-                if self.pan_connect_if is not None:
-                    self.pan_selected = self.pan_connect_if.set_selected_topic(data)
-                else:
-                    self.pan_selected = data
-                setting_updated = True
-            if setting_name == 'tilt_servo':
-                if self.tilt_connect_if is not None:
-                    self.tilt_selected = self.tilt_connect_if.set_selected_topic(data)
-                else:
-                    self.tilt_selected = data
-                setting_updated = True
-        if setting_updated is False:
-            msg = (self.node_name  + " Setting name" + setting_str + " is not supported")
+        # The interface ignores an undiscovered topic, so adopt what it returns.
+        requested = str(setting_value)
+        if setting_name == 'pan_servo':
+            self.pan_selected = self.selectServo(self.pan_connect_if, requested)
+            selected = self.pan_selected
         else:
-            success = True
-        return success, msg
+            self.tilt_selected = self.selectServo(self.tilt_connect_if, requested)
+            selected = self.tilt_selected
+        success = (selected == requested)
+        if success:
+            msg = (self.node_name + " UPDATED SETTINGS " + setting_str)
+        else:
+            msg = (self.node_name + " Servo " + requested + " is not available for " + setting_name +
+                   ", so it stays on " + str(selected) + ". Check that the servo's driver is running")
+
+        self.settings_dict = self.refreshSettingsDict()
+        return success, msg, self.settings_dict
+
+    def selectServo(self, connect_if, topic):
+        # Returns the selection in effect afterwards. An unchanged selection is not
+        # re-sent: set_selected_topic persists and saves config on every accepted call,
+        # and SettingsIF.init() re-applies every saved setting on each startup.
+        if connect_if is None:
+            return topic
+        if topic == connect_if.get_selected_topic():
+            return topic
+        return connect_if.set_selected_topic(topic)
 
 
 
