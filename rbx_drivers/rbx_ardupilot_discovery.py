@@ -321,7 +321,7 @@ class ArdupilotDiscovery:
     baud_str = self.baudrate_list[0]
     for baud_str in self.baudrate_list:
       baud_int = int(baud_str)
-      self.logger.log_warn("Connecting to serial port " + path_str + " with baudrate: " + baud_str)
+      #self.logger.log_warn("Connecting to serial port " + path_str + " with baudrate: " + baud_str)
       try:
         # Try and open serial port
         serial_port = serial.Serial(path_str, baud_int, timeout = 1)
@@ -366,7 +366,7 @@ class ArdupilotDiscovery:
             self.logger.log_info("Found mavlink autonomous device at: " + path_str + " with baudrate " + baud_str + " with sys_id " + str(mav_sys_id))
             break
       # Clean up the serial port
-      self.logger.log_warn("Closing serial port " + path_str)
+      #self.logger.log_warn("Closing serial port " + path_str)
       serial_port.close()
       time.sleep(1)
       if found_device:
