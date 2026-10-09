@@ -428,7 +428,7 @@ class ServosPTXNode:
         init_settings_dict['pan_servo'] = {
             'type': 'Selection',
             'options': self.getSelectorOptions(self.pan_options, self.pan_selected),
-            'default': str(self.pan_selected)
+            'default': self.getServoName(self.pan_selected)
         }
         # Read-only indicators of the selected servo's connection. 'param': False
         # keeps them out of the saved settings, so SettingsIF.init() never
@@ -442,7 +442,7 @@ class ServosPTXNode:
         init_settings_dict['tilt_servo'] = {
             'type': 'Selection',
             'options': self.getSelectorOptions(self.tilt_options, self.tilt_selected),
-            'default': str(self.tilt_selected)
+            'default': self.getServoName(self.tilt_selected)
         }
         init_settings_dict['tilt_connected'] = {
             'type': 'Toggle',
@@ -490,11 +490,11 @@ class ServosPTXNode:
         settings_dict = copy.deepcopy(self.settings_dict)
         settings_dict = nepi_controls.set_options(settings_dict, 'pan_servo',
                             self.getSelectorOptions(self.pan_options, self.pan_selected))
-        settings_dict = nepi_controls.set_value(settings_dict, 'pan_servo', str(self.pan_selected))
+        settings_dict = nepi_controls.set_value(settings_dict, 'pan_servo', self.getServoName(self.pan_selected))
         settings_dict = nepi_controls.set_value(settings_dict, 'pan_connected', (self.pan_connected == True))
         settings_dict = nepi_controls.set_options(settings_dict, 'tilt_servo',
                             self.getSelectorOptions(self.tilt_options, self.tilt_selected))
-        settings_dict = nepi_controls.set_value(settings_dict, 'tilt_servo', str(self.tilt_selected))
+        settings_dict = nepi_controls.set_value(settings_dict, 'tilt_servo', self.getServoName(self.tilt_selected))
         settings_dict = nepi_controls.set_value(settings_dict, 'tilt_connected', (self.tilt_connected == True))
         return settings_dict
 
@@ -509,7 +509,31 @@ class ServosPTXNode:
         selected = str(selected)
         if selected not in options:
             options.append(selected)
-        return options
+        return [self.getServoName(topic) for topic in options]
+
+    def getServoName(self, topic):
+        # The servo selectors show each servo by its node name (maestro_00512566_ch4),
+        # the label the Servo Device page uses, rather than its full SVX topic, which
+        # is too wide for the settings panel. Selections are still held and pushed as
+        # topics; getServoTopic maps a name coming back from the settings panel.
+        name = str(topic)
+        if name.endswith('/svx'):
+            name = name[:-len('/svx')]
+        return name.split('/')[-1]
+
+    def getServoTopic(self, name):
+        # A full topic is accepted as-is: selections saved before the selectors
+        # switched to names were saved as topics, and SettingsIF.init() re-applies them.
+        if name == 'None' or name.startswith('/'):
+            return name
+        topics = [self.pan_selected, self.tilt_selected]
+        for connect_if in [self.pan_connect_if, self.tilt_connect_if]:
+            if connect_if is not None:
+                topics += list(connect_if.get_available_topics())
+        for topic in topics:
+            if topic not in [None, 'None'] and self.getServoName(topic) == name:
+                return topic
+        return None
 
     def getSettingsFunction(self):
         return self.settings_dict
@@ -528,7 +552,12 @@ class ServosPTXNode:
 
         # This is the only place a selection is pushed into a connect interface.
         # The interface ignores an undiscovered topic, so adopt what it returns.
-        requested = str(setting_value)
+        requested = self.getServoTopic(str(setting_value))
+        if requested is None:
+            msg = (self.node_name + " Servo " + str(setting_value) + " is not available for " + setting_name +
+                   ". Check that the servo's driver is running")
+            self.settings_dict = self.refreshSettingsDict()
+            return False, msg, self.settings_dict
         if setting_name == 'pan_servo':
             self.pan_selected = self.selectServo(self.pan_connect_if, requested)
             selected = self.pan_selected
