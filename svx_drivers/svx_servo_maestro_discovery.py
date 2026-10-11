@@ -105,6 +105,9 @@ class SvxServoMaestroDiscovery:
     # How often a board's mode is re-read once it is right, so a board flipped by
     # other software (or swapped for a new one on the same port) gets fixed again.
     MODE_CHECK_INTERVAL_SEC = 10
+    # A channel node that exited on its own (lost serial link, failed handshake)
+    # is relaunched no sooner than this, so a node that keeps failing cannot spin.
+    RELAUNCH_DELAY_SEC = 10
 
     node_launch_name = "maestro"
 
@@ -122,6 +125,8 @@ class SvxServoMaestroDiscovery:
     mode_checks_dict = dict()
     # key -> last message logged, for messages logged only when they change.
     last_log_dict = dict()
+    # launch_id -> time its node was found to have exited on its own.
+    exit_times_dict = dict()
 
     retry = True
 
@@ -183,6 +188,18 @@ class SvxServoMaestroDiscovery:
         for launch_id in path_purge_list:
             self.killDevice(launch_id)
 
+        ### Reap channel nodes that exited on their own. A node shuts itself down
+        ### when it loses its serial link, and without this its stale entry would
+        ### block the relaunch below for as long as its port stays in /dev.
+        for launch_id in list(self.active_devices_dict.keys()):
+            sub_process = self.active_devices_dict[launch_id]['sub_process']
+            if sub_process is not None and sub_process.poll() is not None:
+                self.logger.log_warn("Node " + self.active_devices_dict[launch_id]['node_name'] +
+                                     " exited; relaunching in " + str(self.RELAUNCH_DELAY_SEC) +
+                                     "s if its board is still present")
+                self.exit_times_dict[launch_id] = time.time()
+                self.killDevice(launch_id)
+
         ### Enumerate Maestro Command Ports
         [command_ports, enumerate_ok] = self.findCommandPorts()
         if enumerate_ok == False:
@@ -194,7 +211,7 @@ class SvxServoMaestroDiscovery:
         ### Put every board in the mode the serial_mode option asks for, then
         ### build the desired set of (node port, channel) pairs. The mode goes
         ### first: a channel node launched against a board in the wrong mode fails
-        ### its handshake and exits, and nothing relaunches it.
+        ### its handshake and exits, and is only retried after RELAUNCH_DELAY_SEC.
         current_keys = [p['path'] + '|' + str(p['serial_number']) for p in command_ports]
         for check_key in list(self.mode_checks_dict.keys()):
             if check_key not in current_keys:
@@ -237,6 +254,10 @@ class SvxServoMaestroDiscovery:
             entry = desired_dict[launch_id]
             if entry['port_info']['path'] in self.dont_retry_list:
                 continue
+            if launch_id in self.exit_times_dict:
+                if time.time() - self.exit_times_dict[launch_id] < self.RELAUNCH_DELAY_SEC:
+                    continue
+                del self.exit_times_dict[launch_id]
             self.launchDeviceNode(entry['port_info'], entry['channel'], entry['node_port'])
 
         ### Claim each board's path, and the UART port its nodes talk through,
@@ -589,6 +610,7 @@ class SvxServoMaestroDiscovery:
                     self.active_paths_list.remove(claim_path)
         self.active_devices_dict = dict()
         self.last_channels_dict = dict()
+        self.exit_times_dict = dict()
         # A re-enabled driver re-checks every board's mode straight away.
         self.mode_checks_dict = dict()
         nepi_sdk.sleep(1)

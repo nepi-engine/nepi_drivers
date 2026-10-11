@@ -361,6 +361,9 @@ class SvxServoMaestroNode:
 
 
     def updatePositionHandler(self, timer):
+        if self.serial_port is None:
+            # Link lost; the node is shutting down.
+            return
         stime = nepi_utils.get_time()
         pos_deg = self.driver_getPosition()
         if pos_deg is not None:
@@ -902,32 +905,56 @@ class SvxServoMaestroNode:
     def transact(self, frame, read_len = 0):
         # Send pre-framed bytes under the locks described in send_cmd, and read a
         # fixed-length response when read_len > 0.
-        if self.serial_port is None:
-            return None
-
         response = None
+        link_error = None
         with self.serial_lock:
+            # Read under the lock: another thread may have dropped a lost link.
+            port = self.serial_port
+            if port is None:
+                return None
             locked = False
             try:
                 if HAVE_FCNTL:
-                    fcntl.flock(self.serial_port.fileno(), fcntl.LOCK_EX)
+                    fcntl.flock(port.fileno(), fcntl.LOCK_EX)
                     locked = True
-                self.serial_port.reset_input_buffer()
-                self.serial_port.write(frame)
-                self.serial_port.flush()
+                port.reset_input_buffer()
+                port.write(frame)
+                port.flush()
                 if read_len > 0:
-                    data = self.serial_port.read(read_len)
+                    data = port.read(read_len)
                     if data is not None and len(data) == read_len:
                         response = bytearray(data)
             except Exception as e:
-                self.msg_if.pub_warn("Serial transaction failed: " + str(e))
+                link_error = e
                 response = None
             finally:
                 if locked:
                     try:
-                        fcntl.flock(self.serial_port.fileno(), fcntl.LOCK_UN)
+                        fcntl.flock(port.fileno(), fcntl.LOCK_UN)
                     except Exception:
                         pass
+            if link_error is not None and self.connected == True:
+                # An exception (not a short read) means the port itself is gone --
+                # board unplugged or its USB reset. Drop it so every later call
+                # returns None quietly instead of logging the same failure.
+                try:
+                    port.close()
+                except Exception:
+                    pass
+                self.serial_port = None
+
+        if link_error is not None:
+            if self.connected == True:
+                # Exit rather than retry in place: a re-plugged board can come back
+                # on a different /dev path, and discovery relaunches this channel
+                # on whatever path it finds.
+                self.connected = False
+                self.msg_if.pub_warn("Lost serial link to Maestro on " + str(self.port_str) +
+                                     " (" + str(link_error) + "); shutting down so discovery can relaunch this channel")
+                nepi_sdk.signal_shutdown("Lost serial link to servo device")
+            else:
+                # Still connecting: connect() reports the failed handshake itself.
+                self.msg_if.pub_warn("Serial transaction failed: " + str(link_error))
         return response
 
 
