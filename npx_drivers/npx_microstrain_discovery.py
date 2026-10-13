@@ -228,7 +228,7 @@ class MicrostrainDiscovery:
         return found_device
 
     def checkOnDevice(self,path_str):
-        self.logger.log_debug("Entering check for device function for path: " + str(path_str))###
+        #self.logger.log_debug("Entering check for device function for path: " + str(path_str), throttle_s = 10)###
         active = True
         if path_str not in self.available_paths_list:
             active = False
