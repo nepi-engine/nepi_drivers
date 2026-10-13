@@ -216,9 +216,9 @@ class V4L2CamDiscovery:
           # Debug aid: summarize the two conditions that gate whether this
           # /dev/video* path becomes an Imaging device, so a rejection is never
           # silent. Enable Debug Mode to see these lines.
-          self.msg_if.pub_debug("V4L2 eval " + path_str + " (" + str(device_type) +
-                                "): video_capture=" + str(is_video_cap_device) +
-                                " usb_bus=" + str(usbBus))
+          # self.msg_if.pub_debug("V4L2 eval " + path_str + " (" + str(device_type) +
+          #                       "): video_capture=" + str(is_video_cap_device) +
+          #                       " usb_bus=" + str(usbBus))
 
           if is_video_cap_device and usbBus is not None:
             active_paths.append(path_str) # To check later that the device list has no entries for paths that have disappeared
@@ -293,9 +293,9 @@ class V4L2CamDiscovery:
             if usbBus is None:
               reasons.append("could not parse a USB Bus info id")
             self.msg_if.pub_debug("Skipping path " + path_str + " (" + str(device_type) +
-                                  "): " + " and ".join(reasons))
+                                  "): " + " and ".join(reasons), throttle_s = -1)
             for skip_line in all_out:
-              self.msg_if.pub_debug("  v4l2-ctl --all [" + path_str + "]: " + str(skip_line))
+              self.msg_if.pub_debug("  v4l2-ctl --all [" + path_str + "]: " + str(skip_line), throttle_s = -1)
             
     ######################
     # Check that device paths are still active
