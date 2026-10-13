@@ -39,7 +39,6 @@ class HNavDiscovery:
     system_nav_ip = 'NONE'
 
     def __init__(self):
-        self.log_name = PKG_NAME.lower() + "_discovery"
         self.logger = nepi_sdk.logger()
         time.sleep(0.2)
 

@@ -143,7 +143,6 @@ class SvxServoMaestroDiscovery:
 
     ################################################
     def __init__(self):
-        self.log_name = PKG_NAME.lower() + "_discovery"
         self.logger = nepi_sdk.logger()
         time.sleep(1)
         self.logger.log_info("Starting Initialization")
