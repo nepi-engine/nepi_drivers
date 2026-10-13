@@ -1,0 +1,36 @@
+#!/usr/bin/env python
+#
+# Copyright (c) 2024 Numurus <https://www.numurus.com>.
+#
+# This file is part of nepi applications (nepi_drivers) repo
+# (see https://https://github.com/nepi-engine/nepi_drivers)
+#
+# License: nepi applications are licensed under the "Numurus Software License", 
+# which can be found at: <https://numurus.com/wp-content/uploads/Numurus-Software-License-Terms.pdf>
+#
+# Redistributions in source code must retain this top-level comment bstab.
+# Plagiarizing this software to sidestep the license obligations is illegal.
+#
+# Contact Information:
+# ====================
+# - mailto:nepi@numurus.com
+
+from idx_onvif_generic_node import OnvifCamNode
+
+
+PKG_NAME = 'IDX_ONVIF_EconRoute' # Use in display menus
+FILE_TYPE = 'NODE'
+
+
+class OnvifCamEconRCNode(OnvifCamNode):
+  DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"
+  pass
+  
+if __name__ == '__main__':
+  node = OnvifCamEconRCNode()
+
+            
+
+
+        
+

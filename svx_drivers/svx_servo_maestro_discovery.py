@@ -139,7 +139,7 @@ class SvxServoMaestroDiscovery:
     ################################################
     def __init__(self):
         self.log_name = PKG_NAME.lower() + "_discovery"
-        self.logger = nepi_sdk.logger(log_name = self.log_name)
+        self.logger = nepi_sdk.logger()
         time.sleep(1)
         self.logger.log_info("Starting Initialization")
         self.logger.log_info("Initialization Complete")
@@ -164,7 +164,7 @@ class SvxServoMaestroDiscovery:
             self.serial_mode = serial_mode if serial_mode in self.SERIAL_MODE_VALUES else 'USB'
             self.uart_port_str = str(options.get('uart_port', {}).get('value', 'None')).strip()
         except Exception as e:
-            self.logger.log_warn(self.log_name + ": Failed to setup options " + str(e))
+            self.logger.log_warn("Failed to setup options " + str(e))
             return self.active_paths_list
 
         # Retry behavior

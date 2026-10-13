@@ -64,7 +64,7 @@ class SidusSS182SerialDiscovery:
   def __init__(self):
     # Create Message Logger
     self.log_name = PKG_NAME.lower() + "_discovery"
-    self.logger = nepi_sdk.logger(log_name = self.log_name)
+    self.logger = nepi_sdk.logger()
     time.sleep(1)
     self.logger.log_info("Starting Initialization")
     self.letters_list = list(string.ascii_uppercase)
@@ -117,7 +117,7 @@ class SidusSS182SerialDiscovery:
       self.logger.log_debug("Disc Addr List: " + str(self.addr_search_list))
 
     except Exception as e:
-      self.logger.log_debug("" + self.log_name + ": Failed to setupoptions " + str(e))#
+      self.logger.log_debug("Failed to setupoptions " + str(e))#
       return self.active_paths_list
 
     system_config = drv_dict['DISCOVERY_DICT']['OPTIONS']['system_config']['value']
@@ -226,7 +226,7 @@ class SidusSS182SerialDiscovery:
     if path_str not in self.available_paths_list:
       active = False
     if active == False:
-      self.logger.log_info(":  " +self.log_name + "No longer detecting device on : " + path_str)
+      self.logger.log_info("No longer detecting device on : " + path_str)
       if path_str in self.active_devices_dict.keys():
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']

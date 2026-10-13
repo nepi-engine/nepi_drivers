@@ -111,7 +111,7 @@ class V4l2CamNode:
 
         ##############################  
         # Create Msg Class
-        self.msg_if = MsgIF(log_name = self.class_name)
+        self.msg_if = MsgIF()
         self.msg_if.pub_info("Starting Node Initialization Processes")
 
         ##############################  
@@ -640,7 +640,7 @@ class V4l2CamNode:
             # Debug aid: confirm frames are actually decoding and their dimensions
             # (if frames flow here but the viewer is black, the issue is downstream).
             if cv2_img is not None:
-                self.msg_if.pub_debug("Got color image " + str(getattr(cv2_img, 'shape', None)) + " from " + str(self.device_path), throttle_s = 10.0)
+                self.msg_if.pub_debug("Got color image " + str(getattr(cv2_img, 'shape', None)) + " from " + str(self.device_path), throttle_s = -1)
             return ret, msg, cv2_img, timestamp, encoding
     
     # Good base class candidate - Shared with ONVIF

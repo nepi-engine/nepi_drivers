@@ -67,7 +67,7 @@ class V4L2CamDiscovery:
 
     ##############################  
     # Create Msg Class
-    self.msg_if = MsgIF(log_name = self.class_name)
+    self.msg_if = MsgIF()
     self.msg_if.pub_info("Starting Node Initialization Processes")
 
 
@@ -176,7 +176,7 @@ class V4L2CamDiscovery:
             valid_device = False
         
         if valid_device == True:  
-          self.msg_if.pub_debug("Found a device type: " + device_type + " on path " + path_str, throttle_s = 10.0)
+          self.msg_if.pub_debug("Found a device type: " + device_type + " on path " + path_str, throttle_s = -1)
           # Make sure this is a legitimate Video Capture device, not a Metadata Capture device, etc.
           is_video_cap_device = False
           sub_process = subprocess.Popen(['v4l2-ctl', '-d', path_str, '--all'],
@@ -186,7 +186,7 @@ class V4L2CamDiscovery:
           in_device_caps = False
           usbBus = None
           for all_line in all_out:
-            self.msg_if.pub_debug("Got all_line: " + str(all_line) + " on path " + path_str, throttle_s = 10.0)
+            self.msg_if.pub_debug("Got all_line: " + str(all_line) + " on path " + path_str, throttle_s = -1)
             if ('Bus info' in all_line):
               bus_line = copy.deepcopy(all_line)
               try:
@@ -199,7 +199,7 @@ class V4L2CamDiscovery:
                     usbBus = all_numbers[-1]
               except:
                 pass
-              self.msg_if.pub_debug("Got Bus ID: " + str(usbBus) + " from line " + str(all_line), throttle_s = 10.0)
+              self.msg_if.pub_debug("Got Bus ID: " + str(usbBus) + " from line " + str(all_line), throttle_s = -1)
                    
               # if '-' in all_line:
               #   usbBus = all_line.rsplit("-",1)[1].replace(".","")
@@ -272,7 +272,7 @@ class V4L2CamDiscovery:
               
               # Only start one device per check 
               if success == False:
-                self.msg_if.pub_debug("Found new device on path: " + device_type + ' : ' + path_str, throttle_s = 10.0)
+                self.msg_if.pub_debug("Found new device on path: " + device_type + ' : ' + path_str, throttle_s = -1)
                 # Restart Device
                 success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
                 if success == True:
@@ -280,7 +280,7 @@ class V4L2CamDiscovery:
                 
               else:
                 pass
-                self.msg_if.pub_debug("Failed to start new node for path: " + path_str, throttle_s = 10.0)
+                self.msg_if.pub_debug("Failed to start new node for path: " + path_str, throttle_s = -1)
 
           else:
             # Debug aid: this /dev/video* path was found but did NOT qualify as an

@@ -236,7 +236,7 @@ class SvxServoMaestroNode:
 
         ##############################
         # Create Msg Class
-        self.msg_if = MsgIF(log_name = self.class_name)
+        self.msg_if = MsgIF()
         self.msg_if.pub_info("Starting Node Initialization Processes")
 
         # In-process guard around each serial transaction (paired with the

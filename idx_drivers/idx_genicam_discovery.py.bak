@@ -1,0 +1,365 @@
+#!/usr/bin/env python
+#
+# Copyright (c) 2024 Numurus <https://www.numurus.com>.
+#
+# This file is part of nepi applications (nepi_drivers) repo
+# (see https://https://github.com/nepi-engine/nepi_drivers)
+#
+# License: nepi applications are licensed under the "Numurus Software License", 
+# which can be found at: <https://numurus.com/wp-content/uploads/Numurus-Software-License-Terms.pdf>
+#
+# Redistributions in source code must retain this top-level comment bstab.
+# Plagiarizing this software to sidestep the license obligations is illegal.
+#
+# Contact Information:
+# ====================
+# - mailto:nepi@numurus.com
+
+
+import os
+# ROS namespace setup
+#NEPI_BASE_NAMESPACE = '/nepi/device1/'
+#os.environ["ROS_NAMESPACE"] = NEPI_BASE_NAMESPACE[0:-1]
+import subprocess
+import time
+import copy
+
+from nepi_sdk import nepi_sdk
+from nepi_sdk import nepi_utils
+from nepi_sdk import nepi_drvs
+from nepi_sdk import nepi_system
+
+
+# Needed for GenICam auto-detect
+from harvesters.core import Harvester
+
+from nepi_api.messages_if import MsgIF
+
+
+PKG_NAME = 'IDX_GENICAM' # Use in display menus
+FILE_TYPE = 'DISCOVERY'
+
+class GenicamCamDiscovery:
+
+  CHECK_INTERVAL_S = 3.0
+
+  NODE_LAUNCH_TIME_SEC = 10
+
+  DEFAULT_GENTL_PRODUCER_USB =  '/opt/baumer/gentl_producers/libbgapi2_usb.cti.2.15'
+  DEFAULT_GENTL_PRODUCER_GIGE = '/opt/baumer/gentl_producers/libbgapi2_gige.cti.2.15'
+
+  launch_time_dict = dict()
+  retry = True
+  dont_retry_list = []
+  test_val = 2
+   
+  INCLUDE_DEVICES = []
+  EXCLUDE_DEVICES = []     
+
+  settings_if = None
+
+  check_for_devices = True
+
+  drv_dict = dict()                        
+  deviceList = []      
+
+  ################################################
+  DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
+
+  def __init__(self):
+    ####  NODE Initialization ####
+    nepi_sdk.init_node(name= self.DEFAULT_NODE_NAME)
+    self.class_name = type(self).__name__
+    self.base_namespace = nepi_sdk.get_base_namespace()
+    self.node_name = nepi_sdk.get_node_name()
+    self.node_namespace = nepi_sdk.get_node_namespace()
+
+    ##############################  
+    # Create Msg Class
+    self.msg_if = MsgIF()
+    self.msg_if.pub_info("Starting Node Initialization Processes")
+
+
+    ########################
+    self.genicam_harvester = Harvester()
+    
+    self.genicam_harvester.add_file(self.DEFAULT_GENTL_PRODUCER_USB)    
+    self.genicam_harvester.add_file(self.DEFAULT_GENTL_PRODUCER_GIGE)
+
+
+    ########################
+    # Update discovery options
+    success = self.updateDiscoveryOptions()
+    if success == False:
+        nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
+        return
+    
+    ########################
+    # Start node processes
+    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+    nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
+    nepi_sdk.on_shutdown(self.cleanup_actions)
+
+    ########################
+    # Now start the node
+    self.msg_if.pub_info("Initialization Complete")
+    nepi_sdk.spin()
+
+
+
+
+  #**********************
+  # Discovery functions
+  #**********************
+
+  def updateDriverDictCb(self,timer):
+    updated = self.updateDiscoveryOptions()
+    nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
+
+  def updateDiscoveryOptions(self):
+    ########################
+    # Get discovery options
+    success = False
+    last_drv_dict = copy.deepcopy(self.drv_dict)
+    self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
+    if len(list(self.drv_dict.keys())) == 0:
+      self.msg_if.pub_warn("Failed to load Driver dict " + str(e))#
+      return success    
+    if 'DISCOVERY_DICT' not in self.drv_dict.keys():
+      self.msg_if.pub_warn("Discovery dict missing in Drvier dict discovery dict ")#
+      return success
+    if last_drv_dict != self.drv_dict:
+      self.msg_if.pub_warn("Updated Driver Dict: " + str(self.drv_dict))
+    success = True
+
+    if 'retry_enabled' in self.drv_dict.keys():
+      self.retry = self.drv_dict['retry_enabled']
+    else:
+      self.retry = True
+    if self.retry == True:
+      self.dont_retry_list = []
+
+
+    return success
+
+
+
+  def detectAndManageDevices(self, timer):
+    if self.check_for_devices == False:
+      self.msg_if.pub_warn("Stopping device discovery process") 
+      return
+    if len(self.deviceList) > 0:
+      # CALLING THIS CAN SHUT DOWN ANY CONNECTED CAMERAS
+      nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+      return
+    #self.msg_if.pub_warn("Starting detection process")
+    # Make sure our genicam harvesters context is up to date.
+    self.genicam_harvester.update()
+    device_info_list = self.genicam_harvester.device_info_list
+    #self.msg_if.pub_info("Found cameres: " + str(device_info_list))
+    # Take note of any genicam nodes currently running. If they are not found
+    # in the current genicam harvesters context, we must assume that they have
+    # been disconnected and stop the corresponding node(s).
+    active_devices = {d["node_namespace"]: False for d in self.deviceList\
+                                                 if d["device_class"] == "genicam"}
+
+    # Iterate through each device in the current context.
+       
+    
+    for device in device_info_list:
+      #self.msg_if.pub_info(device)
+      model = device.model
+      sn = device.serial_number
+      vendor = device.vendor
+      device_is_known = False
+
+      # Look to see if this device has already been launched as a node. If it
+      # has, do nothing. If it hasn't, spin up a new node.
+      for known_device in self.deviceList:
+        node_namespace = known_device["node_namespace"]
+
+        if known_device["device_class"] != "genicam":
+          continue
+        # try:
+        #   # The call to communicate() will timeout if the node is still running.
+        #   # If the node has exited, we log the corresponding stdout and stderr
+        #   # and allow it to be restarted.
+        #   stdo, stde = known_device["node_subprocess"].communicate(timeout=0.1)
+          
+        #   self.stopAndPurgeDeviceNode(node_namespace)
+
+        #   ### DON'T REMOVE FROM dont_retry_list ###
+        #   launch_id = node_namespace
+        #   if launch_id in self.dont_retry_list:
+        #     self.msg_if.pub_warn("node " + node_namespace + " is not running. WILL NOT RESTART")
+        #   else:
+        #     self.msg_if.pub_warn("node " + node_namespace + " is not running. RESTARTING")
+
+
+
+        #   continue
+        # except subprocess.TimeoutExpired:
+        #   pass
+        device_is_known = (device_is_known or (known_device["model"] == device.model and\
+                known_device["serial_number"] == device.serial_number))
+        #self.msg_if.pub_info("Device known: " + str(device_is_known))
+        if device_is_known:
+          active_devices[known_device["node_namespace"]] = True
+          break
+      if not device_is_known: 
+        self.msg_if.pub_info("Launching node")
+        self.startDeviceNode(vendor=vendor, model=model, serial_number=sn)
+
+    # Stop any nodes associated with devices that have disappeared.
+    for node_namespace, running in active_devices.items():
+      if not running:
+        self.msg_if.pub_info("Device no longer present. Stopping node " + node_namespace)
+        self.stopAndPurgeDeviceNode(node_namespace)
+          
+        # Remove from dont_retry_list
+        launch_id = node_namespace
+        if launch_id in self.dont_retry_list:
+          self.dont_retry_list.remove(launch_id) 
+
+    #nepi_sdk.sleep(self.CHECK_INTERVAL_S,100)
+    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+
+
+  def startDeviceNode(self, vendor, model, serial_number):
+    success = False 
+
+    # Get Node Namespace
+    vendor_ros = vendor.split()[0].replace('-', '_').lower() # Some vendors have really long strings, so just use the part to the first space
+    model_ros = model.replace('-', '_').replace(' ', '_').lower()
+    serial_number_ros = serial_number.replace('-', '_').replace(' ', '_').lower()
+    # TODO: Validate that the resulting rootname is a legal ROS identifier
+    root_name = f'{vendor_ros}_{model_ros}'
+    root_name = self.short_name(root_name)
+    unique_root_name = root_name + '_' + serial_number
+    node_needs_serial_number = True
+    for device in self.deviceList:
+      if device['device_type'] == model:
+        node_needs_serial_number = True
+        break
+    device_name = root_name if not node_needs_serial_number else unique_root_name
+
+    node_name = nepi_system.get_device_alias(device_name)
+
+    node_namespace = os.path.join(self.base_namespace, node_name)
+    if node_namespace in self.dont_retry_list:
+      return False
+  
+
+    launch_id = node_namespace
+
+    # Check if should try to launch
+    launch_check = True
+    if launch_id in self.launch_time_dict.keys():
+      launch_time = self.launch_time_dict[launch_id]
+      cur_time = nepi_sdk.get_time()
+      launch_check = (cur_time - launch_time) > self.NODE_LAUNCH_TIME_SEC
+    if launch_check == False or node_name in self.dont_retry_list:
+      return False  ###
+
+    ### Start Node Luanch Process
+    # TODO: fair to assume uniqueness of device serial numbers?
+ 
+    self.msg_if.pub_warn(" launching node: " + node_name)
+    self.msg_if.pub_warn("Initiating new Genicam node " + node_namespace)
+
+    self.msg_if.pub_warn("Starting node " + node_name + " via rosrun")
+
+    # NOTE: have to make serial_number look like a string by prefixing with "sn", otherwise ROS
+    #       treats it as an int param and it causes an overflow. Better way to handle this?
+
+
+    
+    #Setup required param server drv_dict for discovery node
+    dict_param_name = nepi_sdk.create_namespace(self.base_namespace,node_name + "/drv_dict")
+    self.drv_dict['DEVICE_DICT']={'device_name': device_name,
+                                'device_path': '',
+                                'model': model,
+                                'serial_number': serial_number
+                                } 
+    nepi_sdk.set_param(dict_param_name,self.drv_dict)
+
+
+    file_name = self.drv_dict['NODE_DICT']['file_name']
+    #Try and launch node
+    [success, msg, sub_process] = nepi_drvs.launchDriverNode(file_name, node_name)
+    time.sleep(1)
+    if sub_process.poll() is not None:
+      success = False
+      msg = "Node " + node_name + " did not responde after launching"
+    else:
+      self.deviceList.append({"device_class": "genicam",
+                              "model": model,
+                              "serial_number": serial_number,
+                              "device_type": model,
+                              "node_name": node_name,
+                              "node_namespace": node_namespace,
+                              "node_subprocess": sub_process})
+
+    # Process luanch results
+    self.launch_time_dict[launch_id] = nepi_sdk.get_time()
+    if success:
+      self.msg_if.pub_info(" Launched node: " + node_name)
+    else:
+      self.msg_if.pub_info(" Failed to lauch node: " + node_name + " with msg: " + msg)
+      if self.retry == False:
+        self.msg_if.pub_info(" Will not try relaunch for node: " + node_name)
+        self.dont_retry_list.append(node_name)
+      else:
+        self.msg_if.pub_info(" Will attemp relaunch for node: " + node_name + " in " + self.NODE_LAUNCH_TIME_SEC + " secs")
+    return success
+
+  def stopAndPurgeDeviceNode(self, node_namespace = 'All'):
+      if node_namespace == 'All':
+        self.check_for_devices = False
+      for i, device in enumerate(self.deviceList):
+        namespace = device['node_namespace']
+        node_name = os.path.basename(namespace)
+        if namespace == node_namespace or node_namespace == 'All':
+          sub_process = device['node_subprocess']
+          self.msg_if.pub_info("Killing device node: " + node_name)
+          self.deviceList.remove(device)
+          self.dont_retry_list.append(node_name)
+          success = nepi_drvs.killDriverNode(node_name,sub_process)
+          if success == False:
+            self.msg_if.pub_warn("Unable to kill device node " + node_name)
+          else:
+            self.msg_if.pub_warn("Node killed. Removed device from active list " + node_name)
+
+      self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
+
+  def deviceNodeIsRunning(self, node_namespace):
+    for device in self.deviceList:
+      if device['node_namespace'] == node_namespace:
+        if device['node_subprocess'].poll() is not None:
+          return False
+        else:
+          return True
+    # If we get here, didn't find the node in our list    
+    self.msg_if.pub_warn("cannot check run status of unknown node " + node_namespace)
+    return False
+  
+
+  def short_name(self,name):
+    split = name.split("_")
+    if len(split) > 3:
+      short_name = (split[0] + "_" + split[1] + "_" + split[2])
+    else:
+      short_name = name
+    return short_name
+  
+  def cleanup_actions(self):
+    self.msg_if.pub_info("Shutting down: Executing script cleanup actions")
+    self.stopAndPurgeDeviceNode('All')
+    
+if __name__ == '__main__':
+  node = GenicamCamDiscovery()            
+
+        
+      
+
+ 
