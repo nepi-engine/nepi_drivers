@@ -68,7 +68,7 @@ class AfTowerLightDiscovery:
     ########################
     # Get discovery options
     try:
-      #Sself.logger.log_warn("": " + self.log_name + ": Starting discovery with drv_dict " + str(drv_dict))#
+      #Sself.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
       baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
       self.baud_rate = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
     except Exception as e:

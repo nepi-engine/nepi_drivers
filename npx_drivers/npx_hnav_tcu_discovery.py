@@ -40,7 +40,7 @@ class HNavDiscovery:
 
     def __init__(self):
         self.log_name = PKG_NAME.lower() + "_discovery"
-        self.logger = nepi_sdk.logger(log_name=self.log_name)
+        self.logger = nepi_sdk.logger()
         time.sleep(0.2)
 
         self.system_config = nepi_system.load_nepi_system_config()
