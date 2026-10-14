@@ -919,9 +919,11 @@ class ArdupilotNode:
   def takeoff_action(self):
     self.rbx_if.update_prev_errors()
     self.rbx_if.update_current_errors( [0,0,0,0,0,0,0] )
+    self.rbx_if.update_current_goals( [0,0,0,0,0,0,0] )
     cmd_success = False
     if self.state_current == "ARM":
       takeoff_height_m = float(nepi_controls.get_value(self.settings_dict,'takeoff_height_m'))
+      self.rbx_if.update_current_goals( [None,None,takeoff_height_m,None,None,None,None] )
       takeoff_min_pitch_deg = float(nepi_controls.get_value(self.settings_dict,'takeoff_min_pitch_deg'))
       self.msg_if.pub_info("Sending Takeoff Command to altitude to " + str(takeoff_height_m) + " meters")
       takeoff_cmd = CommandTOLRequest()
@@ -954,7 +956,7 @@ class ArdupilotNode:
       check_timer = 0
       alt_error = (goal_alt - self.rbx_if.current_location_wgs84_geo[2])
       while (abs(alt_error) > error_bound_m and check_timer < timeout_sec):
-        self.rbx_if.update_current_errors( [0,0,alt_error,0,0,0,0] )
+        self.rbx_if.update_current_errors( [None,None,alt_error,None,None,None,None] )
         alt_error = (goal_alt - self.rbx_if.current_location_wgs84_geo[2])
         time.sleep(check_interval_s)
         check_timer += check_interval_s
