@@ -53,7 +53,8 @@ class ServosPanTiltDiscovery:
   def __init__(self):
     ############
     # Create Message Logger
-    self.logger = nepi_sdk.logger()
+    self.log_name = PKG_NAME.lower() + "_discovery"
+    self.logger = nepi_sdk.logger(namespace = self.log_name)
     time.sleep(1)
     self.logger.log_info("Starting Initialization")
     self.logger.log_info("Initialization Complete")

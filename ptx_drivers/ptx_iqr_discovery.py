@@ -53,7 +53,8 @@ class IqrPanTiltDiscovery:
   def __init__(self):
     ############
     # Create Message Logger
-    self.logger = nepi_sdk.logger()
+    self.log_name = PKG_NAME.lower() + "_discovery"
+    self.logger = nepi_sdk.logger(namespace = self.log_name)
     time.sleep(1)
     self.logger.log_info("Starting Initialization")
     self.logger.log_info("Initialization Complete")
@@ -94,6 +95,7 @@ class IqrPanTiltDiscovery:
         self.active_paths_list.remove(path_str)
 
     ### Checking for devices on available paths
+    self.logger.log_debug("Checking for devices on acive paths", throttle_s = 5)
     for path_str in self.available_paths_list:
       if path_str not in self.active_paths_list and path_str not in self.excludedDevices:
         found_device = self.checkForDevice(path_str)

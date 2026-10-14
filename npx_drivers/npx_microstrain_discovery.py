@@ -66,7 +66,8 @@ class MicrostrainDiscovery:
     def __init__(self):
         ############
         # Create Message Logger
-        self.logger = nepi_sdk.logger()
+        self.log_name = PKG_NAME.lower() + "_discovery"
+        self.logger = nepi_sdk.logger(namespace = self.log_name)
         time.sleep(1)
         self.logger.log_info("Starting Initialization")
         self.logger.log_info("Initialization Complete")
@@ -228,7 +229,7 @@ class MicrostrainDiscovery:
         return found_device
 
     def checkOnDevice(self,path_str):
-        self.logger.log_debug("Entering check for device function for path: " + str(path_str))###
+        #self.logger.log_debug("Entering check for device function for path: " + str(path_str), throttle_s = 10)###
         active = True
         if path_str not in self.available_paths_list:
             active = False
