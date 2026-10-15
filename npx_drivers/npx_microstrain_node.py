@@ -85,13 +85,13 @@ def launch_driver_node(base_namespace, node_name, param_file_path):
     try:
         sub_process = subprocess.Popen(device_node_launch_cmd)
     except Exception as e:
-        return (False, f"Failed to launch {ros_node_name}: {e}", None)
+        return (False, f"Failed to launch {node_name}: {e}", None)
 
     # If the process died immediately, treat as failure
     rc = sub_process.poll()
     if rc is not None and rc != 0:
         return (False,
-                f"Failed to start {ros_node_name} via: {' '.join(device_node_launch_cmd)} (rc={rc})",
+                f"Failed to start {node_name} via: {' '.join(device_node_launch_cmd)} (rc={rc})",
                 None)
 
     return (True, "Success", sub_process)
@@ -148,21 +148,21 @@ class MicrostrainNode(object):
         ##############################  
         # Create Msg Class
         self.msg_if = MsgIF()
-        self.msg_if.pub_info("Starting Node Initialization Processes")
+        self.msg_if.pub_info("Starting Initialization Processes")
         
 
         ##############################
         # Gather Driver Settings
-        self.msg_if.pub_info("Gathering driver settings")
+        self.msg_if.pub_debug("Gathering driver settings")
         try:
             self.device_dict = nepi_sdk.get_param('~drv_dict',dict())['DEVICE_DICT'] 
         except:
-            self.msg_if.pub_warn("Failed to load driver settings from params")
+            self.msg_if.pub_debug("Failed to load driver settings from params")
             self.device_dict = device_dict
         
-        self.msg_if.pub_info("Got drv dict: " + str(self.device_dict))
+        self.msg_if.pub_debug("Got drv dict: " + str(self.device_dict))
         if self.device_dict is None:
-            self.msg_if.pub_info("Driver Dict not provided")
+            self.msg_if.pub_debug("Driver Dict not provided")
             nepi_sdk.signal_shutdown(self.node_name + ": Driver Dict not provided")
             return
 
@@ -170,28 +170,28 @@ class MicrostrainNode(object):
         # Get required drv driver dict info
         try:
             self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
-            #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
+            #self.msg_if.pub_debug("Nex_Dict: " + str(self.drv_dict))
             self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
             self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
             port = self.device_dict['port']
-            self.msg_if.pub_info("Using port: " + str(port))
+            self.msg_if.pub_debug("Using port: " + str(port))
 
             baudrate = self.device_dict['baudrate']
-            self.msg_if.pub_info("Using baudrate: " + str(baudrate))
+            self.msg_if.pub_debug("Using baudrate: " + str(baudrate))
 
             aux_port = self.device_dict['aux_port']
-            self.msg_if.pub_info("Using aux_port: " + str(aux_port))
+            self.msg_if.pub_debug("Using aux_port: " + str(aux_port))
 
             aux_baudrate = self.device_dict['aux_baudrate']
-            self.msg_if.pub_info("Using aux_baudrate: " + str(aux_baudrate))
+            self.msg_if.pub_debug("Using aux_baudrate: " + str(aux_baudrate))
 
             debug = False
             if 'debug' in self.device_dict.keys():
                 debug = self.device_dict['debug']
-            self.msg_if.pub_info("Debug set to: " + str(debug))
+            self.msg_if.pub_debug("Debug set to: " + str(debug))
 
             param_file = self.device_dict['param_file']
-            self.msg_if.pub_info("Using param_file: " + str(param_file))
+            self.msg_if.pub_debug("Using param_file: " + str(param_file))
         except Exception as e:
             self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
@@ -209,7 +209,7 @@ class MicrostrainNode(object):
 
             return
 
-        self.msg_if.pub_info("Updating params in: " + param_file)
+        self.msg_if.pub_debug("Updating params in: " + param_file)
         # Read Param File Settings
         node_params_dict = nepi_utils.read_dict_from_file(param_file)
         if node_params_dict is None:
@@ -226,7 +226,7 @@ class MicrostrainNode(object):
         success = nepi_utils.write_dict_to_file(node_params_dict,param_file)
         
         if success == True:
-            self.msg_if.pub_warn("Updated param file at: " + param_file + " with: " + str(node_params_dict))
+            self.msg_if.pub_debug("Updated param file at: " + param_file + " with: " + str(node_params_dict))
         else:
             self.msg_if.pub_warn("Failed to update param file at: " + param_file)
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting Down - Failed to update param file")
@@ -240,7 +240,7 @@ class MicrostrainNode(object):
             self.msg_if.pub_warn("Failed to launch driver process node: " + self.driver_node_name + " with return msg: " + str(msg))
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting Down - Failed to update param file")
             return
-        self.msg_if.pub_info("Source Node launch return msg: " + msg)
+        self.msg_if.pub_debug("Source Node launch return msg: " + msg)
 
 
         #############################
@@ -253,18 +253,18 @@ class MicrostrainNode(object):
         # Create Subscribers
         #sub_base_namespace = nepi_sdk.create_namespace(self.base_namespace,self.driver_node_name)
         sub_namespace = nepi_sdk.create_namespace(self.base_namespace, "imu/data")
-        self.msg_if.pub_warn("Starting Imu subscriber for namespace: " + sub_namespace)
+        self.msg_if.pub_debug("Starting Imu subscriber for namespace: " + sub_namespace)
         self.imu_sub = nepi_sdk.create_subscriber(sub_namespace, Imu, self.imuCb, queue_size = 10)
 
         sub_namespace = nepi_sdk.create_namespace(self.node_namespace, "shutdown")
-        self.msg_if.pub_warn("Starting Shutdown subsriber for namespace: " + sub_namespace) 
+        self.msg_if.pub_debug("Starting Shutdown subsriber for namespace: " + sub_namespace) 
         self.imu_sub = nepi_sdk.create_subscriber(sub_namespace, Empty, self.shutdownCb, queue_size = 10)
       
         ###############################
         # Create a NPX Device IF
         self.msg_if.pub_warn("Starting NPX Class Initialization")
         if self.getNavPoseCb is not None:
-            self.msg_if.pub_warn("Starting NPX Device IF Initialization")
+            self.msg_if.pub_debug("Starting NPX Device IF Initialization")
             self.npx_if = NPXDeviceIF(device_info = self.device_info_dict, 
                 data_source_description = "sensor", #self.data_source_description
                 data_ref_description = "sensor_center",
@@ -299,7 +299,7 @@ class MicrostrainNode(object):
         ang_vel = imu_msg.angular_velocity
 
         timestamp = nepi_sdk.sec_from_msg_stamp(imu_msg.header.stamp)
-        #self.msg_if.pub_warn("Got Timestamp from msg: " + str(timestamp) + " : " + str(imu_msg.header.stamp), throttle_s = 5)
+        #self.msg_if.pub_debug("Got Timestamp from msg: " + str(timestamp) + " : " + str(imu_msg.header.stamp), throttle_s = 5)
         self.driver_navpose_dict['time_orientation'] = timestamp
         self.driver_navpose_dict['roll_deg'] = rpy[0]
         self.driver_navpose_dict['pitch_deg'] = rpy[1]
