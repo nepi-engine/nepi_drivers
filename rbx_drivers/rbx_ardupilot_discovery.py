@@ -725,6 +725,18 @@ class ArdupilotDiscovery:
 
         # Identify a heartbeat packet by tell-tale signs
         if pkt_len == 9 and msg_id_l == 0x0 and msg_id_m == 0x0 and msg_id_h == 0x0: # Heartbeat message id = 0x00 00 00
+          # Read the 9 byte HEARTBEAT payload; byte 5 is the autopilot type.
+          # A PX4 (MAV_AUTOPILOT_PX4 = 12) speaks MAVLink too, and launching
+          # ArduPilot handling against it would be wrong, so its port is
+          # treated as not found here.
+          try:
+            pkt_payload = serial_port.read(9)
+          except Exception as e:
+            pkt_payload = b''
+          if len(pkt_payload) == 9 and pkt_payload[5] == 12:
+            self.logger.log_info("PX4 heartbeat seen on " + path_str + " -- leaving this port for the RBX_PX4 driver" +
+                                 " (which connects PX4 over USB or SITL only)", throttle_s = 60.0)
+            break
           if sys_id > 0 and sys_id < 240:
             found_device = True
             mav_comp_id = comp_id

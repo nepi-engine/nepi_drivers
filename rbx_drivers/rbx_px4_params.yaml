@@ -1,0 +1,24 @@
+driver:
+  pkg_name: RBX_PX4
+  display_name: PX4 Autopilot
+  description: Driver package for PX4 autopilot multicopters via mavros, connected over the Pixhawk USB port or to a PX4 SITL simulation over UDP
+  type: RBX
+  group_id: PX4
+  NODE_DICT:
+    file_name: rbx_px4_node.py
+    class_name: PX4Node
+  DRIVER_DICT:
+    file_name: None
+    class_name: None
+  DISCOVERY_DICT:
+    file_name: rbx_px4_discovery.py
+    class_name: PX4Discovery
+    process: CALL
+    OPTIONS:
+      connection:
+        type: Selection
+        options:
+          - USB
+          - SITL
+        default: USB
+        value: USB
