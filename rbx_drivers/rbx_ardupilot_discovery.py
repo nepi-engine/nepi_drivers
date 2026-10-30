@@ -735,7 +735,7 @@ class ArdupilotDiscovery:
             pkt_payload = b''
           if len(pkt_payload) == 9 and pkt_payload[5] == 12:
             self.logger.log_info("PX4 heartbeat seen on " + path_str + " -- leaving this port for the RBX_PX4 driver" +
-                                 " (which connects PX4 over USB or SITL only)", throttle_s = 60.0)
+                                 " (set its connection option to SERIAL to use it)", throttle_s = 60.0)
             break
           if sys_id > 0 and sys_id < 240:
             found_device = True

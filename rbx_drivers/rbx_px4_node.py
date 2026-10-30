@@ -195,12 +195,13 @@ class PX4Node:
   MAV_CMD_COMPONENT_ARM_DISARM = 400
   MAV_CMD_FORCE_MAGIC = 21196.0
 
-  # SITL link watchdog: a simulator that goes away leaves mavros running with
-  # connected False. The node shuts itself down so discovery purges the
-  # device and probes for the simulator again. A USB link needs no watchdog:
+  # Link watchdog (SITL and SERIAL): a simulator that goes away, or a
+  # Pixhawk that powers off on a UART that stays present, leaves mavros
+  # running with connected False. The node shuts itself down so discovery
+  # purges the device and probes for it again. A USB link needs no watchdog:
   # discovery purges it when the /dev path disappears.
-  SITL_LINK_LOST_SEC = 15.0
-  SITL_WATCHDOG_INTERVAL_SEC = 1.0
+  LINK_LOST_SEC = 15.0
+  LINK_WATCHDOG_INTERVAL_SEC = 1.0
 
   device_info_dict = dict(device_name = "",
                           path = "",
@@ -301,8 +302,10 @@ class PX4Node:
         self.mav_node_name = self.drv_dict['DEVICE_DICT']['mavlink_node_name']
         self.connection = self.drv_dict['DEVICE_DICT']['connection']
         # Gates the data_source_description reported to RBXRobotIF (the Sim
-        # Connector app discovers simulators by it) and the SITL link watchdog.
+        # Connector app discovers simulators by it).
         self.is_sitl = (str(self.connection).upper() == 'SITL')
+        # Gates the link watchdog -- see LINK_LOST_SEC
+        self.watch_link = self.is_sitl or (str(self.connection).upper() == 'SERIAL')
     except Exception as e:
         self.msg_if.pub_warn("Failed to load Device Dict " + str(e))
         nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
@@ -474,9 +477,9 @@ class PX4Node:
     nepi_sdk.start_timer_process(setpoint_pub_interval, self.sendSetpointStreamCb)
     ## Start the motor test refresh loop -- see MOTOR_TEST_REFRESH_SEC
     nepi_sdk.start_timer_process(self.MOTOR_TEST_REFRESH_SEC, self.motorTestRefreshCb)
-    ## Start the SITL link watchdog -- see SITL_LINK_LOST_SEC
-    if self.is_sitl:
-      nepi_sdk.start_timer_process(self.SITL_WATCHDOG_INTERVAL_SEC, self.sitlLinkWatchdogCb)
+    ## Start the link watchdog -- see LINK_LOST_SEC
+    if self.watch_link:
+      nepi_sdk.start_timer_process(self.LINK_WATCHDOG_INTERVAL_SEC, self.linkWatchdogCb)
     ## Initiation Complete
     self.msg_if.pub_info("Initialization Complete")
     #Set up node shutdown
@@ -1266,22 +1269,23 @@ class PX4Node:
 
 
   #######################
-  # SITL Link Watchdog
+  # Link Watchdog (SITL and SERIAL)
 
-  def sitlLinkWatchdogCb(self, timer):
-    # mavros keeps publishing State with connected False once the SITL
-    # heartbeat stops. Only a continuous SITL_LINK_LOST_SEC of that counts.
+  def linkWatchdogCb(self, timer):
+    # mavros keeps publishing State with connected False once the PX4
+    # heartbeat stops. Only a continuous LINK_LOST_SEC of that counts.
     now = nepi_utils.get_time()
     connected = (self.mavlink_state is not None and self.mavlink_state.connected == True)
     if connected:
       self.link_lost_time = None
     elif self.link_lost_time is None:
       self.link_lost_time = now
-    elif (now - self.link_lost_time) >= self.SITL_LINK_LOST_SEC and self.link_lost_signalled == False:
+    elif (now - self.link_lost_time) >= self.LINK_LOST_SEC and self.link_lost_signalled == False:
       self.link_lost_signalled = True
-      self.msg_if.pub_warn("No PX4 SITL link for " + str(int(self.SITL_LINK_LOST_SEC)) +
-                           " s -- shutting down so discovery can probe for the simulator again")
-      nepi_sdk.signal_shutdown(self.node_name + ": SITL link lost")
+      self.msg_if.pub_warn("No PX4 " + str(self.connection) + " link on " + str(self.device_path) +
+                           " for " + str(int(self.LINK_LOST_SEC)) +
+                           " s -- shutting down so discovery can probe for it again")
+      nepi_sdk.signal_shutdown(self.node_name + ": " + str(self.connection) + " link lost")
 
 
   #######################

@@ -28,6 +28,7 @@ from serial.tools import list_ports
 from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_drvs
 from nepi_sdk import nepi_system
+from nepi_sdk import nepi_serial
 
 PKG_NAME = 'RBX_PX4' # Use in display menus
 FILE_TYPE = 'DISCOVERY'
@@ -176,8 +177,8 @@ class PX4Discovery:
   USB_PRODUCT_MATCH = 'PX4'
   USB_BOOTLOADER_TOKEN = 'BL'
   USB_BAUD_STR = '115200' # CDC-ACM ignores the rate; used for the probe and the fcu_url alike
-  USB_READ_TIMEOUT_SEC = 0.1
-  USB_READ_CHUNK_BYTES = 512
+  PORT_READ_TIMEOUT_SEC = 0.1 # USB and SERIAL probes alike
+  PORT_READ_CHUNK_BYTES = 512
   USB_LISTEN_SEC = 2.0        # SYS_USB_AUTO = 2: PX4 transmits first
   USB_ANSWER_LISTEN_SEC = 3.0 # SYS_USB_AUTO = 1: PX4 answers our heartbeat
   # drivers_mgr runs every driver's discoveryFunction in turn on one thread,
@@ -185,6 +186,22 @@ class PX4Discovery:
   # every other driver the full 5 s probe on every cycle. A silent port is
   # re-probed at this interval instead.
   USB_SILENT_RETRY_SEC = 15.0
+
+  # SERIAL: a Pixhawk TELEM port wired to one of this computer's UARTs
+  # (ttyAMA, ttyTHS) or to a USB-serial adapter (ttyUSB). TELEM2 is PX4's
+  # companion port (SER_TEL2_BAUD 921600, MAV_1_MODE Onboard) but its MAVLink
+  # instance is off until MAV_1_CONFIG = TELEM 2. TELEM1 carries MAVLink by
+  # default at 57600 with MAV_0_RATE capped at 1200 B/s for a telemetry radio,
+  # so it is probed second: a vehicle wired that way still connects. ttyACM
+  # ports are never probed here -- a Pixhawk's own USB port is the USB
+  # connection, and Maestro and Teensy boards are ttyACM ports too.
+  SERIAL_BAUD_LIST = ['921600', '57600']
+  SERIAL_EXCLUDED_DEVICES = ['ttyACM']
+  SERIAL_LISTEN_SEC = 1.5 # PX4 sends HEARTBEAT at 1 Hz on every link
+  # Most serial ports belong to lights, pan-tilts or GPS units and never send
+  # a PX4 heartbeat, and each one costs a listen at every baud rate on
+  # drivers_mgr's one discovery thread, so they are re-probed this rarely.
+  SERIAL_SILENT_RETRY_SEC = 30.0
 
   # SITL: PX4 SITL's offboard-API MAVLink instance sends from UDP 14580 to
   # 14540 on its target host (localhost unless the SITL was started with this
@@ -290,6 +307,26 @@ class PX4Discovery:
             self.logger.log_info("USB mavlink launch process returned: " + str(success))
             if success:
               self.active_paths_list.append(path_str)
+    # RUN SERIAL PROCESSES (a Pixhawk TELEM port on a UART or USB-serial adapter)
+    elif connection_type == 'SERIAL':
+      # Create path search options
+      self.path_list = self.getPx4SerialPortsList()
+      for path_str in list(self.silent_ports_dict.keys()):
+        if path_str not in self.path_list:
+          del self.silent_ports_dict[path_str]
+      for path_str in self.path_list:
+        valid_path = True
+        if path_str in self.active_paths_list or path_str in self.dont_retry_list:
+          valid_path = False
+        if valid_path and path_str in self.silent_ports_dict.keys():
+          valid_path = (nepi_sdk.get_time() - self.silent_ports_dict[path_str]) > self.SERIAL_SILENT_RETRY_SEC
+        if valid_path:
+          [found_device, path_str, comp_id, sys_id, baud_str] = self.checkForSerialDevice(path_str)
+          if found_device:
+            success = self.launchSerialDeviceNode(path_str, comp_id, sys_id, baud_str)
+            self.logger.log_info("Serial mavlink launch process returned: " + str(success))
+            if success:
+              self.active_paths_list.append(path_str)
     # RUN SITL PROCESS (PX4 Software-In-The-Loop over UDP)
     elif connection_type == 'SITL':
       path_str = self.SITL_PATH_STR
@@ -312,7 +349,8 @@ class PX4Discovery:
     # still alive and its path is still present. Both are checked because
     # mavros can stay healthy while the RBX node exits (see the matching
     # comment in rbx_ardupilot_discovery.py) -- and the RBX node exiting is
-    # exactly how a SITL link loss is signalled (PX4Node's link watchdog).
+    # exactly how a SITL or SERIAL link loss is signalled (PX4Node's link
+    # watchdog).
     active = True
     if path_str not in self.active_devices_dict.keys():
       return False
@@ -330,7 +368,8 @@ class PX4Discovery:
     elif rbx_subproc is None or rbx_subproc.poll() is not None:
       self.logger.log_warn("PX4 RBX node for " + path_str + " is no longer running... purging from managed list")
       purge_node = True
-    # For USB connections, check that the port still exists
+    # For USB and SERIAL connections, check that the port still exists (a
+    # UART never disappears; the node's link watchdog covers that case)
     elif path_str.startswith('/dev/') and path_str not in self.available_paths_list:
       self.logger.log_warn("Port associated with node no longer detected " + path_str)
       purge_node = True
@@ -526,12 +565,12 @@ class PX4Discovery:
   def readForPx4Heartbeat(self, serial_port, listen_sec):
     # Reads for up to listen_sec and returns [sys_id, comp_id, mavlink_version]
     # from the first PX4 heartbeat, or None. Only the tail a split frame could
-    # still occupy is kept between reads, so a fast USB stream cannot grow the
+    # still occupy is kept between reads, so a fast stream cannot grow the
     # buffer.
     read_buffer = b''
     end_time = nepi_sdk.get_time() + listen_sec
     while nepi_sdk.get_time() < end_time:
-      bytes_read = serial_port.read(self.USB_READ_CHUNK_BYTES)
+      bytes_read = serial_port.read(self.PORT_READ_CHUNK_BYTES)
       if len(bytes_read) == 0:
         continue
       read_buffer = read_buffer + bytes_read
@@ -548,7 +587,7 @@ class PX4Discovery:
     mav_sys_id = None
     try:
       # Try and open serial port
-      serial_port = serial.Serial(path_str, int(self.USB_BAUD_STR), timeout = self.USB_READ_TIMEOUT_SEC)
+      serial_port = serial.Serial(path_str, int(self.USB_BAUD_STR), timeout = self.PORT_READ_TIMEOUT_SEC)
     except Exception as e:
       self.logPortErrorOnce(path_str, "Unable to open PX4 USB port " + path_str + " (" + str(e) + ")")
       return found_device, path_str, mav_comp_id, mav_sys_id
@@ -597,6 +636,88 @@ class PX4Discovery:
       fcu_url = path_str + ':' + self.USB_BAUD_STR
       gcs_url = ""
       success = self.launchDeviceNode(path_str, device_id_str, mav_comp_id, mav_sys_id, fcu_url, gcs_url, 'USB')
+    return success
+
+
+  ########## SERIAL PROCESSES ############
+
+  def getPx4SerialPortsList(self):
+    # Every port nepi_serial lists (including Jetson ttyTHS UARTs) except the
+    # SERIAL_EXCLUDED_DEVICES ones.
+    ports_list = []
+    try:
+      all_ports_list = nepi_serial.get_serial_ports_list()
+    except Exception as e:
+      self.logPortErrorOnce('list_ports', "Unable to list serial ports (" + str(e) + ")")
+      return ports_list
+    for path_str in all_ports_list:
+      valid_path = True
+      for exclude_device in self.SERIAL_EXCLUDED_DEVICES:
+        if path_str.find(exclude_device) != -1:
+          valid_path = False
+      if valid_path:
+        ports_list.append(path_str)
+    return ports_list
+
+
+  def checkForSerialDevice(self, path_str):
+    found_device = False
+    mav_comp_id = None
+    mav_sys_id = None
+    found_baud_str = None
+    heartbeat = None
+    for baud_str in self.SERIAL_BAUD_LIST:
+      try:
+        # Try and open serial port. exclusive takes a flock, so a port some
+        # other process holds under flock fails to open here instead of
+        # losing bytes to this probe.
+        serial_port = serial.Serial(path_str, int(baud_str), timeout = self.PORT_READ_TIMEOUT_SEC, exclusive = True)
+      except Exception as e:
+        self.logPortErrorOnce(path_str, "Unable to open serial port " + path_str + " for a PX4 probe (" + str(e) + ")")
+        return found_device, path_str, mav_comp_id, mav_sys_id, found_baud_str
+      try:
+        # Listen only, never write: PX4 heartbeats unprompted on every TELEM
+        # port with a MAVLink instance, and the other ports probed here
+        # belong to other devices.
+        heartbeat = self.readForPx4Heartbeat(serial_port, self.SERIAL_LISTEN_SEC)
+      except Exception as e:
+        self.logPortErrorOnce(path_str, "PX4 serial probe failed on " + path_str + " (" + str(e) + ")")
+      finally:
+        # Clean up the serial port
+        try:
+          serial_port.close()
+        except Exception:
+          pass
+      if heartbeat is not None:
+        found_baud_str = baud_str
+        break
+
+    if heartbeat is not None:
+      [mav_sys_id, mav_comp_id, mav_version] = heartbeat
+      found_device = True
+      self.silent_ports_dict.pop(path_str, None)
+      self.port_errors_dict.pop(path_str, None)
+      self.logger.log_info("Found PX4 autopilot at: " + path_str + " with baudrate " + found_baud_str +
+                           " with sys_id " + str(mav_sys_id) + " comp_id " + str(mav_comp_id) +
+                           " (MAVLink " + str(mav_version) + ")")
+    else:
+      # Info once per port: most ports probed here are other devices, so
+      # silence is the normal answer, not a fault.
+      if path_str not in self.silent_ports_dict.keys():
+        self.logger.log_info("Serial port " + path_str + " sent no PX4 heartbeat at " +
+                             " or ".join(self.SERIAL_BAUD_LIST) + " baud" +
+                             " -- will re-check it every " + str(int(self.SERIAL_SILENT_RETRY_SEC)) + " s")
+      self.silent_ports_dict[path_str] = nepi_sdk.get_time()
+    return found_device, path_str, mav_comp_id, mav_sys_id, found_baud_str
+
+
+  def launchSerialDeviceNode(self, path_str, mav_comp_id, mav_sys_id, baud_str):
+    success = False
+    if mav_comp_id is not None and mav_sys_id is not None and baud_str is not None:
+      device_id_str = path_str.split('/')[-1]
+      fcu_url = path_str + ':' + baud_str
+      gcs_url = ""
+      success = self.launchDeviceNode(path_str, device_id_str, mav_comp_id, mav_sys_id, fcu_url, gcs_url, 'SERIAL')
     return success
 
 
