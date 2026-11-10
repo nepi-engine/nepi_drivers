@@ -75,7 +75,7 @@ class V4L2CamDiscovery:
     # Update discovery options
     success = self.updateDiscoveryOptions()
     if success == False:
-        self.msg_if.pub_warn("Shutting down because failed to get Driver Dict")
+        self.msg_if.pub_debug("Shutting down because failed to get Driver Dict")
         nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because failed to get Driver Dict")
         return
     
@@ -116,7 +116,7 @@ class V4L2CamDiscovery:
       self.msg_if.pub_warn("Discovery dict missing in Drvier dict discovery dict ")#
       return success
     if last_drv_dict != self.drv_dict:
-      self.msg_if.pub_warn("Updated Driver Dict: " + str(self.drv_dict))
+      self.msg_if.pub_debug("Updated Driver Dict: " + str(self.drv_dict))
     success = True
 
 
@@ -235,7 +235,7 @@ class V4L2CamDiscovery:
                 if device['device_type'] != device_type:
                   # Uh oh -- device has switched on us!
                   # Kill previous and start new?
-                  self.msg_if.pub_warn("detected V4L2 device type change (" + device['device_type'] + "-->" + 
+                  self.msg_if.pub_info("detected V4L2 device type change (" + device['device_type'] + "-->" + 
                                 device_type + ") for device at " + path_str)
                   self.stopAndPurgeDeviceNode(node_namespace)
                   # Remove from dont_retry_list
@@ -252,9 +252,9 @@ class V4L2CamDiscovery:
                   ### DON'T REMOVE FROM dont_retry_list ###
                   launch_id = path_str
                   if launch_id in self.dont_retry_list:
-                    self.msg_if.pub_warn("node " + device['node_name'] + " is not running. WILL NOT RESTART")
+                    self.msg_if.pub_debug("node " + device['node_name'] + " is not running. WILL NOT RESTART")
                   else:
-                    self.msg_if.pub_warn("node " + device['node_name'] + " is not running. RESTARTING")
+                    self.msg_if.pub_debug("node " + device['node_name'] + " is not running. RESTARTING")
 
                     # Only start one device per check 
                     if success == False:
@@ -262,7 +262,7 @@ class V4L2CamDiscovery:
                       self.msg_if.pub_info("Restarting known device on path: " + device_type + ' : ' + path_str)
                       success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
                       if success == True:
-                        self.msg_if.pub_warn("Started new node on: " + path_str)
+                        self.msg_if.pub_info("Started new node on: " + path_str)
 
 
             ####################
@@ -276,7 +276,7 @@ class V4L2CamDiscovery:
                 # Restart Device
                 success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
                 if success == True:
-                  self.msg_if.pub_warn("Started new node on: " + path_str)
+                  self.msg_if.pub_info("Started new node on: " + path_str)
                 
               else:
                 pass
@@ -314,7 +314,7 @@ class V4L2CamDiscovery:
     #########################
     # Setup next check process
     if success == True:
-      self.msg_if.pub_warn("Delaying next check for " + str(self.launch_delay_sec) + " seconds")
+      self.msg_if.pub_info("Delaying next check for " + str(self.launch_delay_sec) + " seconds")
       nepi_sdk.sleep(self.launch_delay_sec)
 
     nepi_sdk.start_timer_process(self.CHECK_INTERVAL_S, self.detectAndManageDevices, oneshot = True)
@@ -391,8 +391,8 @@ class V4L2CamDiscovery:
                                       'node_name': node_name, 'node_namespace': node_namespace,
                                       'node_subprocess': sub_process})
 
-            self.msg_if.pub_warn("Added device to active list " + node_name)
-            self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
+            self.msg_if.pub_info("Added device to active list " + node_name)
+            self.msg_if.pub_debug("Updated Active Device List " + str(self.deviceList))
 
             # Process luanch results
             self.launch_time_dict[launch_id] = nepi_utils.get_time()
@@ -428,10 +428,10 @@ class V4L2CamDiscovery:
           if success == False:
             self.msg_if.pub_warn("Unable to kill device node " + node_name)
           else:
-            self.msg_if.pub_warn("Node killed. Removed device from active list " + node_name)
+            self.msg_if.pub_debug("Node killed. Removed device from active list " + node_name)
 
       
-      self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
+      self.msg_if.pub_debug("Updated Active Device List " + str(self.deviceList))
 
 
   def deviceNodeIsRunning(self, node_namespace):
@@ -442,7 +442,7 @@ class V4L2CamDiscovery:
         else:
           return True
     # If we get here, didn't find the node in our list    
-    self.msg_if.pub_warn("cannot check run status of unknown node " + node_namespace)
+    self.msg_if.pub_debug("cannot check run status of unknown node " + node_namespace)
     return False
   
 

@@ -262,7 +262,7 @@ class MicrostrainNode(object):
       
         ###############################
         # Create a NPX Device IF
-        self.msg_if.pub_warn("Starting NPX Class Initialization")
+        self.msg_if.pub_info("Starting NPX Class Initialization")
         if self.getNavPoseCb is not None:
             self.msg_if.pub_debug("Starting NPX Device IF Initialization")
             self.npx_if = NPXDeviceIF(device_info = self.device_info_dict, 
@@ -317,7 +317,7 @@ class MicrostrainNode(object):
     def shutdownCb(self,msg):
         self.msg_if.pub_warn("Recieved shutdown request for node: " + str(self.node_name))
         if self.driver_node_process is not None:
-            self.msg_if.pub_warn("Killing driver node: " + str(self.driver_node_process))
+            self.msg_if.pub_info("Killing driver node: " + str(self.driver_node_process))
             success = kill_driver_node(self.driver_node_name)
             if success == False:
                 self.msg_if.pub_warn("Failed to kill driver node: " + str(self.driver_node_process))
@@ -326,13 +326,13 @@ class MicrostrainNode(object):
     #######################
     ### Cleanup processes on node shutdown
     def cleanup_actions(self):
-        self.msg_if.pub_warn("Shutting down: Executing script cleanup actions")
+        self.msg_if.pub_info("Shutting down: Executing script cleanup actions")
         if self.driver_node_process is not None:
-            self.msg_if.pub_warn("Killing driver node: " + str(self.driver_node_process))
+            self.msg_if.pub_info("Killing driver node: " + str(self.driver_node_process))
             success = kill_driver_node(self.driver_node_name)
             if success == False:
                 self.msg_if.pub_warn("Failed to kill driver node: " + str(self.driver_node_process))
-        self.msg_if.pub_warn("Shutdown cleanup actions complete")
+        self.msg_if.pub_info("Shutdown cleanup actions complete")
             
 
 if __name__ == '__main__':

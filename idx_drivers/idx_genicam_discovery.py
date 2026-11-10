@@ -264,10 +264,10 @@ class GenicamCamDiscovery:
     ### Start Node Luanch Process
     # TODO: fair to assume uniqueness of device serial numbers?
  
-    self.msg_if.pub_warn(" launching node: " + node_name)
-    self.msg_if.pub_warn("Initiating new Genicam node " + node_namespace)
+    self.msg_if.pub_info(" launching node: " + node_name)
+    self.msg_if.pub_info("Initiating new Genicam node " + node_namespace)
 
-    self.msg_if.pub_warn("Starting node " + node_name + " via rosrun")
+    self.msg_if.pub_debug("Starting node " + node_name + " via rosrun")
 
     # NOTE: have to make serial_number look like a string by prefixing with "sn", otherwise ROS
     #       treats it as an int param and it causes an overflow. Better way to handle this?
@@ -328,9 +328,9 @@ class GenicamCamDiscovery:
           if success == False:
             self.msg_if.pub_warn("Unable to kill device node " + node_name)
           else:
-            self.msg_if.pub_warn("Node killed. Removed device from active list " + node_name)
+            self.msg_if.pub_info("Node killed. Removed device from active list " + node_name)
 
-      self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
+      self.msg_if.pub_debug("Updated Active Device List " + str(self.deviceList))
 
   def deviceNodeIsRunning(self, node_namespace):
     for device in self.deviceList:
@@ -340,7 +340,7 @@ class GenicamCamDiscovery:
         else:
           return True
     # If we get here, didn't find the node in our list    
-    self.msg_if.pub_warn("cannot check run status of unknown node " + node_namespace)
+    self.msg_if.pub_debug("cannot check run status of unknown node " + node_namespace)
     return False
   
 

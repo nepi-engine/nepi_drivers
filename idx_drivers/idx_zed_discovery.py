@@ -62,7 +62,7 @@ class ZedCamDiscovery:
   deviceList = []      
   dont_retry_list = []
 
-  navpose_enabled = False
+  navpose_enabled = True # Matches the idx_zed_params.yaml default
   navpose_pub_rate = 10
   ################################################
   DEFAULT_NODE_NAME = PKG_NAME.lower() + "_discovery"    
@@ -115,13 +115,13 @@ class ZedCamDiscovery:
     last_drv_dict = copy.deepcopy(self.drv_dict)
     self.drv_dict = nepi_sdk.get_param('~drv_dict',dict())
     if len(list(self.drv_dict.keys())) == 0:
-      self.msg_if.pub_warn("Failed to load Driver dict " + str(e))#
+      self.msg_if.pub_warn("Failed to load Driver dict: ~drv_dict param is empty")#
       return success    
     if 'DISCOVERY_DICT' not in self.drv_dict.keys():
       self.msg_if.pub_warn("Discovery dict missing in Drvier dict discovery dict ")#
       return success
     if last_drv_dict != self.drv_dict:
-      self.msg_if.pub_warn("Updated Driver Dict: " + str(self.drv_dict))
+      self.msg_if.pub_debug("Updated Driver Dict: " + str(self.drv_dict))
     success = True
     
     if 'resolution' in self.drv_dict['DISCOVERY_DICT']['OPTIONS']:
@@ -151,7 +151,11 @@ class ZedCamDiscovery:
       self.dont_retry_list = []
 
     if 'navpose_enabled' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
-      self.navpose_enabled = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['navpose_enabled']['value'] == 'True'
+      # drivers_mgr stores a Toggle option as a real bool (nepi_controls normalizes
+      # it), so comparing to the string 'True' alone was always False and the
+      # ZED's NPX navpose could never be enabled. Accept either form.
+      navpose_enabled = self.drv_dict['DISCOVERY_DICT']['OPTIONS']['navpose_enabled']['value']
+      self.navpose_enabled = (navpose_enabled == True or navpose_enabled == 'True' or navpose_enabled == 'true')
 
     if 'navpose_pub_rate' in self.drv_dict['DISCOVERY_DICT']['OPTIONS'].keys():
       try:
@@ -210,7 +214,7 @@ class ZedCamDiscovery:
                     usbBus = all_numbers[-1]
               except:
                 pass
-              #self.msg_if.pub_warn("Got Bus ID: " + str(usbBus) + " from line " + str(all_line))
+              #self.msg_if.pub_debug("Got Bus ID: " + str(usbBus) + " from line " + str(all_line))
                    
               # if '-' in all_line:
               #   usbBus = all_line.rsplit("-",1)[1].replace(".","")
@@ -237,7 +241,7 @@ class ZedCamDiscovery:
               
 
             if known_device == False and path_str not in self.dont_retry_list:
-              self.msg_if.pub_warn("Starting zed on path" + path_str)
+              self.msg_if.pub_info("Starting zed on path" + path_str)
               success = self.startDeviceNode(dtype = device_type, path_str= path_str, bus = usbBus)
               if success:
                 self.msg_if.pub_info("Started new node for path: " + path_str)
@@ -245,7 +249,7 @@ class ZedCamDiscovery:
                 self.msg_if.pub_info("Failed to start new node for path: " + path_str)
 
     # Check that device path still active
-    #self.msg_if.pub_warn("Active paths " + str(active_paths))
+    #self.msg_if.pub_debug("Active paths " + str(active_paths))
     purge_list = []
     for path_str in self.device_dict.keys():
       if path_str not in active_paths:
@@ -321,7 +325,7 @@ class ZedCamDiscovery:
                                           'framerate': self.fr_val, 
                                           'data_products': self.data_products,
                                           'navpose_enabled': self.navpose_enabled, 
-                                          'navpose_pub_rate': self.navpose_pub_rate
+                                          'navpose_update_rate': self.navpose_pub_rate
                                           }
             nepi_sdk.set_param(dict_param_name,self.drv_dict)
             

@@ -32,6 +32,7 @@ from nepi_sdk import nepi_controls
 
 
 from nepi_api.device_if_idx import IDXDeviceIF
+from nepi_api.device_if_npx import NPXDeviceIF
 from nepi_api.messages_if import MsgIF
 
 
@@ -219,13 +220,31 @@ class ZedCamNode(object):
     init_settings_dict = dict()
     settings_dict = dict()
 
+    getNavPoseCb = None
     navpose_enabled = False
-    navpose_pub_rate = 10
+    navpose_update_rate = 10
     navpose_dict = copy.deepcopy(nepi_nav.BLANK_NAVPOSE_DICT)
  
     nav_published = False
+    last_tracking_state = None # Last sl.POSITIONAL_TRACKING_STATE seen (see getZedPose)
+    pose_origin_xyz = None # Tracking position at the first good navpose sample; positions are reported relative to it
 
     print_pc_stats = True
+
+
+    msg_if = None
+    node_if = None
+    settings_if = None
+    save_data_if = None
+    transform_if = None
+    navpose_if = None
+    connect_navpose_if = None
+    npx_if = None
+
+    # Own-navpose source selection (see selectOwnNavPoseCb)
+    OWN_NAVPOSE_MAX_TRIES = 60 # 1 s apart
+    own_navpose_topic = None
+    own_navpose_tries = 0
 
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"         
@@ -251,7 +270,7 @@ class ZedCamNode(object):
         # Get required drv driver dict info
         try:
             self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
-            #self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
+            #self.msg_if.pub_debug("Nex_Dict: " + str(self.drv_dict))
             self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
             self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
             self.zed_type = self.drv_dict['DEVICE_DICT']['zed_type']
@@ -259,9 +278,9 @@ class ZedCamNode(object):
             self.framerate = self.drv_dict['DEVICE_DICT']['framerate']
             self.data_products = self.drv_dict['DEVICE_DICT']['data_products']
             self.navpose_enabled = self.drv_dict['DEVICE_DICT']['navpose_enabled']
-            self.navpose_pub_rate = self.drv_dict['DEVICE_DICT']['navpose_pub_rate']
+            self.navpose_update_rate = self.drv_dict['DEVICE_DICT']['navpose_update_rate']
         except Exception as e:
-            self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
+            self.msg_if.pub_debug("Failed to load Device Dict " + str(e))#
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
             return
 
@@ -326,7 +345,7 @@ class ZedCamNode(object):
             err = self.zed.open(init_params)
             if err == sl.ERROR_CODE.SUCCESS:
                 break
-            self.msg_if.pub_warn("Camera Open (attempt " + str(attempt + 1) + "/" +
+            self.msg_if.pub_debug("Camera Open (attempt " + str(attempt + 1) + "/" +
                                  str(OPEN_MAX_TRIES) + ") : " + str(err))
             # A failed open() leaves the Camera object holding partial state, and
             # calling open() on it again returns INVALID FUNCTION CALL regardless of
@@ -338,7 +357,7 @@ class ZedCamNode(object):
                 return
             nepi_sdk.sleep(OPEN_RETRY_DELAY_SEC)
         if err != sl.ERROR_CODE.SUCCESS:
-            self.msg_if.pub_warn("Camera Open failed after " + str(OPEN_MAX_TRIES) + " attempts : " + str(err))
+            self.msg_if.pub_debug("Camera Open failed after " + str(OPEN_MAX_TRIES) + " attempts : " + str(err))
             # Cleanly exit so drivers_mgr can re-discover and relaunch the node
             # once the camera is available. Without the return the node would fall
             # through into a half-open state and flood the log with grab errors.
@@ -350,7 +369,7 @@ class ZedCamNode(object):
         self.tracking_parameters = sl.PositionalTrackingParameters()
         err = self.zed.enable_positional_tracking(self.tracking_parameters)
         if err != sl.ERROR_CODE.SUCCESS:
-            self.msg_if.pub_warn("Positional Tracking enable failed : " + str(err))
+            self.msg_if.pub_debug("Positional Tracking enable failed : " + str(err))
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Not Able to Connect to Zed Camera")
             return
 
@@ -360,9 +379,8 @@ class ZedCamNode(object):
 
         #############################
         if self.navpose_enabled == True:
-            getNavPoseCb = self.getNavPoseDict
-        else:
-            getNavPoseCb = None
+            self.getNavPoseCb = self.getNavPoseDict
+     
 
        # Initialize controls
         self.factory_controls = self.FACTORY_CONTROLS
@@ -420,10 +438,42 @@ class ZedCamNode(object):
                                     stopDepthMapAcquisition = self.stopDepthMap,
                                     getPointcloud = self.getPointcloud, 
                                     stopPointcloudAcquisition = self.stopPointcloud,                                  
-                                    getNavPoseCb = getNavPoseCb, 
-                                    navpose_update_rate = self.navpose_pub_rate
+                                    msg_if = self.msg_if,
                                     )
         self.msg_if.pub_info("... IDX interface running")
+
+        ready = self.idx_if.wait_for_ready()
+
+        self.node_if = self.idx_if.node_if
+        self.settings_if = self.idx_if.settings_if
+        self.save_data_if = self.idx_if.save_data_if
+        self.connect_navpose_if =self.idx_if.connect_navpose_if
+        ##################################
+        # Setup NPX IF Class ####################
+        # The camera's navpose is published by the NPX device at <node>/<device_name>/npx/navpose.
+        # Compute it deterministically so the image data products can advertise it in
+        # ImageStatus.navpose_topic (the NPX device is created after the data threads start).
+
+        if self.getNavPoseCb is not None:
+
+            self.msg_if.pub_debug("Starting NPX Device IF Initialization")
+            self.npx_if = NPXDeviceIF(device_info = self.device_info_dict,
+                data_source_description = self.data_source_description,
+                data_ref_description = self.data_ref_description,
+                getNavPoseCb = self.getNavPoseCb,
+                max_navpose_update_rate = self.navpose_update_rate,
+                msg_if = self.msg_if,
+                node_if = self.node_if,
+                settings_if = self.settings_if,
+                save_data_if = self.save_data_if,
+                connect_navpose_if = self.connect_navpose_if
+                )
+
+            # Make the camera's own pose the IDX navpose source, so the ZED's images
+            # carry it by default. RC1's IDX IF has no navpose callback; its navpose
+            # only republishes whatever source the shared navpose connect selects.
+            self.own_navpose_topic = self.npx_if.navpose_if.get_namespace()
+            nepi_sdk.start_timer_process(1.0, self.selectOwnNavPoseCb, oneshot = True)
 
         # Update available IDX callbacks based on capabilities that the driver reports
         self.logDeviceInfo()
@@ -463,6 +513,32 @@ class ZedCamNode(object):
           self.msg_if.pub_info("Failed to get timestamp from zed camera")
           nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because Zed Node not running")
 
+
+    def selectOwnNavPoseCb(self, timer):
+        # Select the camera's own NPX navpose as the IDX navpose source once the
+        # connect has discovered it. Only a startup default is replaced ('None',
+        # '', or the node namespace that older saved configs hold), never a
+        # source the operator picked, and it gives up after a bounded number of
+        # tries so a navpose that never appears costs nothing.
+        connect_if = self.connect_navpose_if
+        if connect_if is None or self.own_navpose_topic is None or nepi_sdk.is_shutdown():
+          return
+        selected = connect_if.get_selected_topic()
+        if selected == self.own_navpose_topic:
+          return
+        if selected not in ['None', '', None, self.node_namespace]:
+          self.msg_if.pub_info("Keeping operator navpose source: " + str(selected))
+          return
+        if self.own_navpose_topic in connect_if.get_available_topics():
+          connect_if.set_selected_topic(self.own_navpose_topic)
+          self.msg_if.pub_info("Selected own navpose source: " + self.own_navpose_topic)
+          return
+        self.own_navpose_tries += 1
+        if self.own_navpose_tries < self.OWN_NAVPOSE_MAX_TRIES:
+          nepi_sdk.start_timer_process(1.0, self.selectOwnNavPoseCb, oneshot = True)
+        else:
+          self.msg_if.pub_warn("Own navpose source never appeared, leaving navpose unselected: " + self.own_navpose_topic)
+
       
 
 
@@ -487,7 +563,7 @@ class ZedCamNode(object):
             else:
               setting_dict['options'] = [str(option) for option in cap_setting['options']]
           except Exception as e:
-            self.msg_if.pub_warn("Invalid bounds for setting: " + setting_name + " : " + str(e))
+            self.msg_if.pub_debug("Invalid bounds for setting: " + setting_name + " : " + str(e))
 
         value = self.readSettingValue(setting_name)
         if value is None:
@@ -530,7 +606,7 @@ class ZedCamNode(object):
           if zed_name == "WHITEBALANCE_AUTO" or zed_name == "AEC_AGC_ROI":
             value = (value == 1)
         except Exception as e:
-          self.msg_if.pub_warn("Failed to get setting: " + str(zed_name) + " : " + str(e))
+          self.msg_if.pub_debug("Failed to get setting: " + str(zed_name) + " : " + str(e))
           return None
       elif setting_name == "pointcloud_max_rate":
         value = self.max_pointcloud_framerate
@@ -547,7 +623,7 @@ class ZedCamNode(object):
         elif setting_type == 'Toggle':
           value = (value == True)
       except Exception as e:
-        self.msg_if.pub_warn("Failed to convert setting: " + setting_name + " : " + str(e))
+        self.msg_if.pub_debug("Failed to convert setting: " + setting_name + " : " + str(e))
         return None
       return value
 
@@ -579,7 +655,7 @@ class ZedCamNode(object):
           msg = ( self.node_name  + " UPDATED SETTINGS " + setting_str)
         except Exception as e:
           msg = "Failed to set setting: " + str(zed_name) + " : " + str(e)
-          self.msg_if.pub_warn(msg)
+          self.msg_if.pub_debug(msg)
       elif setting_name == "pointcloud_max_rate":
         success, msg = self.setPointcloudFramerate(setting_value)
       elif setting_name == "pointcloud_rez_ratio":
@@ -595,92 +671,82 @@ class ZedCamNode(object):
 
 
     def getNavPoseDict(self):
-        
-        success = False
+        # Orientation and position both come from ONE grab and ONE get_position
+        # (getZedPose), so they always describe the same frame. They used to be
+        # read by two separate grabs.
+        [rpy, xyz] = self.getZedPose()
+        if rpy is None or xyz is None:
+            return None
+
+        cur_time = nepi_utils.get_time()
         navpose_dict = copy.deepcopy(nepi_nav.BLANK_NAVPOSE_DICT)
+
         navpose_dict['has_orientation'] = True
-        navpose_dict['time_oreantation'] = nepi_utils.get_time()
+        navpose_dict['time_orientation'] = cur_time
+        navpose_dict['roll_deg'] = rpy[0]
+        navpose_dict['pitch_deg'] = rpy[1]
+        navpose_dict['yaw_deg'] = rpy[2]
 
-        rpy = self.getOrientation()
-        if rpy is not None:
-              
-            navpose_dict['roll_deg'] = rpy[0]
-            navpose_dict['pitch_deg'] = rpy[1]
-            navpose_dict['yaw_deg'] = rpy[2]
+        # Position in METERS (init_params.coordinate_units is sl.UNIT.METER), in the
+        # camera's x forward / y left / z up frame, relative to where the camera was
+        # at the first good tracking sample after navpose started (see getZedPose).
+        # It was multiplied by 1000, so a few centimeters of motion read as tens.
+        navpose_dict['x_m'] = xyz[0]
+        navpose_dict['y_m'] = xyz[1]
+        navpose_dict['z_m'] = xyz[2]
+        navpose_dict['has_position'] = True
+        navpose_dict['time_position'] = cur_time
 
-
-
-            # Relative Position Meters in selected 3d frame (x,y,z) with x forward, y right/left, and z up/down
-            xyz = self.getPosition()
-            if xyz is not None:
-              navpose_dict['x_m'] = xyz[0] * 1000
-              navpose_dict['y_m'] = xyz[1] * 1000
-              navpose_dict['z_m'] = xyz[2] * 1000
-              navpose_dict['has_position'] = True
-              navpose_dict['time_position'] = nepi_utils.get_time()
-
-              success = True
-
-              # if self.nav_published == False:
-              #    self.msg_if.pub_warn("nav navpose_dict befor: " + str(navpose_dict))
-
-              #navpose_dict = nepi_nav.convert_navpose_ned2edu(navpose_dict)
-              # self.msg_if.pub_warn("roll: " + str(navpose_dict['roll_deg']) + " | pitch: " + str(navpose_dict['pitch_deg']) + " | yaw: " + str(navpose_dict['yaw_deg']))
-
-
-              if self.nav_published == False:
-                self.nav_published = True
-                self.msg_if.pub_warn("nav navpose_dict after: " + str(navpose_dict))
-
-        if success == False:
-           navpose_dict = None
+        if self.nav_published == False:
+            self.nav_published = True
+            self.msg_if.pub_debug("nav navpose_dict after: " + str(navpose_dict))
         return navpose_dict
-    
-    def getOrientation(self):
-        rpy = None
-        # return rpy
-        orientation_pose = sl.Pose()
+
+
+    def getZedPose(self):
+        # Returns [rpy_deg, xyz_m] for the latest grab, or [None, None] when there is
+        # no grab or positional tracking is not OK. get_position() returns the
+        # tracking state, and a pose taken while it is SEARCHING, FPS_TOO_LOW or OFF
+        # is not a measurement; it used to be published as one.
+        pose = sl.Pose()
+        state = None
         # Route pose grabs through the shared lock so the navpose path does not
         # contend with the color/depth/pointcloud threads on the single ZED handle.
         with self.zed_grab_lock:
             if self._grabSharedFrame():
-              # Get camera pose
-              self.zed.get_position(orientation_pose, sl.REFERENCE_FRAME.WORLD)
+                state = self.zed.get_position(pose, sl.REFERENCE_FRAME.WORLD)
 
-              # Get orientation as a quaternion
-              orientation = orientation_pose.get_orientation()
-              # You can use the quaternion values (orientation.get()[0], etc.)
-              
-              # Get orientation directly as Euler angles (roll, pitch, yaw)
-              # Angles are in radians by default. Use get_roll_pitch_yaw() to get them in a list/vector.
-              roll_pitch_yaw = orientation_pose.get_euler_angles() 
-              roll_deg = round(math.degrees(roll_pitch_yaw[2])*-1, 3)
-              pitch_deg = round(math.degrees(roll_pitch_yaw[0])*-1)
-              yaw_deg = round(math.degrees(roll_pitch_yaw[1])*-1)
+        if state != self.last_tracking_state:
+            self.last_tracking_state = state
+            if state == sl.POSITIONAL_TRACKING_STATE.OK:
+                self.msg_if.pub_info("Zed positional tracking state: " + str(state))
+            else:
+                self.msg_if.pub_warn("Zed positional tracking state: " + str(state) + ", navpose paused")
+        if state != sl.POSITIONAL_TRACKING_STATE.OK:
+            return [None, None]
 
-              rpy = [roll_deg, pitch_deg, yaw_deg]
-              #self.msg_if.pub_warn("roll deg: " + str(roll_deg) + " | pitch deg: " + str(pitch_deg) + " | yaw deg: " + str(yaw_deg))
-        return rpy
-    
-    def getPosition(self):
-      position = None
-      position_pose = sl.Pose()
+        # The camera runs in RIGHT_HANDED_Z_UP_X_FWD (x forward, y left, z up), the
+        # same frame NEPI's ENU navpose uses, so the pose quaternion converts with
+        # nepi_nav's own tf (static xyz) Euler order, as npx_microstrain does. The old
+        # get_euler_angles() index mapping and sign flips were written for the ZED's
+        # default image frame (y down, z forward) and were never updated when the
+        # coordinate system changed, so "roll" was really yaw, "pitch" was roll and
+        # "yaw" was pitch (rounded to whole degrees, so it read 0).
+        quat = pose.get_orientation().get() # [ox, oy, oz, ow]
+        rpy_deg = nepi_nav.convert_quat2rpy([quat[0], quat[1], quat[2], quat[3]])
+        rpy = [round(float(rpy_deg[0]), 3), round(float(rpy_deg[1]), 3), round(float(rpy_deg[2]), 3)]
 
-      # Route pose grabs through the shared lock (see getColorImage) so the
-      # navpose path does not contend with the data-product threads.
-      with self.zed_grab_lock:
-        if self._grabSharedFrame():
-          # Get the pose of the left eye of the camera with reference to the world frame
-          # Get the pose of the camera relative to the world frame
-          state = self.zed.get_position(position_pose, sl.REFERENCE_FRAME.WORLD)
-          # Display translation and timestamp
-          py_translation = sl.Translation()
-          tx = round(position_pose.get_translation(py_translation).get()[0], 3)
-          ty = round(position_pose.get_translation(py_translation).get()[1], 3)
-          tz = round(position_pose.get_translation(py_translation).get()[2], 3)
-
-          position = [tx, ty, tz]
-      return position
+        trans = pose.get_translation(sl.Translation()).get()
+        xyz = [float(trans[0]), float(trans[1]), float(trans[2])]
+        # Zero the position at the first good sample. Tracking starts when the
+        # camera opens, long before navpose comes up, so the SDK origin is wherever
+        # the camera sat at node start, not where it is when navpose starts.
+        if self.pose_origin_xyz is None:
+            self.pose_origin_xyz = xyz
+            self.msg_if.pub_info("Zed navpose position zeroed at tracking origin offset (m): " +
+                                 str([round(v, 3) for v in xyz]))
+        xyz = [round(xyz[i] - self.pose_origin_xyz[i], 3) for i in range(3)]
+        return [rpy, xyz]
 
 
     #**********************
@@ -826,7 +892,7 @@ class ZedCamNode(object):
         # self.color_img_sub = None
         # self.color_img_msg = None
         # self.color_img_lock.release()
-        self.msg_if.pub_warn("Stoped Color Image Acquire")
+        self.msg_if.pub_debug("Stoped Color Image Acquire")
         ret = True
         msg = "Success"
         return ret,msg
@@ -889,7 +955,7 @@ class ZedCamNode(object):
 
         # self.depth_map_msg = None
         # self.depth_map_lock.release()
-        self.msg_if.pub_warn("Stopped Depthmap Acquire")
+        self.msg_if.pub_debug("Stopped Depthmap Acquire")
         ret = True
         msg = "Success"
         return ret,msg
@@ -982,7 +1048,7 @@ class ZedCamNode(object):
               acquire_dict['color'] = round(nepi_utils.get_time() - start_time, 3)
 
               if self.print_pc_stats == True:
-                 self.msg_if.pub_warn("Pointcloud Acquire times: " + str(acquire_dict), throttle_s = 5)
+                 self.msg_if.pub_debug("Pointcloud Acquire times: " + str(acquire_dict), throttle_s = 5)
               self.print_pc_stats = False
 
           return status, msg, o3d_pc, timestamp, frame_id
@@ -999,7 +1065,7 @@ class ZedCamNode(object):
       # self.pc_sub = None
       # self.pc_msg = None
       # self.pc_lock.release()
-      self.msg_if.pub_warn("Stopped Pointcloud Acquire")
+      self.msg_if.pub_debug("Stopped Pointcloud Acquire")
       ret = True
       msg = "Success"
       return ret,msg
@@ -1009,7 +1075,7 @@ class ZedCamNode(object):
       self.msg_if.pub_info("Shutting down: Executing script cleanup actions")
       try:
         self.zed.close()
-        self.msg_if.pub_warn("Closed zed sdk connection")
+        self.msg_if.pub_info("Closed zed sdk connection")
       except Exception as e:
         self.msg_if.pub_warn("Failed to close zed sdk connection" + str(e))
         

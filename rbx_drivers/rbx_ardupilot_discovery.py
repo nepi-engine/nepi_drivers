@@ -366,7 +366,9 @@ class ArdupilotDiscovery:
       self.enable_fake_gps = (str(fake_gps_val).lower() == 'true')
     except Exception as e:
       self.logger.log_warn("Failed to load options " + str(e))
-      return None
+      # drivers_mgr assigns this return to its active_paths_list; None
+      # replaced that list and broke every later discovery call.
+      return self.active_paths_list
 
     # Retry behavior
     self.retry = retry_enabled

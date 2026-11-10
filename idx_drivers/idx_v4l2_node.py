@@ -121,7 +121,7 @@ class V4l2CamNode:
         # Get required drv driver dict info
         try:
             self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
-            self.msg_if.pub_warn("Nex_Dict: " + str(self.drv_dict))
+            self.msg_if.pub_debug("Nex_Dict: " + str(self.drv_dict))
             self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
             self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
             self.driver_path = self.drv_dict['path']
@@ -129,13 +129,13 @@ class V4l2CamNode:
             self.driver_module = self.driver_file.split('.')[0]
             self.driver_class_name = self.drv_dict['DRIVER_DICT']['class_name']
         except Exception as e:
-            self.msg_if.pub_warn("Failed to load Device Dict " + str(e))#
+            self.msg_if.pub_debug("Failed to load Device Dict " + str(e))#
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no valid Device Dict")
             return
 
         if self.device_path == "":
             #self.device_path = self.DEFAULT_DEVICE_PATH
-            self.msg_if.pub_warn("No Device Path given")#
+            self.msg_if.pub_debug("No Device Path given")#
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because no No Device Path given")
             return
         # import driver class fromn driver module
@@ -151,23 +151,23 @@ class V4l2CamNode:
                     is_mjpg = True
                     break
             self.msg_if.pub_info("Launching driver with mjpg mode: " + str(is_mjpg))
-            self.msg_if.pub_warn("device path: " + str(self.device_path))
+            self.msg_if.pub_debug("device path: " + str(self.device_path))
 
             try:
                 self.driver = self.driver_class(self.device_path, is_mjpg)
             except Exception as e:
                 # Only log the error every 30 seconds -- don't want to fill up log in the case that the camera simply isn't attached.
-                self.msg_if.pub_warn("Failed to instantiate driver: " + str(e) )
+                self.msg_if.pub_debug("Failed to instantiate driver: " + str(e) )
                 sys.exit(-1)
         ################################################
         # Start node initialization
         
         if self.driver is None:
-            self.msg_if.pub_warn("No Driver loaded")#
+            self.msg_if.pub_debug("No Driver loaded")#
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because No Driver loaded")
             return            
         if not self.driver.isConnected():
-            self.msg_if.pub_warn("Failed to connect to camera device at " + str(self.device_path) +
+            self.msg_if.pub_debug("Failed to connect to camera device at " + str(self.device_path) +
                                  "; shutting down node instead of presenting a device that produces no images")
             nepi_sdk.signal_shutdown(self.node_name + ": Shutting down because camera device not connected")
             return
@@ -327,7 +327,7 @@ class V4l2CamNode:
         self.init_settings_dict = init_settings_dict
         settings_dict = nepi_controls.create_controls_dict(init_settings_dict)
         settings_dict_values = nepi_controls.get_values_dict(settings_dict)
-        self.msg_if.pub_warn("Initialized Settings: " + str(settings_dict_values))
+        self.msg_if.pub_debug("Initialized Settings: " + str(settings_dict_values))
         return settings_dict
 
     def refreshSettingsDict(self):
@@ -371,7 +371,7 @@ class V4l2CamNode:
                         pass
                 else:
                     settings_dict = nepi_controls.set_value(settings_dict, setting_name, str(setting_current))
-                #self.msg_if.pub_warn("Refreshed Current Controls: " + str([setting_name,settings_dict[setting_name]]))
+                #self.msg_if.pub_debug("Refreshed Current Controls: " + str([setting_name,settings_dict[setting_name]]))
         # Add Resolution Settting
         if 'resolution' in settings_dict.keys():
             try:
@@ -411,9 +411,9 @@ class V4l2CamNode:
                 self.current_fps = framerate                 
             except Exception as e:
                 self.msg_if.pub_info(" " + "Driver returned invalid framerate options: " + str(e))
-        #self.msg_if.pub_warn("Refreshed Current Controls: " + str(settings_dict))
+        #self.msg_if.pub_debug("Refreshed Current Controls: " + str(settings_dict))
         settings_dict_values = nepi_controls.get_values_dict(settings_dict)
-        self.msg_if.pub_warn("Refreshed Current Settings: " + str(settings_dict_values))
+        self.msg_if.pub_debug("Refreshed Current Settings: " + str(settings_dict_values))
         return settings_dict
         
     
@@ -426,7 +426,7 @@ class V4l2CamNode:
 
     def setSettingFunction(self,setting_name, setting_value):
         setting_str = setting_name + ":" + str(setting_value)
-        #self.msg_if.pub_warn("Got Setting Update Request" + setting_str)
+        #self.msg_if.pub_debug("Got Setting Update Request" + setting_str)
         success = True
         msg = 'Success'
         found_setting = False
@@ -434,7 +434,7 @@ class V4l2CamNode:
                 found_setting = True
                 cur_val = nepi_controls.get_value(self.settings_dict, setting_name)
                 if str(cur_val) != str(setting_value):
-                    self.msg_if.pub_warn("Update Setting: " + setting_name + " from: " + str(cur_val) + " to: " + str(setting_value))
+                    self.msg_if.pub_debug("Update Setting: " + setting_name + " from: " + str(cur_val) + " to: " + str(setting_value))
                     needs_update = True
                     if setting_name != "resolution" and setting_name != "framerate":
                             
@@ -443,7 +443,7 @@ class V4l2CamNode:
                             #     msg = ("Setting Updated " + setting_str)
                             # else:
                             #     msg = (" FAILED to Update Setting: " + setting_str + " : " + str(success) + " : " + str(msg))
-                            # self.msg_if.pub_warn(msg)
+                            # self.msg_if.pub_debug(msg)
                     elif setting_name == "resolution":
                         # The value arrives as this method's setting_value
                         # argument. `data` was left over from the retired
@@ -467,11 +467,11 @@ class V4l2CamNode:
                                         framerate = float(framerate)
                                         ret = self.driver.setFramerate(framerate)
                                         # if ret[0]:
-                                        #     self.msg_if.pub_warn("Updated framerate: " + str(framerate) )
+                                        #     self.msg_if.pub_debug("Updated framerate: " + str(framerate) )
                                         # else:
-                                        #     self.msg_if.pub_warn("Failed to update framerate: " + str(framerate) + " : " + ret[1])
+                                        #     self.msg_if.pub_debug("Failed to update framerate: " + str(framerate) + " : " + ret[1])
                                     except Exception as e:
-                                        self.msg_if.pub_warn("Failed to update Framerate setting to: " + str(framerate) + " : " + str(e))
+                                        self.msg_if.pub_debug("Failed to update Framerate setting to: " + str(framerate) + " : " + str(e))
 
                                 # if 'brightness' in self.settings_dict.keys():
                                 #     nepi_sdk.sleep(1)
@@ -479,11 +479,11 @@ class V4l2CamNode:
                                 #         brightness = int(brightness)
                                 #         ret = self.driver.setCameraControl('brightness', brightness)
                                 #         # if ret[0]:
-                                #         #     self.msg_if.pub_warn("Updated brightness: " + str(brightness) )
+                                #         #     self.msg_if.pub_debug("Updated brightness: " + str(brightness) )
                                 #         # else:
-                                #         #     self.msg_if.pub_warn("Failed to update brightness: " + str(brightness) + " : " + ret[1])
+                                #         #     self.msg_if.pub_debug("Failed to update brightness: " + str(brightness) + " : " + ret[1])
                                 #     except Exception as e:
-                                #         self.msg_if.pub_warn("Failed to update Framerate setting to: " + str(brightness) + " : " + str(e))
+                                #         self.msg_if.pub_debug("Failed to update Framerate setting to: " + str(brightness) + " : " + str(e))
 
             
 
@@ -500,11 +500,11 @@ class V4l2CamNode:
                                 #                 [setting_name, setting_type, data] = nepi_controls.get_data_from_setting(setting)
                                 #                 ret = self.driver.setCameraControl(setting_name,data)
                                 #                 if ret[0]:
-                                #                     self.msg_if.pub_warn("Updated setting: " + setting_name + " : "  + str(data) )
+                                #                     self.msg_if.pub_debug("Updated setting: " + setting_name + " : "  + str(data) )
                                 #                 else:
-                                #                     self.msg_if.pub_warn("Failed to update setting: " + setting_name + " : "  + setting_str  + " : "  + str(data) + " : " + ret[1])
+                                #                     self.msg_if.pub_debug("Failed to update setting: " + setting_name + " : "  + setting_str  + " : "  + str(data) + " : " + ret[1])
                                 #         except Exception as e:
-                                #             self.msg_if.pub_warn("Failed to update setting: " + setting_name + " : "  + setting_str  + " : "  + str(data) + " : " + str(e))
+                                #             self.msg_if.pub_debug("Failed to update setting: " + setting_name + " : "  + setting_str  + " : "  + str(data) + " : " + str(e))
                         except Exception as e:
                             self.msg_if.pub_info("Resolution setting: " + str(setting_value) + " could not be parsed to width:height " + str(e))
                     elif setting_name == "framerate":
@@ -517,13 +517,18 @@ class V4l2CamNode:
                         success = False
                         needs_update = False
                     if needs_update == True:
-                        self.settings_dict = self.refreshSettingsDict()
+                        # Hold the image lock so the read-back can't land while getColorImg is
+                        # reopening the capture: OpenCV opens the device at 640x480 before it
+                        # restores the real format, and a read in that window reported 640:480
+                        # (and its framerate) as the current resolution.
+                        with self.img_lock:
+                            self.settings_dict = self.refreshSettingsDict()
 
         if found_setting is False:
             success = False
             msg = (self.node_name  + " Setting name" + setting_str + " is not supported")        
         # settings_values_dict = nepi_controls.get_values_dict(self.settings_dict)
-        # self.msg_if.pub_warn("Returning Updated Settings: "  + str(settings_values_dict) )           
+        # self.msg_if.pub_debug("Returning Updated Settings: "  + str(settings_values_dict) )           
         return success, msg, self.settings_dict
 
 
@@ -609,7 +614,7 @@ class V4l2CamNode:
             ret, msg = self.driver.startImageAcquisition()
             if ret is False:
                 # Debug aid: surface why streaming could not start (results in no image at all).
-                self.msg_if.pub_warn("Image acquisition failed to start for " + str(self.device_path) + ": " + str(msg), throttle_s = 5.0)
+                self.msg_if.pub_debug("Image acquisition failed to start for " + str(self.device_path) + ": " + str(msg), throttle_s = 5.0)
                 self.img_lock.release()
                 return ret, msg, None, None, None
             self.color_image_acquisition_running = True

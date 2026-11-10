@@ -65,7 +65,7 @@ from nepi_sdk import nepi_sdk
 from nepi_sdk import nepi_utils
 from nepi_sdk import nepi_controls
 
-from nepi_api.device_if_svx import SVXActuatorIF
+from nepi_api.device_if_svx import DeviceSVXIF
 from nepi_api.messages_if import MsgIF
 
 PKG_NAME = 'SVX_SERVO_MAESTRO' # Use in display menus
@@ -319,11 +319,19 @@ class SvxServoMaestroNode:
         # by the IF (continuous_enabled param + set_continuous_mode topic); the
         # driver declares nothing about it.
         self.msg_if.pub_info("Launching NEPI SVX interface...")
-        self.svx_if = SVXActuatorIF(device_info = self.device_info_dict,
+        # Positional hobby servos: rotate type (DeviceSVXIF defaults to spin).
+        # DeviceSVXIF has no device reset callback, so resetDevice is not passed.
+        self.svx_if = DeviceSVXIF(device_info = self.device_info_dict,
+                                    is_rotate = True,
                                     getSettingsFunction = self.getSettingsFunction,
                                     setSettingFunction = self.setSettingFunction,
                                     factoryControls = self.FACTORY_CONTROLS,
-                                    factoryLimits = self.FACTORY_LIMITS_DICT,
+                                    # DeviceSVXIF is unitless: its limit keys carry no _deg
+                                    factoryLimits = {
+                                        'min_hardstop': self.FACTORY_LIMITS_DICT['min_hardstop_deg'],
+                                        'max_hardstop': self.FACTORY_LIMITS_DICT['max_hardstop_deg'],
+                                        'min_softstop': self.FACTORY_LIMITS_DICT['min_softstop_deg'],
+                                        'max_softstop': self.FACTORY_LIMITS_DICT['max_softstop_deg']},
                                     stopMovingCb = self.stopMoving,
                                     gotoPositionCb = self.gotoPosition,
                                     getPositionCb = self.getPosition,
@@ -335,8 +343,7 @@ class SvxServoMaestroNode:
                                     getSpeedMaxCb = self.getSpeedMax,
                                     goHomeCb = self.goHome,
                                     setHomePositionCb = self.setHomePosition,
-                                    setHomePositionHereCb = self.setHomePositionHere,
-                                    deviceResetCb = self.resetDevice
+                                    setHomePositionHereCb = self.setHomePositionHere
                                     )
         self.msg_if.pub_info(" ... SVX interface running")
 
@@ -344,7 +351,7 @@ class SvxServoMaestroNode:
         # still None (mid-construction), so setDegRange could not push them to the IF and
         # the IF kept the factory range. Re-push the current calibrated range now that the
         # IF exists, so its clamp range (and the reported travel) matches the settings.
-        self.svx_if.setHardstopLimits(self.limits_dict['min_hardstop_deg'],
+        self.svx_if.set_hardstop_limits(self.limits_dict['min_hardstop_deg'],
                                       self.limits_dict['max_hardstop_deg'])
 
         # Poll the Maestro for the pulse width it is currently transmitting so
@@ -579,7 +586,7 @@ class SvxServoMaestroNode:
         # finishes coming up -- in that case the constructor reads
         # FACTORY_LIMITS_DICT and picks the new range up anyway.
         if self.svx_if is not None:
-            if self.svx_if.setHardstopLimits(min_deg, max_deg) == False:
+            if self.svx_if.set_hardstop_limits(min_deg, max_deg) == False:
                 return False, ("SVX interface rejected degree range " + str(min_deg) +
                                " to " + str(max_deg))
 
@@ -812,7 +819,7 @@ class SvxServoMaestroNode:
             # PERSISTENT settings followed by a reinitialize, so a wrong offset
             # would corrupt board configuration rather than just fail. Skip until
             # the stride is confirmed against real hardware. Nothing is lost:
-            # SVXActuatorIF clamps every commanded position to the soft limits
+            # DeviceSVXIF clamps every commanded position to the soft limits
             # before it ever reaches this driver, so the onboard clamp is
             # belt-and-braces, and the board simply keeps its existing limits.
             self.msg_if.pub_info("Skipping firmware Min/Max push on channel %d "

@@ -373,7 +373,8 @@ class ServosPTXNode:
         svx_namespace = args[0]
         # A message already in flight when its servo vanished must not re-add it.
         if svx_namespace in self.servo_status_subs_dict:
-            self.servo_connected_dict[svx_namespace] = msg.servo_connected
+            # RC1 DeviceSVXStatus reports servo connected in its 'connected' field
+            self.servo_connected_dict[svx_namespace] = msg.connected
 
     def filterConnectedServos(self, options, selected):
         # Only servos marked Servo Connected on the servo device page are offered. An
@@ -409,9 +410,11 @@ class ServosPTXNode:
        
     def getNavPoseDict(self):
         pan_deg, tilt_deg = self.current_position
-        navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
+        # A copy: assigning BLANK_NAVPOSE_DICT itself wrote this node's values into the
+        # shared module default
+        navpose_dict = copy.deepcopy(nepi_nav.BLANK_NAVPOSE_DICT)
         navpose_dict['has_orientation'] = True
-        navpose_dict['time_oreantation'] = nepi_utils.get_time()
+        navpose_dict['time_orientation'] = nepi_utils.get_time()
         navpose_dict['roll_deg'] = 0.0
         # current_position is already in the node frame; the axis direction was applied
         # when it was sampled. Applying it again here inverted both axes.

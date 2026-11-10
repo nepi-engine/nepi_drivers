@@ -40,6 +40,8 @@ from nepi_sdk import nepi_nav
 
 
 from nepi_api.device_if_ptx import PTXActuatorIF
+from nepi_api.device_if_npx import NPXDeviceIF
+from nepi_api.device_if_svx import DeviceSVXIF
 from nepi_api.messages_if import MsgIF
 
 PKG_NAME = 'PTX_IQR' # Use in display menus
@@ -89,7 +91,10 @@ class IqrPanTiltNode:
     FACTORY_LIMITS_DICT['max_tilt_softstop_deg'] = 60
     
 
-    limits_dict = FACTORY_LIMITS_DICT
+    # A copy: as the same dict, every soft-limit change also rewrote the factory
+    # limits that setSoftLimits clamps against, so a narrowed limit could not be
+    # widened again until restart
+    limits_dict = copy.deepcopy(FACTORY_LIMITS_DICT)
 
     PAN_DEG_DIR = 1
     TILT_DEG_DIR = 1
@@ -117,6 +122,8 @@ class IqrPanTiltNode:
     sw_version = "Unknown"
     fw_version = "Unknown"
     ptx_if = None
+    svx_pan_if = None
+    svx_tilt_if = None
 
     both_str = '!'
     pan_str = '#'
@@ -151,8 +158,28 @@ class IqrPanTiltNode:
     pan_stop_trig = False
     tilt_stop_trig = False
 
+    # Last goto target commanded on each axis, in the node frame, from any of the
+    # PTX, pan SVX or tilt SVX interfaces. None means never commanded, or invalidated
+    # by a stop or jog (which command both axes to where they are). The IQR takes
+    # both axes in one write, so a single-axis goto resends the other axis's target
+    # (or its current position) to leave that axis alone. goto_lock makes reading the
+    # other target, recording this one and sending them one step, so a pan goto and a
+    # tilt goto arriving together cannot undo each other. Serial access itself is
+    # serialized separately by pt_status_lock.
+    last_goto_pan_deg = None
+    last_goto_tilt_deg = None
+    goto_lock = Lock()
+
     pt_status = PanTiltStatus()
 
+
+    msg_if = None
+    node_if = None
+    settings_if = None
+    save_data_if = None
+    transform_if = None
+    navpose_if = None
+    connect_navpose_if = None
 
     ################################################
     DEFAULT_NODE_NAME = PKG_NAME.lower() + "_node"      
@@ -175,7 +202,7 @@ class IqrPanTiltNode:
 
         # Get required drv driver dict info
         self.drv_dict = nepi_sdk.get_param('~drv_dict',dict()) 
-        #self.msg_if.pub_warn("Got Drivers_Dict from param server: " + str(self.drv_dict))
+        #self.msg_if.pub_debug("Got Drivers_Dict from param server: " + str(self.drv_dict))
         try:
             self.device_name = self.drv_dict['DEVICE_DICT']['device_name']
             self.device_path = self.drv_dict['DEVICE_DICT']['device_path']
@@ -250,14 +277,128 @@ class IqrPanTiltNode:
                                         setSpeedRatioCb = self.setSpeedRatio,
                                         getPositionCb = self.getPosition,
                                         gotoPositionCb = self.gotoPosition,
+                                        gotoPanPositionCb = self.gotoPanPosition,
+                                        gotoTiltPositionCb = self.gotoTiltPosition,
                                         goHomeCb = self.goHome,
                                         setHomePositionCb = self.setHomePosition,
                                         setHomePositionHereCb = self.setHomePositionHere,
-                                        getNavPoseCb = self.getNavPoseDict,
-                                        navpose_update_rate = self.MAX_POSITION_UPDATE_RATE,
-                                        deviceResetCb = self.resetDevice
+                                        deviceResetCb = self.resetDevice,
+                                        msg_if = self.msg_if,
+                                        node_if = self.node_if,
+                                        settings_if = self.settings_if,
+                                        save_data_if = self.save_data_if,
+                                        connect_navpose_if = self.connect_navpose_if
                                         )
             self.msg_if.pub_info(" ... PTX interface running")
+
+
+            self.node_if = self.ptx_if.node_if
+            self.settings_if = self.ptx_if.settings_if
+            self.save_data_if = self.ptx_if.save_data_if
+            self.transform_if = self.ptx_if.transform_if
+            self.connect_navpose_if = self.ptx_if.connect_navpose_if
+            self.navpose_if = self.ptx_if.navpose_if   
+
+            ##################################
+            # Setup NPX IF Class ####################
+            # The camera's navpose is published by the NPX device at <node>/npx/navpose.
+            # Compute it deterministically so the image data products can advertise it in
+            # ImageStatus.navpose_topic (the NPX device is created after the data threads start).
+
+            self.data_source_description = 'Pan Tilt'
+            self.data_ref_description  =   'Pan Tilt Center Axis'
+
+            if self.getNavPoseCb is not None:
+
+                self.msg_if.pub_debug("Starting NPX Device IF Initialization")
+                self.npx_if = NPXDeviceIF(device_info = self.device_info_dict,
+                    data_source_description = self.data_source_description,
+                    data_ref_description = self.data_ref_description,
+                    getNavPoseCb = self.getNavPoseCb,
+                    max_navpose_update_rate = self.MAX_POSITION_UPDATE_RATE,
+                    msg_if = self.msg_if,
+                    node_if = self.node_if,
+                    settings_if = self.settings_if,
+                    save_data_if = self.save_data_if,
+                    connect_navpose_if = self.connect_navpose_if
+
+                    )
+
+
+            ##################################
+            # Setup Pan and Tilt SVX IF Classes ####################
+            # Each axis is also exposed as its own servo device, so it can be driven
+            # from the Servo devices page. Both share the PTX interface's node_if,
+            # settings_if, save_data_if and connect_navpose_if, so no second SaveDataIF
+            # or ConnectNavPoseIF is created at the node namespace. The _pan/_tilt
+            # device names keep their namespaces (<node>/<device_name>/svx) and their
+            # node_if registry keys apart. Stop and speed stay shared across both
+            # axes: the IQR has one stop command and one speed ratio. Neither axis
+            # publishes navpose of its own; the NPX device above does.
+            self.msg_if.pub_info("Launching NEPI SVX pan and tilt axis interfaces...")
+            pan_device_info = copy.deepcopy(self.device_info_dict)
+            pan_device_info["device_name"] = self.device_info_dict["device_name"] + "_pan"
+            self.svx_pan_if = DeviceSVXIF(device_info = pan_device_info,
+                                        is_rotate = True,
+                                        has_pan_control = True,
+                                        # Both axes are built into the unit, so they are
+                                        # always connected and get no Servo Connected toggle
+                                        always_connected = True,
+                                        # DeviceSVXIF is unitless: its limit keys carry no _deg
+                                        factoryLimits = {
+                                            'min_hardstop': self.FACTORY_LIMITS_DICT['min_pan_hardstop_deg'],
+                                            'max_hardstop': self.FACTORY_LIMITS_DICT['max_pan_hardstop_deg'],
+                                            'min_softstop': self.FACTORY_LIMITS_DICT['min_pan_softstop_deg'],
+                                            'max_softstop': self.FACTORY_LIMITS_DICT['max_pan_softstop_deg']},
+                                        stopMovingCb = self.stopMoving,
+                                        moveCb = self.movePan,
+                                        gotoPositionCb = self.gotoPanPosition,
+                                        getPositionCb = self.getPanPosition,
+                                        setSoftLimitsCb = self.setPanSoftLimits,
+                                        getSoftLimitsCb = self.getPanSoftLimits,
+                                        setSpeedRatioCb = self.setSpeedRatio,
+                                        getSpeedRatioCb = self.getSpeedRatio,
+                                        goHomeCb = self.goPanHome,
+                                        setHomePositionCb = self.setPanHomePosition,
+                                        setHomePositionHereCb = self.setPanHomePositionHere,
+                                        msg_if = self.msg_if,
+                                        node_if = self.node_if,
+                                        settings_if = self.settings_if,
+                                        save_data_if = self.save_data_if,
+                                        connect_navpose_if = self.connect_navpose_if
+                                        )
+
+            tilt_device_info = copy.deepcopy(self.device_info_dict)
+            tilt_device_info["device_name"] = self.device_info_dict["device_name"] + "_tilt"
+            self.svx_tilt_if = DeviceSVXIF(device_info = tilt_device_info,
+                                        is_rotate = True,
+                                        has_tilt_control = True,
+                                        always_connected = True,
+                                        # DeviceSVXIF is unitless: its limit keys carry no _deg
+                                        factoryLimits = {
+                                            'min_hardstop': self.FACTORY_LIMITS_DICT['min_tilt_hardstop_deg'],
+                                            'max_hardstop': self.FACTORY_LIMITS_DICT['max_tilt_hardstop_deg'],
+                                            'min_softstop': self.FACTORY_LIMITS_DICT['min_tilt_softstop_deg'],
+                                            'max_softstop': self.FACTORY_LIMITS_DICT['max_tilt_softstop_deg']},
+                                        stopMovingCb = self.stopMoving,
+                                        moveCb = self.moveTilt,
+                                        gotoPositionCb = self.gotoTiltPosition,
+                                        getPositionCb = self.getTiltPosition,
+                                        setSoftLimitsCb = self.setTiltSoftLimits,
+                                        getSoftLimitsCb = self.getTiltSoftLimits,
+                                        setSpeedRatioCb = self.setSpeedRatio,
+                                        getSpeedRatioCb = self.getSpeedRatio,
+                                        goHomeCb = self.goTiltHome,
+                                        setHomePositionCb = self.setTiltHomePosition,
+                                        setHomePositionHereCb = self.setTiltHomePositionHere,
+                                        msg_if = self.msg_if,
+                                        node_if = self.node_if,
+                                        settings_if = self.settings_if,
+                                        save_data_if = self.save_data_if,
+                                        connect_navpose_if = self.connect_navpose_if
+                                        )
+            self.msg_if.pub_info(" ... SVX pan and tilt axis interfaces running")
+
 
             # Start an ptx activity check process that kills node after some number of failed comms attempts
             self.msg_if.pub_info("Starting an activity check process")
@@ -281,17 +422,18 @@ class IqrPanTiltNode:
 
     def logDeviceInfo(self):
         dev_info_string = self.node_name + " Device Info:\n"
-        dev_info_string += "Manufacturer: " + self.dev_info["Manufacturer"] + "\n"
-        dev_info_string += "Model: " + self.dev_info["Model"] + "\n"
-        dev_info_string += "Firmware Version: " + self.dev_info["FirmwareVersion"] + "\n"
-        dev_info_string += "Serial Number: " + self.dev_info["SerialNum"] + "\n"
+        dev_info_string += "Device Name: " + str(self.device_info_dict["device_name"]) + "\n"
+        dev_info_string += "Path: " + str(self.device_info_dict["path"]) + "\n"
+        dev_info_string += "Hardware Version: " + str(self.device_info_dict["hw_version"]) + "\n"
+        dev_info_string += "Software Version: " + str(self.device_info_dict["sw_version"]) + "\n"
+        dev_info_string += "Serial Number: " + str(self.device_info_dict["serial_number"]) + "\n"
         self.msg_if.pub_info(dev_info_string)
 
-    def getNavPoseDict(self):
+    def getNavPoseCb(self):
         pan_deg, tilt_deg = self.current_position
-        navpose_dict = nepi_nav.BLANK_NAVPOSE_DICT
+        navpose_dict = copy.deepcopy(nepi_nav.BLANK_NAVPOSE_DICT)
         navpose_dict['has_orientation'] = True
-        navpose_dict['time_oreantation'] = nepi_utils.get_time()
+        navpose_dict['time_orientation'] = nepi_utils.get_time()
         navpose_dict['roll_deg'] = 0.0
         navpose_dict['yaw_deg'] = pan_deg * self.PAN_DEG_DIR
         navpose_dict['pitch_deg'] = tilt_deg * self.TILT_DEG_DIR
@@ -323,7 +465,15 @@ class IqrPanTiltNode:
     ### PTX IF Functions
 
     def stopMoving(self):
+        self.clearGotoTargets()
         self.driver_stopMotion()
+
+    def clearGotoTargets(self):
+        # Stop and jog command both axes to where they are now, so neither axis's
+        # last goto target is still meaningful to resend.
+        with self.goto_lock:
+            self.last_goto_pan_deg = None
+            self.last_goto_tilt_deg = None
 
     def checkResetPanStopTrigger(self):
         stop_trig = copy.deepcopy(self.pan_stop_trig)
@@ -336,11 +486,13 @@ class IqrPanTiltNode:
         return stop_trig
 
     def movePan(self, direction, duration):
+        self.clearGotoTargets()
         success = self.driver_jogPan(direction, duration)
 
 
 
     def moveTilt(self, direction, duration):
+            self.clearGotoTargets()
             success = self.driver_jogTilt(direction, duration)
 
     def setSoftLimits(self,pan_min,pan_max,tilt_min,tilt_max):
@@ -391,11 +543,35 @@ class IqrPanTiltNode:
         
 
     def gotoPosition(self, pan_deg, tilt_deg):
-        self.driver_moveToPosition(pan_deg * self.PAN_DEG_DIR, tilt_deg * self.TILT_DEG_DIR)
+        #self.msg_if.pub_debug("Got GoTo Position: " + str([pan_deg,tilt_deg]), throttle_s = 1)
+        with self.goto_lock:
+            self.last_goto_pan_deg = pan_deg
+            self.last_goto_tilt_deg = tilt_deg
+            self.driver_moveToPosition(pan_deg * self.PAN_DEG_DIR, tilt_deg * self.TILT_DEG_DIR)
+
+    def gotoPanPosition(self, pan_deg):
+        # The IQR commands both axes in one write: hold tilt at its last goto
+        # target, or where it is now if it has none, so a pan goto leaves tilt alone.
+        with self.goto_lock:
+            tilt_deg = self.last_goto_tilt_deg
+            if tilt_deg is None:
+                tilt_deg = self.current_position[1]
+            self.last_goto_pan_deg = pan_deg
+            self.driver_moveToPosition(pan_deg * self.PAN_DEG_DIR, tilt_deg * self.TILT_DEG_DIR)
+
+    def gotoTiltPosition(self, tilt_deg):
+        with self.goto_lock:
+            pan_deg = self.last_goto_pan_deg
+            if pan_deg is None:
+                pan_deg = self.current_position[0]
+            self.last_goto_tilt_deg = tilt_deg
+            self.driver_moveToPosition(pan_deg * self.PAN_DEG_DIR, tilt_deg * self.TILT_DEG_DIR)
 
       
     def goHome(self):
-        self.driver_moveToPosition(self.home_pan_deg, self.home_tilt_deg)
+        # Through gotoPosition so the home targets are recorded as both axes' last
+        # goto targets, like any other goto.
+        self.gotoPosition(self.home_pan_deg, self.home_tilt_deg)
 
     def setHomePosition(self, pan_deg, tilt_deg):
         self.home_pan_deg = pan_deg
@@ -410,12 +586,58 @@ class IqrPanTiltNode:
     def resetDevice(self):
         self.speed_ratio = 0.5
         self.limits_dict['min_pan_softstop_deg'] = self.FACTORY_LIMITS_DICT['min_pan_softstop_deg']
-        self.limits_dict['max_pan_softstop_deg'] = self.FACTORY_LIMITS_DICT['min_pan_softstop_deg']
+        self.limits_dict['max_pan_softstop_deg'] = self.FACTORY_LIMITS_DICT['max_pan_softstop_deg']
         self.limits_dict['min_tilt_softstop_deg'] = self.FACTORY_LIMITS_DICT['min_tilt_softstop_deg']
         self.limits_dict['max_tilt_softstop_deg'] = self.FACTORY_LIMITS_DICT['max_tilt_softstop_deg']
 
     def driver_reportsPosition(self):
         return True
+
+    #######################
+    ### SVX IF Functions (one servo device per axis)
+    # Stop, jog, speed and the per-axis gotos are shared with the PTX IF functions
+    # above. These adapt the node's two-axis state to the single-axis SVX callbacks.
+
+    def getPanPosition(self):
+        return self.current_position[0]
+
+    def getTiltPosition(self):
+        return self.current_position[1]
+
+    def setPanSoftLimits(self, min_deg, max_deg):
+        # Through setSoftLimits so both paths share one clamp; tilt is resent as is.
+        pan_min, pan_max, tilt_min, tilt_max = self.getSoftLimits()
+        self.setSoftLimits(min_deg, max_deg, tilt_min, tilt_max)
+
+    def getPanSoftLimits(self):
+        pan_min, pan_max, tilt_min, tilt_max = self.getSoftLimits()
+        return [pan_min, pan_max]
+
+    def setTiltSoftLimits(self, min_deg, max_deg):
+        pan_min, pan_max, tilt_min, tilt_max = self.getSoftLimits()
+        self.setSoftLimits(pan_min, pan_max, min_deg, max_deg)
+
+    def getTiltSoftLimits(self):
+        pan_min, pan_max, tilt_min, tilt_max = self.getSoftLimits()
+        return [tilt_min, tilt_max]
+
+    def goPanHome(self):
+        self.gotoPanPosition(self.home_pan_deg)
+
+    def goTiltHome(self):
+        self.gotoTiltPosition(self.home_tilt_deg)
+
+    def setPanHomePosition(self, pan_deg):
+        self.home_pan_deg = pan_deg
+
+    def setTiltHomePosition(self, tilt_deg):
+        self.home_tilt_deg = tilt_deg
+
+    def setPanHomePositionHere(self):
+        self.home_pan_deg = self.current_position[0]
+
+    def setTiltHomePositionHere(self):
+        self.home_tilt_deg = self.current_position[1]
 
    #######################
     ### Driver Interface Functions
@@ -469,7 +691,7 @@ class IqrPanTiltNode:
             self.driver_moveToPosition(pan, tilt)
             return True
         except Exception as e:
-            self.msg_if.pub_warn("Failed to stop motion: " + e)
+            self.msg_if.pub_warn("Failed to stop motion: " + str(e))
             return False
 
 
@@ -479,22 +701,26 @@ class IqrPanTiltNode:
         return pan, tilt
 
     def driver_moveToPosition(self,pan, tilt):
+        # Returns True once the command is sent. The jog functions run their timed
+        # stop only on success, so returning None sent every timed jog on to the soft limit.
         if pan < -60.0 or pan > 60.0:
-            return
+            return False
         if tilt < -60.0 or tilt > 60.0:
-            return
+            return False
         speed_count = self.ratio2speed_count(self.speed_ratio)
         with self.pt_status_lock:
-            if self.modbus_master is not None:
-                sendBuf = [speed_count, round(pan*100), round(tilt*100)]
-                self.modbus_master.set_multiple_registers(self.addr_int, 0x0006, sendBuf)
-                nepi_sdk.sleep(0.01)
+            if self.modbus_master is None:
+                return False
+            sendBuf = [speed_count, round(pan*100), round(tilt*100)]
+            self.modbus_master.set_multiple_registers(self.addr_int, 0x0006, sendBuf)
+            nepi_sdk.sleep(0.01)
+        return True
 
     def driver_getSpeedRatio(self, axis_str = '#'):
         method_name = sys._getframe().f_code.co_name
-        self.msg_if.pub_warn("Got speed count: " + str(self.pt_status.speed)) 
+        self.msg_if.pub_debug("Got speed count: " + str(self.pt_status.speed)) 
         ratio = self.speed_count2ratio(self.pt_status.speed)
-        self.msg_if.pub_warn("Returning speed ratio: " + str(ratio)) 
+        self.msg_if.pub_debug("Returning speed ratio: " + str(ratio)) 
         return ratio
         
 
@@ -565,7 +791,7 @@ class IqrPanTiltNode:
         else:
             self.self_check_counter = self.self_check_counter + 1 # increment counter
 
-        #self.msg_if.pub_warn("Current failed comms count: " + str(self.self_check_counter))
+        #self.msg_if.pub_debug("Current failed comms count: " + str(self.self_check_counter))
         if self.self_check_counter > self.self_check_count:  # Crashes node if set above limit??
             self.msg_if.pub_warn("Shutting down device: " +  self.addr_str + " on port " + self.device_path)
             self.msg_if.pub_warn("Too many comm failures")
@@ -596,7 +822,7 @@ class IqrPanTiltNode:
                 [success,pt_status] = self.driver_getPtStatus()
                 if success:
                     self.msg_if.pub_info("Connected to device on port: " +  self.device_path)
-                    self.msg_if.pub_warn("Got status on connection: " + str(pt_status))
+                    self.msg_if.pub_debug("Got status on connection: " + str(pt_status))
                     self.pt_status = pt_status
                     # Update serial, hardware, and software status values
                     self.serial_num = pt_status.serial_num

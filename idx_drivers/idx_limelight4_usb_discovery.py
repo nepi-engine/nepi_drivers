@@ -92,7 +92,7 @@ class Limelight4UsbCamDiscovery:
             self.msg_if.pub_warn("Discovery dict missing in Driver dict")
             return success
         if last_drv_dict != self.drv_dict:
-            self.msg_if.pub_warn("Updated Driver Dict: " + str(self.drv_dict))
+            self.msg_if.pub_debug("Updated Driver Dict: " + str(self.drv_dict))
         success = True
         return success
 
@@ -105,7 +105,7 @@ class Limelight4UsbCamDiscovery:
         try:
             all_ifaces = os.listdir('/sys/class/net/')
         except Exception as e:
-            self.msg_if.pub_warn("Failed to list /sys/class/net/: " + str(e))
+            self.msg_if.pub_debug("Failed to list /sys/class/net/: " + str(e))
             nepi_sdk.start_timer_process(self.CHECK_INTERVAL_S, self.detectAndManageDevices, oneshot=True)
             return
 
@@ -186,8 +186,8 @@ class Limelight4UsbCamDiscovery:
                     'node_namespace': node_namespace,
                     'node_subprocess': sub_process,
                 })
-                self.msg_if.pub_warn("Started Limelight4 node: " + node_name)
-                self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
+                self.msg_if.pub_info("Started Limelight4 node: " + node_name)
+                self.msg_if.pub_debug("Updated Active Device List " + str(self.deviceList))
             else:
                 self.msg_if.pub_warn("Failed to launch Limelight4 node for " + iface + ": " + msg)
 
@@ -229,8 +229,8 @@ class Limelight4UsbCamDiscovery:
                     if not success:
                         self.msg_if.pub_warn("Unable to kill device node " + node_name)
                     else:
-                        self.msg_if.pub_warn("Node killed. Removed device from active list " + node_name)
-            self.msg_if.pub_warn("Updated Active Device List " + str(self.deviceList))
+                        self.msg_if.pub_info("Node killed. Removed device from active list " + node_name)
+            self.msg_if.pub_debug("Updated Active Device List " + str(self.deviceList))
         return success
 
     def deviceNodeIsRunning(self, node_namespace):
@@ -240,7 +240,7 @@ class Limelight4UsbCamDiscovery:
                     return False
                 else:
                     return True
-        self.msg_if.pub_warn("Cannot check run status of unknown node " + node_namespace)
+        self.msg_if.pub_debug("Cannot check run status of unknown node " + node_namespace)
         return False
 
     def cleanup_actions(self):

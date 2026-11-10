@@ -77,9 +77,9 @@ class MicrostrainDiscovery:
 
         # Create path search options
         
-        #self.logger.log_warn("Entering discovery function with available_paths_list: " + str(available_paths_list))###
-        #self.logger.log_warn("Entering discovery function with active_paths_list: " + str(active_paths_list))###
-        #self.logger.log_warn("Entering discovery function with drv_dict: " + str(drv_dict))###
+        #self.logger.log_debug("Entering discovery function with available_paths_list: " + str(available_paths_list))###
+        #self.logger.log_debug("Entering discovery function with active_paths_list: " + str(active_paths_list))###
+        #self.logger.log_debug("Entering discovery function with drv_dict: " + str(drv_dict))###
 
         self.drv_dict = drv_dict
         self.available_paths_list = available_paths_list
@@ -101,11 +101,11 @@ class MicrostrainDiscovery:
 
         try:
                 
-            #self.logger.log_warn("Starting discovery with drv_dict " + str(drv_dict))#
+            #self.logger.log_debug("Starting discovery with drv_dict " + str(drv_dict))#
             baudrate_options = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['options']
             baudrate_sel = drv_dict['DISCOVERY_DICT']['OPTIONS']['baud_rate']['value']
-            #self.logger.log_warn("Got baudrate options: " + str(baudrate_options))###
-            #self.logger.log_warn("Got selected baudrate: " + str(baudrate_sel))###
+            #self.logger.log_debug("Got baudrate options: " + str(baudrate_options))###
+            #self.logger.log_debug("Got selected baudrate: " + str(baudrate_sel))###
             baudrate_list = []
             if baudrate_sel != "All":
                 baudrate_list.append(baudrate_sel)
@@ -126,7 +126,7 @@ class MicrostrainDiscovery:
 
 
         ### Purge Unresponsive Connections
-        #self.logger.log_warn("Running Cleanup Check Process")
+        #self.logger.log_debug("Running Cleanup Check Process")
         path_purge_list = []
         for path_str in self.active_devices_dict:
             success = self.checkOnDevice(path_str)
@@ -139,22 +139,22 @@ class MicrostrainDiscovery:
                 self.active_paths_list.remove(path_str)
 
         ### Checking for devices on available paths
-        #self.logger.log_warn("Starting Check for Device Process with path list: " + str(self.path_list))
+        #self.logger.log_debug("Starting Check for Device Process with path list: " + str(self.path_list))
         for path_str in self.path_list:
             valid_path = True
-            #self.logger.log_warn("Checking path against exclude list: " + str(self.excludedDevices))
+            #self.logger.log_debug("Checking path against exclude list: " + str(self.excludedDevices))
             for exclude in self.excludedDevices:
-                #self.logger.log_warn("Checking exclude : " + str(exclude) + " with active list " + str(self.active_paths_list))
+                #self.logger.log_debug("Checking exclude : " + str(exclude) + " with active list " + str(self.active_paths_list))
                 if path_str.find(exclude) != -1 or path_str in self.active_paths_list:
                     valid_path = False
-            #self.logger.log_warn("Got path check valid: " + str(valid_path))
+            #self.logger.log_debug("Got path check valid: " + str(valid_path))
             if valid_path and path_str not in self.dont_retry_list and path_str not in self.active_paths_list:
-                #self.logger.log_warn("Looking for path: " + path_str)
-                #self.logger.log_warn("In path_list: " + str(self.active_paths_list))
+                #self.logger.log_debug("Looking for path: " + path_str)
+                #self.logger.log_debug("In path_list: " + str(self.active_paths_list))
                 found = False
                     
                 if path_str == self.DEVICE_PATH:
-                    #self.logger.log_warn("Using set port for to MicroStrain device on : " + str(path_str))
+                    #self.logger.log_debug("Using set port for to MicroStrain device on : " + str(path_str))
                     found = True
 
                 if found:
@@ -189,19 +189,19 @@ class MicrostrainDiscovery:
 
             # Send an ping command to the device
             command = b'\x75\x65\x01\x02\x02\x01\xE0\xC6' 
-            #self.logger.log_warn("checking for device on: " + str(port_str))
+            #self.logger.log_debug("checking for device on: " + str(port_str))
             ser.write(command)
             #response = ser.readline().decode('utf-8').strip()
             response = str(ser.readline().hex()) # Read the response
-            #self.logger.log_warn("Response: " + str(response))
+            #self.logger.log_debug("Response: " + str(response))
             ser.close()
 
             # Check if the response is valid
             if response and '7565010404f10100d56a' in response: # Check for expected response
-                #self.logger.log_warn("Successfully verified connection to MicroStrain device on : " + str(port_str))
+                #self.logger.log_debug("Successfully verified connection to MicroStrain device on : " + str(port_str))
                 return True
             else:
-                #self.logger.log_warn("Device did not respond as expected on port: " + str(port_str))
+                #self.logger.log_debug("Device did not respond as expected on port: " + str(port_str))
                 return False
 
         except serial.SerialException as e:
@@ -215,17 +215,17 @@ class MicrostrainDiscovery:
     ##########  Device specific calls
     def checkForDevice(self, path_str):
         found_device = False
-        #self.logger.log_warn("Checking for device on path: " + path_str)
+        #self.logger.log_debug("Checking for device on path: " + path_str)
 
         if path_str not in self.active_paths_list:
             for baud_str in self.baudrate_list:
                 self.baud_str = baud_str
                 found_device = self.verify_microstrain_connection(path_str,baud_str)
                 if found_device == True:
-                    self.logger.log_warn("Found device on path: " + path_str + " with baud rate: " + baud_str) 
+                    self.logger.log_info("Found device on path: " + path_str + " with baud rate: " + baud_str) 
                     break
 
-        #self.logger.log_warn("Check for device on path returned: " + str(found_device))
+        #self.logger.log_debug("Check for device on path returned: " + str(found_device))
         return found_device
 
     def checkOnDevice(self,path_str):
@@ -260,7 +260,7 @@ class MicrostrainDiscovery:
         file_name = self.drv_dict['NODE_DICT']['file_name']
         device_name = self.node_launch_name + "_" + path_str.split('/')[-1]
         node_name = nepi_system.get_device_alias(device_name)
-        self.logger.log_warn(" launching node: " + node_name)
+        self.logger.log_info(" launching node: " + node_name)
         
         
         #Setup required param server drv_dict for discovery node
@@ -274,7 +274,7 @@ class MicrostrainDiscovery:
         self.drv_dict['DEVICE_DICT']['aux_baudrate'] = int(self.baud_str)
         self.drv_dict['DEVICE_DICT']['param_file'] = PARAM_FILE_PATH
         
-        self.logger.log_warn("Launching node with path: " + path_str + " baudrate: " + self.baud_str)
+        self.logger.log_debug("Launching node with path: " + path_str + " baudrate: " + self.baud_str)
         
         nepi_sdk.set_param(dict_param_name, self.drv_dict)
         
@@ -282,25 +282,25 @@ class MicrostrainDiscovery:
 
         self.launch_time_dict[launch_id] = nepi_sdk.get_time()
         if success:
-            self.logger.log_warn("Launched node: " + node_name)
+            self.logger.log_debug("Launched node: " + node_name)
             self.active_devices_dict[path_str] = {'node_name': node_name, 'sub_process': sub_process}
         else:
             self.logger.log_warn("Failed to launch node: " + node_name + " with msg: " + msg)
             if self.retry == False:
-                self.logger.log_warn("Will not try relaunch for node: " + node_name)
+                self.logger.log_debug("Will not try relaunch for node: " + node_name)
                 self.dont_retry_list.append(launch_id)
             else:
-                self.logger.log_warn("Will attempt relaunch for node: " + node_name + " in " + str(self.NODE_LOAD_TIME_SEC) + " secs")
+                self.logger.log_debug("Will attempt relaunch for node: " + node_name + " in " + str(self.NODE_LOAD_TIME_SEC) + " secs")
         return success
     
 
 
     def killAllDevices(self,active_paths_list):
-        #self.logger.log_warn("Entering Kill All Devices function for path: " + str(path_str))###
+        #self.logger.log_debug("Entering Kill All Devices function for path: " + str(path_str))###
         path_purge_list = []
         for key in self.active_devices_dict.keys():
             path_purge_list.append(key)
-        #self.logger.log_warn("Killing Devices: " + str(path_purge_list))
+        #self.logger.log_debug("Killing Devices: " + str(path_purge_list))
         for path_str in path_purge_list:
             path_entry = self.active_devices_dict[path_str]
             node_name = path_entry['node_name']

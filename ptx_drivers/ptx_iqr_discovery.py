@@ -66,8 +66,8 @@ class IqrPanTiltDiscovery:
   ### Function to try and connect to device and also monitor and clean up previously connected devices
   def discoveryFunction(self,available_paths_list, active_paths_list,base_namespace, drv_dict, retry_enabled = True):
     self.drv_dict = drv_dict
-    #self.logger.log_warn("Got drv_dict : " + str(self.drv_dict))
-    #self.logger.log_warn("Got available paths list : " + str(available_paths_list))
+    #self.logger.log_debug("Got drv_dict : " + str(self.drv_dict))
+    #self.logger.log_debug("Got available paths list : " + str(available_paths_list))
     self.available_paths_list = available_paths_list
     self.active_paths_list = active_paths_list
     self.base_namespace = base_namespace
@@ -146,11 +146,11 @@ class IqrPanTiltDiscovery:
     launch_id = path_str
 
     node_launch_name = 'iqr_pan_tilt_'
-    self.logger.log_warn("Entering launch device function for path: " + str(path_str) )###
+    self.logger.log_debug("Entering launch device function for path: " + str(path_str) )###
     file_name = self.drv_dict['NODE_DICT']['file_name']
     device_name = self.node_launch_name
     node_name = nepi_system.get_device_alias(device_name)
-    self.logger.log_warn(" launching node: " + node_name)
+    self.logger.log_info(" launching node: " + node_name)
 
 
 
@@ -178,17 +178,17 @@ class IqrPanTiltDiscovery:
     return success
 
   def killAllDevices(self,active_paths_list):
-    #self.logger.log_warn("Entering Kill All Devices function for path: " + str(path_str))###
+    #self.logger.log_debug("Entering Kill All Devices function for path: " + str(path_str))###
     path_purge_list = []
     for key in self.active_devices_dict.keys():
       path_purge_list.append(key)
-    #self.logger.log_warn("Killing Devices: " + str(path_purge_list))
+    #self.logger.log_debug("Killing Devices: " + str(path_purge_list))
     for path_str in path_purge_list:
         path_entry = self.active_devices_dict[path_str]
         node_name = path_entry['node_name']
         sub_process = path_entry['sub_process']
         if self.retry == False:
-          self.logger.log_warn("Will not try relaunch for node: " + node_name)
+          self.logger.log_debug("Will not try relaunch for node: " + node_name)
           self.dont_retry_list.append(path_str)        
         success = nepi_drvs.killDriverNode(node_name,sub_process)
         if path_str in active_paths_list:

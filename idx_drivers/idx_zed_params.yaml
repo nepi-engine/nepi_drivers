@@ -38,7 +38,7 @@ driver:
         default: 'color_image,depth_map,pointcloud'
       navpose_enabled:
         type: Toggle
-        default: 'False'
+        default: 'True'
       navpose_pub_rate:
         type: Int
         options:

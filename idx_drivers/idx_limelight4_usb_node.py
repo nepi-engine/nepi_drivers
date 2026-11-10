@@ -192,7 +192,6 @@ class Limelight4UsbCamNode:
                 proc_img_height=960,
                 proc_img_width=1280,
                 classes_list=[],
-                default_config_dict=self.AI_DEFAULT_CONFIG,
                 processImageFunction=self.processDetectionsCb,
                 processFileFunction=self.processFileCb,
                 msg_if=self.msg_if
