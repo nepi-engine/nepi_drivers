@@ -47,16 +47,36 @@ from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeReq
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Image, NavSatFix, BatteryState
 
-from nepi_interfaces.msg import UpdateBool
-
 from nepi_api.device_if_rbx import RBXRobotIF
 from nepi_api.device_if_npx import NPXDeviceIF
 from nepi_api.device_if_svx import DeviceSVXIF
 from nepi_api.data_product_if_image import ColorImageIF
 from nepi_api.messages_if import MsgIF
 
+# The Nav Sim app's GPS instance status names the mavros node each instance
+# injects GPS_INPUT into, which is how this driver finds its own fake GPS.
+# Optional: a deployment without the app only loses the fake GPS commands.
+try:
+  from nepi_app_nav_sim.msg import NepiAppGpsSimStatus
+except ImportError:
+  NepiAppGpsSimStatus = None
+
 PKG_NAME = 'RBX_ARDUPILOT' # Use in display menus
 FILE_TYPE = 'NODE'
+
+# Nav Sim GPS instance command topics, relative to the instance namespace
+# (<base>/app_nav_sim/gps_instances/<name>), keyed by this driver's command
+# names. They are nav_sim's programmatic API for the GPS kind, carried over
+# from the retired Fake GPS app.
+FAKE_GPS_STATUS_MSG = 'NepiAppGpsSimStatus'
+FAKE_GPS_CMD_TOPICS = {
+  'enable':        ('set_gps_enabled', Bool),
+  'reset':         ('reset_location',  GeoPoint),
+  'go_stop':       ('go_stop',         Empty),
+  'goto_position': ('goto_position',   Point),
+  'goto_location': ('goto_location',   GeoPoint),
+}
+FAKE_GPS_TARGET_UPDATE_SEC = 2.0
 
 
 
@@ -1115,38 +1135,28 @@ class ArdupilotNode:
     self.teleop_last_cmd_time = 0.0
 
 
-    # Define fake gps namespace and create fake_gps publishers.
-    # Created unconditionally so the goto/home/mode callbacks never hit a missing
-    # publisher; harmless when no fake_gps app is subscribed.
-    # Target the Fake GPS app (nepi_app_fake_gps) -- a single instance at the base
-    # namespace ("<base>/app_fake_gps") that injects HilGPS into its selected mavros
-    # node. (Replaces the old per-device "<base>/fake_gps_<port>" node convention.)
-    FAKE_GPS_APP_NODE_NAME = "app_fake_gps"
-    FAKE_GPS_NAMESPACE = os.path.join(self.base_namespace, FAKE_GPS_APP_NODE_NAME)
-    self.msg_if.pub_info("Setting up fake_gps pubs at namespace: " + FAKE_GPS_NAMESPACE)
-    # update_device_enable (UpdateBool: name=this device's OWN mavros namespace,
-    # value=enabled) replaced the old select_mavros_node+enable pair. app_fake_gps
-    # is a single shared instance, and the previous single global enabled+
-    # selected_mavros_node meant two ArduPilot devices running at once (a
-    # physical drone + its SITL twin) fought over the same shared toggle --
-    # whichever device (re)launched most recently silently won and undid the
-    # other's setting (confirmed live 2026-09-16). Addressing by name means this
-    # device only ever touches its own entry, never anyone else's.
-    self.fake_gps_update_enable_pub = nepi_sdk.create_publisher(FAKE_GPS_NAMESPACE + "/update_device_enable", UpdateBool, queue_size=1)
-    self.fake_gps_reset_pub = nepi_sdk.create_publisher(FAKE_GPS_NAMESPACE + "/reset", GeoPoint, queue_size=1)
-    self.fake_gps_go_stop_pub = nepi_sdk.create_publisher(FAKE_GPS_NAMESPACE + "/go_stop", Empty, queue_size=1)
-    self.fake_gps_goto_position_pub = nepi_sdk.create_publisher(FAKE_GPS_NAMESPACE + "/goto_position", Point, queue_size=1)
-    self.fake_gps_goto_location_pub = nepi_sdk.create_publisher(FAKE_GPS_NAMESPACE + "/goto_location", GeoPoint, queue_size=1)
-
-    # Reconcile the Fake GPS app against what kind of vehicle this actually is.
-    # Placed here, after the fake_gps publishers exist, rather than earlier next
-    # to the mavros service setup: an earlier attempt built its own publisher
-    # from self.base_namespace + "app_fake_gps/" and silently published into
-    # "/nepi/device1app_fake_gps/enable" -- get_base_namespace() returns the
-    # namespace with NO trailing slash, which is exactly why the block above
-    # uses os.path.join. Reusing these publishers means one namespace
-    # convention, proven by the existing goto/home callbacks, instead of two.
-    self.reconcileFakeGpsApp()
+    # Fake GPS commands (takeoff climb, gotos, stop, home reset) go to the Nav
+    # Sim app's GPS instance that injects GPS_INPUT into THIS vehicle's mavros
+    # node. Nav Sim absorbed the Fake GPS app in 3.4 and the old single
+    # "<base>/app_fake_gps" node is gone, so publishing there reached nothing:
+    # the simulated fix never moved and takeoff timed out with its whole
+    # height as the error. Each nav_sim GPS instance reports the mavros node it
+    # is bound to on its own status topic, so updateFakeGpsTargetCb follows
+    # those and points the command publishers at the instance bound to this
+    # vehicle -- never at one feeding another vehicle (a physical drone and its
+    # SITL twin can run at once). With no instance bound here, pubFakeGps is a
+    # no-op, which is all publishing to an absent app ever amounted to.
+    self.fake_gps_lock = threading.Lock()
+    self.fake_gps_status_subs = dict()   # instance namespace -> status subscriber
+    self.fake_gps_bound_mavros = dict()  # instance namespace -> its selected_mavros_node
+    self.fake_gps_target_ns = None
+    # Replaced whole on every target change, never mutated, so pubFakeGps can
+    # read it without the lock
+    self.fake_gps_pubs = dict()          # command name -> publisher on the target
+    if NepiAppGpsSimStatus is None:
+      self.msg_if.pub_warn("nepi_app_nav_sim is not installed -- fake GPS commands are disabled")
+    else:
+      nepi_sdk.start_timer_process(1.0, self.updateFakeGpsTargetCb, oneshot = True)
 
 
 
@@ -1486,14 +1496,13 @@ class ArdupilotNode:
   def setHomeLocation(self,geo_point):
     self.set_home_location(geo_point)
     if self.has_fake_gps:
-      self.fake_gps_reset_pub.publish(geo_point)
+      self.pubFakeGps('reset',geo_point)
 
   def getHomeLocation(self):
     return self.home_location
 
   def setFakeGPSFunction(self,fake_gps_enabled):
-    self.fake_gps_update_enable_pub.publish(name = self.mavlink_namespace.rstrip('/'),
-                                            name2 = "", name3 = "", value = fake_gps_enabled)
+    self.pubFakeGps('enable', Bool(data = bool(fake_gps_enabled)))
 
 
   def setMotorControlRatio(self,motor_ind,speed_ratio):
@@ -1664,7 +1673,7 @@ class ArdupilotNode:
 
   def goStop(self):
     self.stop_triggered = True
-    self.fake_gps_go_stop_pub.publish(Empty())
+    self.pubFakeGps('go_stop', Empty())
     return True
 
   def goHome(self):
@@ -1675,7 +1684,7 @@ class ArdupilotNode:
     home_loc = self.home_location
     setpoint_location = [home_loc.latitude,home_loc.longitude,home_loc.altitude,-999]
     self.rbx_if.setpoint_location_global_wgs84(setpoint_location)
-    self.fake_gps_goto_location_pub.publish(home_loc)
+    self.pubFakeGps('goto_location',home_loc)
     return True
 
 
@@ -1793,6 +1802,14 @@ class ArdupilotNode:
     # here makes this match rbx_sim_node.py's rover exactly, giving the
     # quadcopter the same "move N units from wherever it is right now"
     # capability the rover already had.
+    #
+    # The fake GPS gets the offset as received, NOT that absolute target:
+    # nav_sim's goto_position is itself a relative move from the simulated
+    # fix's current spot. Handing it the absolute target moved the fix by
+    # offset + current local position on every goto -- confirmed on the bench
+    # 2026-11-10: "forward 6 m" from 5 m up moved it 7.84 m, mostly upward, and
+    # the altitude compounded over each following goto.
+    fake_gps_offset_enu_m = Point(x = point_enu_m.x, y = point_enu_m.y, z = point_enu_m.z)
     point_enu_m.x = point_enu_m.x + self.navpose_dict['x_m']
     point_enu_m.y = point_enu_m.y + self.navpose_dict['y_m']
     point_enu_m.z = point_enu_m.z + self.navpose_dict['z_m']
@@ -1810,7 +1827,7 @@ class ArdupilotNode:
     position_local_target_msg.pose = pose_enu
     ## Send Message and Check for Setpoint Success
     self.position_target = position_local_target_msg
-    self.fake_gps_goto_position_pub.publish(point_enu_m)
+    self.pubFakeGps('goto_position',fake_gps_offset_enu_m)
 
   def gotoLocation(self,geopoint_amsl,orientation_enu_deg):
     loc_str = str(geopoint_amsl)
@@ -1841,7 +1858,7 @@ class ArdupilotNode:
     # The Fake GPS app keeps its location in WGS84 (ellipsoid) altitude, so
     # it gets the goal back as ellipsoid height: AMSL + N.
     geopoint_wsg84 = nepi_nav.convert_amsl_to_wgs84(geopoint_amsl)
-    self.fake_gps_goto_location_pub.publish(geopoint_wsg84)
+    self.pubFakeGps('goto_location',geopoint_wsg84)
 
   ##########################
   # Control Ready Check Funcitons
@@ -2496,10 +2513,92 @@ class ArdupilotNode:
       waited += 0.25
     return False
 
+  def updateFakeGpsTargetCb(self, timer):
+    # Track every Nav Sim GPS instance's status and keep the fake GPS command
+    # publishers on the one bound to this vehicle's mavros node. Instances come
+    # and go with the app, and an operator can rebind one in the app's RUI at
+    # any time, so this runs for the life of the node.
+    if nepi_sdk.is_shutdown():
+      return
+    try:
+      status_topics = nepi_sdk.find_topics_by_msg(FAKE_GPS_STATUS_MSG)
+      inst_namespaces = [t[:-len('/status')] for t in status_topics if t.endswith('/status')]
+      gone_subs = []
+      with self.fake_gps_lock:
+        for inst_ns in list(self.fake_gps_status_subs.keys()):
+          if inst_ns not in inst_namespaces:
+            gone_subs.append(self.fake_gps_status_subs.pop(inst_ns))
+            self.fake_gps_bound_mavros.pop(inst_ns, None)
+        new_namespaces = [ns for ns in inst_namespaces if ns not in self.fake_gps_status_subs]
+      for sub in gone_subs:
+        if sub is not None:
+          try:
+            sub.unregister()
+          except Exception:
+            pass
+      for inst_ns in new_namespaces:
+        # nav_sim latches this status, so the binding arrives right away
+        sub = nepi_sdk.create_subscriber(inst_ns + '/status', NepiAppGpsSimStatus,
+                                         self.fakeGpsStatusCb, queue_size = 1,
+                                         callback_args = (inst_ns,))
+        with self.fake_gps_lock:
+          self.fake_gps_status_subs[inst_ns] = sub
+
+      own_mavros = self.mavlink_namespace.rstrip('/')
+      with self.fake_gps_lock:
+        bound = sorted(ns for ns, mavros_ns in self.fake_gps_bound_mavros.items()
+                       if mavros_ns == own_mavros)
+      target_ns = bound[0] if len(bound) > 0 else None
+      if len(bound) > 1:
+        # Two instances injecting into one FCU is the two-GPS EKF conflict
+        # reconcileFakeGpsApp describes; the operator has to unbind one.
+        self.msg_if.pub_warn("Several Nav Sim GPS instances inject into " + own_mavros
+                             + ": " + str(bound) + " -- sending fake GPS commands to "
+                             + str(target_ns), throttle_s = 30)
+      if target_ns != self.fake_gps_target_ns:
+        self.setFakeGpsTarget(target_ns)
+    except Exception as e:
+      self.msg_if.pub_warn("Fake GPS target update failed: " + str(e), throttle_s = 30)
+    nepi_sdk.start_timer_process(FAKE_GPS_TARGET_UPDATE_SEC, self.updateFakeGpsTargetCb, oneshot = True)
+
+  def fakeGpsStatusCb(self, status_msg, args):
+    inst_ns = args[0]
+    with self.fake_gps_lock:
+      # Ignore a late message from an instance whose subscriber was just dropped
+      if inst_ns in self.fake_gps_status_subs:
+        self.fake_gps_bound_mavros[inst_ns] = status_msg.selected_mavros_node
+
+  def setFakeGpsTarget(self, inst_ns):
+    new_pubs = dict()
+    if inst_ns is not None:
+      for cmd_name, (topic, msg_type) in FAKE_GPS_CMD_TOPICS.items():
+        new_pubs[cmd_name] = nepi_sdk.create_publisher(inst_ns + '/' + topic, msg_type, queue_size = 1)
+    old_pubs = self.fake_gps_pubs
+    self.fake_gps_pubs = new_pubs
+    self.fake_gps_target_ns = inst_ns
+    for pub in old_pubs.values():
+      if pub is not None:
+        try:
+          pub.unregister()
+        except Exception:
+          pass
+    if inst_ns is None:
+      self.msg_if.pub_warn("No Nav Sim GPS instance injects into " + self.mavlink_namespace.rstrip('/')
+                           + " any more -- fake GPS commands are disabled")
+    else:
+      self.msg_if.pub_info("Sending fake GPS commands to Nav Sim GPS instance: " + inst_ns)
+      self.reconcileFakeGpsApp()
+
+  def pubFakeGps(self, cmd_name, msg):
+    # No-op while no Nav Sim GPS instance is bound to this vehicle
+    pub = self.fake_gps_pubs.get(cmd_name)
+    if pub is not None:
+      nepi_sdk.publish_pub(pub, msg)
+
   def reconcileFakeGpsApp(self):
     # A simulated vehicle brings its own GPS; a real airframe on this deployment
-    # may not have one at all. The Fake GPS app cannot know which it is looking
-    # at, so this driver -- which does -- tells it.
+    # may not have one at all. The Nav Sim GPS instance cannot know which it is
+    # looking at, so this driver -- which does -- tells it.
     #
     # Why this exists: confirmed live 2026-08-12, app_fake_gps left enabled from
     # earlier real-hardware testing kept injecting GPS_INPUT at 41 Hz from its
@@ -2517,59 +2616,53 @@ class ArdupilotNode:
     # builds as connection_type + "_" + address (see discoveryFunction): a SITL
     # connection is always "SITL_<addr>_<port>", every real connection type
     # (SERIAL/USB/TCP/UDP to an actual FCU) is not.
-    #   SITL  -> disable Fake GPS for THIS device's own mavros node (the sim
-    #            has its own GPS; injection would break it)
-    #   real  -> enable Fake GPS for THIS device's own mavros node, but only
-    #            when this driver's own fake_gps discovery option is on. A
-    #            real airframe with its own GPS would otherwise get the same
-    #            two-GPS EKF conflict described above; with the option off,
-    #            the app is left untouched.
+    #   SITL  -> disable the Nav Sim GPS instance bound to THIS device's own
+    #            mavros node (the sim has its own GPS; injection would break it)
+    #   real  -> enable that instance, but only when this driver's own
+    #            fake_gps discovery option is on. A real airframe with its own
+    #            GPS would otherwise get the same two-GPS EKF conflict
+    #            described above; with the option off, the instance is left
+    #            untouched.
     #
-    # update_device_enable (UpdateBool: name=this device's own mavros
-    # namespace, value=enabled) addresses only this device's own entry in
-    # app_fake_gps's per-device enabled_devices list -- see
-    # fake_gps_app_node.py's own NepiAppFakeGpsStatus.msg comment for why this
-    # replaced a single global enabled+selected_mavros_node: with two ArduPilot
-    # devices running at once (a physical drone + its SITL twin), each one's
-    # own reconcile used to stomp the other's setting, since there was only
-    # one shared toggle for the whole system to fight over. Addressing by name
-    # means this device's reconcile can never touch anyone else's entry.
+    # Only the instance bound to this vehicle's mavros node is ever touched
+    # (see updateFakeGpsTargetCb), so with two ArduPilot devices running at
+    # once (a physical drone + its SITL twin) each one's reconcile reaches only
+    # the instance feeding it, never the other's.
     #
-    # Timing note: this runs once, here, rather than on a timer. Discovery
-    # relaunches this whole node whenever the vehicle is re-detected (see
-    # checkOnDevice), so "once per detected vehicle" is exactly the right
-    # granularity, and it deliberately does NOT fight a human who later toggles
-    # Fake GPS by hand in the RUI for that same vehicle's own row.
+    # Timing note: this runs once per binding -- when the driver first finds
+    # an instance bound to this vehicle, or the binding moves to another
+    # instance -- not on every status message. Discovery relaunches this whole
+    # node whenever the vehicle is re-detected (see checkOnDevice), so that is
+    # still "once per detected vehicle", and it deliberately does NOT fight a
+    # human who later toggles that instance's enable by hand in the Nav Sim RUI.
     is_sitl = self.is_sitl
     if not is_sitl and not self.has_fake_gps:
       return
+    enable_pub = self.fake_gps_pubs.get('enable')
+    if enable_pub is None:
+      return
     try:
-      # Wait for the app's subscriber to actually connect before publishing.
-      # This publisher is created immediately above, and a rospy publish
+      # Wait for nav_sim's subscriber to actually connect before publishing.
+      # The publisher was created just before this call, and a rospy publish
       # issued before the subscriber connection completes is dropped on the
       # floor with no error -- confirmed live 2026-08-12, an earlier version
       # published straight after create_publisher and the app's enabled flag
-      # never changed. Absence of a subscriber is not an error (the Fake GPS app
-      # need not be installed), so waitForPubConnection just times out and we
-      # publish anyway.
-      self.waitForPubConnection(self.fake_gps_update_enable_pub)
-      update_msg = UpdateBool()
-      update_msg.name = self.mavlink_namespace.rstrip('/')
-      update_msg.value = (not is_sitl)
-      nepi_sdk.publish_pub(self.fake_gps_update_enable_pub, update_msg)
+      # never changed.
+      self.waitForPubConnection(enable_pub)
+      nepi_sdk.publish_pub(enable_pub, Bool(data = (not is_sitl)))
       if is_sitl:
         self.msg_if.pub_warn("Simulated vehicle detected (device_path " + str(self.device_path)
-                             + ") -- disabling the Fake GPS app so its injected GPS_INPUT cannot"
-                             + " prevent this vehicle's EKF from getting a position estimate")
+                             + ") -- disabling Nav Sim GPS instance " + str(self.fake_gps_target_ns)
+                             + " so its injected GPS_INPUT cannot prevent this vehicle's EKF"
+                             + " from getting a position estimate")
       else:
         self.msg_if.pub_warn("Real vehicle detected (device_path " + str(self.device_path)
-                             + ") -- pointing the Fake GPS app at " + str(self.mavlink_namespace)
-                             + " and enabling it")
+                             + ") -- enabling Nav Sim GPS instance " + str(self.fake_gps_target_ns)
+                             + ", which injects into " + str(self.mavlink_namespace))
     except Exception as e:
-      # Never fatal: a deployment without the Fake GPS app installed is entirely
-      # legitimate, and this is a convenience reconcile, not a requirement for
+      # Never fatal: this is a convenience reconcile, not a requirement for
       # this driver to operate.
-      self.msg_if.pub_warn("Could not reconcile the Fake GPS app state: " + str(e))
+      self.msg_if.pub_warn("Could not reconcile the Nav Sim GPS instance state: " + str(e))
 
   def describeArmRefusalCause(self):
     # ArduPilot refusing to ARM is almost never a NEPI-side problem, so the raw
@@ -2636,7 +2729,8 @@ class ArdupilotNode:
       #     the ellipsoid from nepi_nav; a relative climb is the same in both.
       # goal_alt stays in the mavros (ellipsoid) frame for the completion check
       # below, which converges because a +height AMSL climb is a +height
-      # ellipsoid climb at a fixed lat/lon. See fakeGpsGoPosCb in the fake_gps app.
+      # ellipsoid climb at a fixed lat/lon. See GpsSimInstance.gpsGoPosCb in the
+      # nav_sim app, which moves the simulated fix by this offset from its current spot.
       start_alt = self.rbx_if.current_location_wgs84_geo[2]
       goal_alt = start_alt + takeoff_height_m
       self.takeoff_goal_alt = goal_alt
@@ -2644,7 +2738,7 @@ class ArdupilotNode:
       climb_point.x = 0.0
       climb_point.y = 0.0
       climb_point.z = float(takeoff_height_m)
-      self.fake_gps_goto_position_pub.publish(climb_point)
+      self.pubFakeGps('goto_position',climb_point)
 
       error_bound_m = self.rbx_if.status_msg.error_bounds.max_distance_error_m
       self.takeoff_error_bound_m = error_bound_m
@@ -2763,7 +2857,7 @@ class ArdupilotNode:
   global stabilize
   def stabilize(self):
     cmd_success = self.set_mavlink_mode('STABILIZE')
-    self.fake_gps_go_stop_pub.publish(Empty())
+    self.pubFakeGps('go_stop', Empty())
     return cmd_success
       
   ### Function for switching to LAND mode
@@ -2777,7 +2871,7 @@ class ArdupilotNode:
     start_alt = self.rbx_if.current_location_wgs84_geo[2]
     goal_alt = 0
     geo_point.altitude = goal_alt
-    self.fake_gps_goto_location_pub.publish(geo_point)
+    self.pubFakeGps('goto_location',geo_point)
     self.msg_if.pub_info("Waiting for land process to complete and disarm")
     timeout_sec = self.rbx_if.status_msg.cmd_timeout
     check_interval_s = float(timeout_sec) / 100
@@ -2800,7 +2894,7 @@ class ArdupilotNode:
   def rtl(self):
     cmd_success = False
     self.set_mavlink_mode('RTL')
-    self.fake_gps_goto_location_pub.publish(self.home_location)
+    self.pubFakeGps('goto_location',self.home_location)
     error_goal_m = self.rbx_if.status_msg.error_bounds.max_distance_error_m
     last_loc = self.rbx_if.current_location_wgs84_geo
     timeout_sec = self.rbx_if.status_msg.cmd_timeout
@@ -2826,7 +2920,7 @@ class ArdupilotNode:
   global loiter
   def loiter(self):
     cmd_success = self.set_mavlink_mode('LOITER')
-    self.fake_gps_go_stop_pub.publish(Empty())
+    self.pubFakeGps('go_stop', Empty())
     return cmd_success
 
 
@@ -2834,7 +2928,7 @@ class ArdupilotNode:
   global guided
   def guided(self):
     cmd_success = self.set_mavlink_mode('GUIDED')
-    self.fake_gps_go_stop_pub.publish(Empty())
+    self.pubFakeGps('go_stop', Empty())
     return cmd_success
 
   ### Function for switching back to current mission
@@ -2857,7 +2951,7 @@ class ArdupilotNode:
     if response is not None:
       self.home_location = geo_point
       if self.has_fake_gps:
-        self.fake_gps_reset_pub.publish(geo_point)
+        self.pubFakeGps('reset',geo_point)
       cmd_success = True
     else:
       cmd_success = False

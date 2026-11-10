@@ -359,8 +359,10 @@ class ZedCamDiscovery:
     success = False
     self.msg_if.pub_info("stopping " + node_namespace)
     purge_paths = []
-    device_dict = copy.deepcopy(self.device_dict)
-    for i, path_str in enumerate(device_dict.keys()):
+    # Snapshot the keys only: each entry holds the node's subprocess.Popen,
+    # whose internal lock cannot be deepcopied, so a deepcopy here raised
+    # TypeError and the cleanup exited without killing any device node.
+    for path_str in list(self.device_dict.keys()):
       device = self.device_dict[path_str]
       namespace = device['node_namespace']
       node_name = os.path.basename(namespace)
