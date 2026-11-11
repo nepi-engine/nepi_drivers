@@ -1496,7 +1496,7 @@ class ArdupilotNode:
   def setHomeLocation(self,geo_point):
     self.set_home_location(geo_point)
     if self.has_fake_gps:
-      self.pubFakeGps('reset',geo_point)
+      self.pubFakeGpsLocation('reset',geo_point)
 
   def getHomeLocation(self):
     return self.home_location
@@ -1684,7 +1684,7 @@ class ArdupilotNode:
     home_loc = self.home_location
     setpoint_location = [home_loc.latitude,home_loc.longitude,home_loc.altitude,-999]
     self.rbx_if.setpoint_location_global_wgs84(setpoint_location)
-    self.pubFakeGps('goto_location',home_loc)
+    self.pubFakeGpsLocation('goto_location',home_loc)
     return True
 
 
@@ -1855,10 +1855,11 @@ class ArdupilotNode:
     # which mavros sends as SET_POSITION_TARGET_GLOBAL_INT with the altitude
     # unconverted, so geopoint_amsl's AMSL altitude is what the FCU flies to.
     self.location_target = location_global_target_msg
-    # The Fake GPS app keeps its location in WGS84 (ellipsoid) altitude, so
-    # it gets the goal back as ellipsoid height: AMSL + N.
-    geopoint_wsg84 = nepi_nav.convert_amsl_to_wgs84(geopoint_amsl)
-    self.pubFakeGps('goto_location',geopoint_wsg84)
+    # nav_sim's location is AMSL (see pubFakeGpsLocation), the same frame as
+    # this goal, so it gets geopoint_amsl unchanged. This used to convert the
+    # goal to ellipsoid height first, on the belief that the Fake GPS app kept
+    # WGS84; it never did -- it put the altitude straight into GPS_INPUT.alt.
+    self.pubFakeGps('goto_location',geopoint_amsl)
 
   ##########################
   # Control Ready Check Funcitons
@@ -2595,6 +2596,19 @@ class ArdupilotNode:
     if pub is not None:
       nepi_sdk.publish_pub(pub, msg)
 
+  def pubFakeGpsLocation(self, cmd_name, geopoint_wgs84):
+    # nav_sim hands its altitude to the FCU as GPS_INPUT.alt, which MAVLink
+    # defines as MSL, so nav_sim's location is AMSL. This driver's own
+    # geopoints (current location, home) carry WGS84 ellipsoid heights and are
+    # converted here. Sent unconverted, the simulated fix sat the geoid height
+    # (~20 m at the bench) away from the FCU's own goal, so location moves never
+    # converged (bench, 2026-11-10). A -999 hold altitude stays -999 so nav_sim
+    # still holds that axis; converted, it would become a real target.
+    geopoint_out = copy.deepcopy(geopoint_wgs84)
+    if geopoint_wgs84.altitude != -999:
+      geopoint_out = nepi_nav.convert_wgs84_to_amsl(geopoint_wgs84)
+    self.pubFakeGps(cmd_name, geopoint_out)
+
   def reconcileFakeGpsApp(self):
     # A simulated vehicle brings its own GPS; a real airframe on this deployment
     # may not have one at all. The Nav Sim GPS instance cannot know which it is
@@ -2869,7 +2883,13 @@ class ArdupilotNode:
     geo_point.latitude = self.rbx_if.current_location_wgs84_geo[0]
     geo_point.longitude = self.rbx_if.current_location_wgs84_geo[1]
     start_alt = self.rbx_if.current_location_wgs84_geo[2]
+    # nav_sim's altitude is AMSL (see pubFakeGpsLocation). Descend the fake fix
+    # to the home (takeoff) altitude, i.e. the ground, rather than to 0, which
+    # is sea level: with a simulated start at a real terrain elevation, 0 would
+    # drop the fix by that whole elevation. Before any home exists (-999), 0.
     goal_alt = 0
+    if self.home_location.altitude != -999:
+      goal_alt = nepi_nav.convert_wgs84_to_amsl(self.home_location).altitude
     geo_point.altitude = goal_alt
     self.pubFakeGps('goto_location',geo_point)
     self.msg_if.pub_info("Waiting for land process to complete and disarm")
@@ -2894,7 +2914,7 @@ class ArdupilotNode:
   def rtl(self):
     cmd_success = False
     self.set_mavlink_mode('RTL')
-    self.pubFakeGps('goto_location',self.home_location)
+    self.pubFakeGpsLocation('goto_location',self.home_location)
     error_goal_m = self.rbx_if.status_msg.error_bounds.max_distance_error_m
     last_loc = self.rbx_if.current_location_wgs84_geo
     timeout_sec = self.rbx_if.status_msg.cmd_timeout
@@ -2951,7 +2971,7 @@ class ArdupilotNode:
     if response is not None:
       self.home_location = geo_point
       if self.has_fake_gps:
-        self.pubFakeGps('reset',geo_point)
+        self.pubFakeGpsLocation('reset',geo_point)
       cmd_success = True
     else:
       cmd_success = False
