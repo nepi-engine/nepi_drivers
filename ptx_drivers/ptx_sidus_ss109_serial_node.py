@@ -428,7 +428,7 @@ class SidusSS109SerialPTXNode:
         if self.ptx_if is not None:
             navpose_dict['roll_deg_per_sec'] = 0
             navpose_dict['pitch_deg_per_sec'] = self.ptx_if.speed_pan_dps 
-            navpose_dict['yaw_deg_per_sec'] = self.ptx_if.speed_pan_dps  
+            navpose_dict['yaw_deg_per_sec'] = self.ptx_if.speed_tilt_dps  
 
         navpose_dict['has_pan_tilt'] = True
         navpose_dict['time_pan_tilt'] = nepi_utils.get_time()
@@ -436,7 +436,7 @@ class SidusSS109SerialPTXNode:
         navpose_dict['tilt_deg'] = tilt_deg * self.TILT_DEG_DIR
         if self.ptx_if is not None:
             navpose_dict['pan_deg_per_sec'] = self.ptx_if.speed_pan_dps 
-            navpose_dict['tilt_deg_per_sec'] = self.ptx_if.speed_pan_dps 
+            navpose_dict['tilt_deg_per_sec'] = self.ptx_if.speed_tilt_dps 
         return navpose_dict
 
 
