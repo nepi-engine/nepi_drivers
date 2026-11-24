@@ -144,7 +144,7 @@ class IqrPanTiltNode:
     current_position = [0.0,0.0]
     last_position = current_position
 
-    speed_ratio = 0.5
+    speed_ratio = 1.0
 
     drv_dict = dict()    
 
@@ -250,7 +250,7 @@ class IqrPanTiltNode:
                 'tilt_joint_name' : self.node_name + '_tilt_joint',
                 'reverse_pan_control' : False,
                 'reverse_tilt_control' : False,
-                'speed_ratio' : 0.5,
+                'speed_ratio' : 1.0,
                 'status_update_rate_hz' : 10
             }
             
@@ -442,11 +442,18 @@ class IqrPanTiltNode:
         navpose_dict['roll_deg'] = 0.0
         navpose_dict['yaw_deg'] = pan_deg * self.PAN_DEG_DIR
         navpose_dict['pitch_deg'] = tilt_deg * self.TILT_DEG_DIR
+        if self.ptx_if is not None:
+            navpose_dict['roll_deg_per_sec'] = 0
+            navpose_dict['pitch_deg_per_sec'] = self.ptx_if.speed_pan_dps 
+            navpose_dict['yaw_deg_per_sec'] = self.ptx_if.speed_tilt_dps  
 
         navpose_dict['has_pan_tilt'] = True
         navpose_dict['time_pan_tilt'] = nepi_utils.get_time()
         navpose_dict['pan_deg'] = pan_deg * self.PAN_DEG_DIR
         navpose_dict['tilt_deg'] = tilt_deg * self.TILT_DEG_DIR
+        if self.ptx_if is not None:
+            navpose_dict['pan_deg_per_sec'] = self.ptx_if.speed_pan_dps 
+            navpose_dict['tilt_deg_per_sec'] = self.ptx_if.speed_tilt_dps 
         return navpose_dict
 
     #**********************

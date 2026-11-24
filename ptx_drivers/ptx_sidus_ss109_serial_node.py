@@ -144,7 +144,7 @@ class SidusSS109SerialPTXNode:
     current_position = [0.0,0.0]
     position_times = [0.0,0.0]
 
-    speed_ratio = 0.5
+    speed_ratio = 1.0
     speed_max_dps = 20
 
     drv_dict = dict()    
@@ -228,7 +228,7 @@ class SidusSS109SerialPTXNode:
                 'tilt_joint_name' : self.node_name + '_tilt_joint',
                 'reverse_pan_control' : False,
                 'reverse_tilt_control' : False,
-                'speed_ratio' : 0.5,
+                'speed_ratio' : 1.0,
                 'status_update_rate_hz' : 10
             }
             
@@ -419,21 +419,24 @@ class SidusSS109SerialPTXNode:
        
     def getNavPoseCb(self):
         pan_deg, tilt_deg = self.current_position
-        # A copy: assigning BLANK_NAVPOSE_DICT itself would write this node's values into the
-        # shared module default
         navpose_dict = copy.deepcopy(nepi_nav.BLANK_NAVPOSE_DICT)
         navpose_dict['has_orientation'] = True
         navpose_dict['time_orientation'] = nepi_utils.get_time()
         navpose_dict['roll_deg'] = 0.0
-        # current_position is already in the node frame, the same values getPosition
-        # reports; getCurrentPanPosition/getCurrentTiltPosition flip the device reading.
-        navpose_dict['yaw_deg'] = pan_deg
-        navpose_dict['pitch_deg'] = tilt_deg
+        navpose_dict['yaw_deg'] = pan_deg * self.PAN_DEG_DIR
+        navpose_dict['pitch_deg'] = tilt_deg * self.TILT_DEG_DIR
+        if self.ptx_if is not None:
+            navpose_dict['roll_deg_per_sec'] = 0
+            navpose_dict['pitch_deg_per_sec'] = self.ptx_if.speed_pan_dps 
+            navpose_dict['yaw_deg_per_sec'] = self.ptx_if.speed_tilt_dps  
 
         navpose_dict['has_pan_tilt'] = True
         navpose_dict['time_pan_tilt'] = nepi_utils.get_time()
-        navpose_dict['pan_deg'] = pan_deg
-        navpose_dict['tilt_deg'] = tilt_deg
+        navpose_dict['pan_deg'] = pan_deg * self.PAN_DEG_DIR
+        navpose_dict['tilt_deg'] = tilt_deg * self.TILT_DEG_DIR
+        if self.ptx_if is not None:
+            navpose_dict['pan_deg_per_sec'] = self.ptx_if.speed_pan_dps 
+            navpose_dict['tilt_deg_per_sec'] = self.ptx_if.speed_tilt_dps 
         return navpose_dict
 
 
