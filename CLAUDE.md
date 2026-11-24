@@ -116,6 +116,7 @@ Hardware-specific runtime dependencies:
 | LSX Sealite | Serial port present, device at configured address |
 | All serial | `pyserial`, `nepi_serial` SDK module |
 | IDX RPi cam3 | `picamera2`, libcamera stack (`sudo apt install python3-picamera2`); Raspberry Pi 5 only |
+| NPX Blue Robotics Bar | `ms5837` Python module (Blue Robotics ms5837-python) plus `smbus2` or `smbus`; sensor on `/dev/i2c-<bus>` (the `i2c_bus` option), 3.3 V logic |
 
 ## Naming Conventions
 

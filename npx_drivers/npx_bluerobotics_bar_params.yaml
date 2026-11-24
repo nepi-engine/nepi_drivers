@@ -1,0 +1,75 @@
+driver:
+  pkg_name: NPX_BLUEROBOTICS_BAR
+  display_name: Blue Robotics Bar02/Bar30 Depth Sensor (I2C)
+  description: Driver for a Blue Robotics Bar02 or Bar30 depth/pressure sensor (TE MS5837) wired directly to one of the host's I2C buses, read with Blue Robotics' ms5837-python library. Publishes depth as a NavPose device, plus pressure (pascals) and water temperature (deg C) topics. The sensor answers at the fixed I2C address 0x76 and uses 3.3 V logic; 5 V logic damages it. Only the bus named by i2c_bus is ever probed. Needs the ms5837 Python module and smbus2 (or smbus) in the NEPI container, and /dev/i2c-<bus> visible inside it.
+  type: NPX
+  group_id: None
+  NODE_DICT:
+    file_name: npx_bluerobotics_bar_node.py
+    class_name: BlueRoboticsBarNode
+  DRIVER_DICT:
+    file_name: None
+    class_name: None
+  DISCOVERY_DICT:
+    file_name: npx_bluerobotics_bar_discovery.py
+    class_name: BlueRoboticsBarDiscovery
+    process: CALL
+    OPTIONS:
+      i2c_bus:
+        type: Selection
+        description: 'The host I2C bus the sensor is wired to: the N in /dev/i2c-N. Default 1, the Raspberry Pi 5 header bus (pins 3 SDA and 5 SCL). Only this bus is probed, and only while no node is running on it: a probe writes a reset command and reads the calibration words at address 0x76, so the other buses, which on a Jetson carry cameras and power-management parts, are never touched. Use i2cdetect -y N on the host to confirm the sensor shows at 0x76. Changing this stops the node on the old bus and probes the new one.'
+        options:
+          - '0'
+          - '1'
+          - '2'
+          - '3'
+          - '4'
+          - '5'
+          - '6'
+          - '7'
+          - '8'
+          - '9'
+          - '10'
+          - '11'
+          - '12'
+          - '13'
+          - '14'
+          - '15'
+        default: '1'
+        value: '1'
+      depth_model:
+        type: Selection
+        description: 'Which Bar sensor is wired. Default BlueRobotics Bar02 (MS5837-02BA), 0 to 10 m and as fine as 0.16 mm. BlueRobotics Bar30 (MS5837-30BA) reads 0 to about 300 m and as fine as 2 mm. The two use different conversion math, and running the wrong one reads about 20 times too high or too low; neither chip can report which it is. Check the part label. At startup the node compares its first reading with surface_pressure_mbar and logs a warning when the other model''s math fits better. Changing this restarts the node.'
+        options:
+          - 'BlueRobotics Bar02 (MS5837-02BA)'
+          - 'BlueRobotics Bar30 (MS5837-30BA)'
+        default: 'BlueRobotics Bar02 (MS5837-02BA)'
+        value: 'BlueRobotics Bar02 (MS5837-02BA)'
+      depth_osr:
+        type: Selection
+        description: 'The oversampling ratio of each pressure and temperature conversion. Higher is quieter but slower, and keeps the sensor converting more of the time, which warms it. Default 1024, about 0.4 mm of fresh water RMS noise on a Bar02 (5.5 mm on a Bar30); ArduPilot uses 1024 to limit self-heating. 8192 is the quietest (0.16 mm on a Bar02). The library waits out both conversions on every read, about 5 ms at 1024 and 41 ms at 8192, so the node reads about 20 times a second up to 4096 and 10 times a second at 8192. Changing this restarts the node.'
+        options:
+          - '256'
+          - '512'
+          - '1024'
+          - '2048'
+          - '4096'
+          - '8192'
+        default: '1024'
+        value: '1024'
+      fluid_density_kg_m3:
+        type: Float
+        description: 'The density of the water, 950-1100 kg/m3. Default 997, fresh water; sea water is 1029. Depth is the pressure above surface_pressure_mbar divided by density times gravity, so a fresh-water setting in the sea reads about 3% deep. Changing this restarts the node.'
+        options:
+          - '950.0'
+          - '1100.0'
+        default: '997.0'
+        value: '997.0'
+      surface_pressure_mbar:
+        type: Float
+        description: 'The air pressure at the water surface, 700-1100 mbar, which is depth 0. Default 1013.25, standard sea-level pressure. Weather moves it by about 30 mbar, which is 30 cm of depth, and altitude by about 120 mbar per 1000 m. For accurate depth, measure it with the sensor in air at the surface and enter that: the node logs its first reading in mbar when it starts, and publishes pressure continuously on its pressure topic in pascals (divide by 100 for mbar). It also marks the sensor''s own height as depth 0, so depth is the sensor''s depth, not the vehicle''s. Changing this restarts the node.'
+        options:
+          - '700.0'
+          - '1100.0'
+        default: '1013.25'
+        value: '1013.25'
