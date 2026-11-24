@@ -735,9 +735,9 @@ class ArdupilotNode:
   settings_if = None
   save_data_if = None
   connect_navpose_if = None
-  OWN_NAVPOSE_MAX_TRIES = 60 # 1 s apart
+  OWN_NAVPOSE_RETRY_SEC = 2.0
   own_navpose_topic = None
-  own_navpose_tries = 0
+  own_navpose_wait_logged = False
 
   # Geoid height N at the current fix (geoid above the WGS84 ellipsoid), for
   # navpose geoid_height_meters. Looked up again only once the fix has moved
@@ -1201,8 +1201,7 @@ class ArdupilotNode:
         save_data_if = self.save_data_if,
         connect_navpose_if = self.connect_navpose_if
         )
-    # Make the autopilot's own navpose the RBX navpose source.
-    self.own_navpose_topic = self.npx_if.navpose_if.get_namespace()
+    # Make the autopilot's own navpose the RBX navpose source (see selectOwnNavPoseCb).
     nepi_sdk.start_timer_process(1.0, self.selectOwnNavPoseCb, oneshot = True)
 
     ##################################
@@ -2107,29 +2106,53 @@ class ArdupilotNode:
     return copy.deepcopy(self.navpose_dict)
 
   def selectOwnNavPoseCb(self, timer):
-    # Select the autopilot's own NPX navpose as the RBX navpose source once the
-    # connect has discovered it. Only a startup default is replaced ('None',
-    # '', or the node namespace that older saved configs hold), never a
-    # source the operator picked, and it gives up after a bounded number of
-    # tries so a navpose that never appears costs nothing.
+    # Make the autopilot's own NPX navpose the RBX navpose source. RBXRobotIF
+    # takes the current_* state that goto and takeoff completion check against
+    # from that source, so it has to be this autopilot.
+    #
+    # A robot's navpose selector lists only NavPose Manager frames by default
+    # (ConnectNavPoseIF filter ['navposes']) and auto-selects the first one, so
+    # the NPX topic is added to this robot's selector and an auto-selected frame
+    # is replaced. An operator's pick is the SAVED selection: auto-select never
+    # saves, set_selected_topic always does. A saved topic inside this node's
+    # own namespace is a stale name for this NPX, not an operator's pick.
+    #
+    # The NPX creates its navpose publisher (navpose_pub_if) only once
+    # getNavPoseCb returns data, after a local pose and a GPS fix, which can
+    # take minutes, so this keeps checking until then. npx_if.navpose_if is not
+    # that topic: it is the node-level navpose this robot republishes, which
+    # the selector excludes.
     connect_if = self.connect_navpose_if
-    if connect_if is None or self.own_navpose_topic is None or nepi_sdk.is_shutdown():
+    if connect_if is None or self.npx_if is None or nepi_sdk.is_shutdown():
       return
-    selected = connect_if.get_selected_topic()
-    if selected == self.own_navpose_topic:
-      return
-    if selected not in ['None', '', None, self.node_namespace]:
-      self.msg_if.pub_info("Keeping operator navpose source: " + str(selected))
-      return
-    if self.own_navpose_topic in connect_if.get_available_topics():
-      connect_if.set_selected_topic(self.own_navpose_topic)
-      self.msg_if.pub_info("Selected own navpose source: " + self.own_navpose_topic)
-      return
-    self.own_navpose_tries += 1
-    if self.own_navpose_tries < self.OWN_NAVPOSE_MAX_TRIES:
-      nepi_sdk.start_timer_process(1.0, self.selectOwnNavPoseCb, oneshot = True)
-    else:
-      self.msg_if.pub_warn("Own navpose source never appeared, leaving navpose unselected: " + self.own_navpose_topic)
+    if self.own_navpose_topic is None:
+      navpose_pub_if = getattr(self.npx_if, 'navpose_pub_if', None)
+      if navpose_pub_if is not None:
+        self.own_navpose_topic = navpose_pub_if.get_namespace()
+        # An empty filter list already offers every topic. Replaced, not
+        # appended to: the default list is one module-level object that every
+        # ConnectNavPoseIF in this process shares.
+        if len(connect_if.filter_topics_list) > 0:
+          connect_if.filter_topics_list = list(connect_if.filter_topics_list) + [self.own_navpose_topic]
+    if self.own_navpose_topic is not None:
+      if connect_if.get_selected_topic() == self.own_navpose_topic:
+        return
+      if self.own_navpose_topic in connect_if.get_available_topics():
+        saved = connect_if.node_if.get_param(connect_if.selected_topic_param)
+        # NodeIF lowercases topic namespaces but not the node namespace
+        # (ardupilot_ttyacm0 vs ardupilot_ttyACM0), so they are compared lowercased.
+        saved_lower = str(saved).lower()
+        node_lower = self.node_namespace.lower()
+        if saved not in ['None', '', None] and saved_lower != node_lower and not saved_lower.startswith(node_lower + '/'):
+          self.msg_if.pub_info("Keeping operator navpose source: " + str(saved))
+          return
+        connect_if.set_selected_topic(self.own_navpose_topic)
+        self.msg_if.pub_info("Selected own navpose source: " + self.own_navpose_topic)
+        return
+    if self.own_navpose_wait_logged == False:
+      self.own_navpose_wait_logged = True
+      self.msg_if.pub_info("Own navpose source can be selected once the autopilot has a local position and a GPS fix")
+    nepi_sdk.start_timer_process(self.OWN_NAVPOSE_RETRY_SEC, self.selectOwnNavPoseCb, oneshot = True)
 
   def selectOwnImageCb(self, timer):
     # Select the SITL robot_color image IF as the RBX image source once the

@@ -23,3 +23,9 @@ driver:
           - SITL
         default: USB
         value: USB
+      fake_gps:
+        type: 'Toggle'
+        options:
+          - ''
+        default: 'False'
+        value: 'False'

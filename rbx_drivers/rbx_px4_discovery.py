@@ -167,6 +167,9 @@ class PX4Discovery:
 
   active_devices_dict = dict()
   node_launch_name = "px4"
+  # fake_gps discovery option, handed to the node in DEVICE_DICT (see
+  # PX4Node.reconcileFakeGpsApp)
+  enable_fake_gps = False
 
   # USB: the Pixhawk's own USB port enumerates as a CDC-ACM ttyACM device
   # whose USB product string starts "PX4 " on every vendor checked. Only those
@@ -268,6 +271,13 @@ class PX4Discovery:
       # drivers_mgr assigns this return value back to the ONE active_paths_list
       # every driver shares, so it is returned unchanged, never None.
       return self.active_paths_list
+    # Read on its own so an option set saved before fake_gps existed still
+    # discovers, with the fake GPS off.
+    try:
+      fake_gps_val = drv_dict['DISCOVERY_DICT']['OPTIONS']['fake_gps']['value']
+      self.enable_fake_gps = (str(fake_gps_val).lower() == 'true')
+    except Exception:
+      self.enable_fake_gps = False
 
     # Retry behavior
     self.retry = retry_enabled
@@ -481,7 +491,8 @@ class PX4Discovery:
       'gcs_url': gcs_url,
       'mav_sys_id': mav_sys_id,
       'mav_comp_id': mav_comp_id,
-      'connection': connection_str
+      'connection': connection_str,
+      'fake_gps': self.enable_fake_gps
     }
     dict_param_name = nepi_sdk.create_namespace(self.base_namespace, rbx_node_name + "/drv_dict")
     nepi_sdk.set_param(dict_param_name, self.drv_dict)

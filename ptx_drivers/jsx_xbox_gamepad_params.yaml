@@ -1,0 +1,16 @@
+driver:
+  pkg_name: JSX_XBOX_GAMEPAD
+  display_name: Xbox Controller (USB)
+  description: Wired Xbox controller (USB-C) read through the Linux joystick API (/dev/input/js*). Each controller gets its own node, which publishes the sticks and buttons as sensor_msgs/Joy on <node>/joy at 20 Hz and its connection as JSON on <node>/status. Nothing moves until an operator selects the controller and switches Controller Control on in a device's settings (every PTX pan/tilt offers it). Lives in ptx_drivers because only those folders are installed; type JSX marks it as a joystick driver.
+  type: JSX
+  group_id: None
+  NODE_DICT:
+    file_name: jsx_xbox_gamepad_node.py
+    class_name: XboxGamepadNode
+  DRIVER_DICT:
+    file_name: jsx_xbox_gamepad_driver.py
+    class_name: XboxGamepadReader
+  DISCOVERY_DICT:
+    file_name: jsx_xbox_gamepad_discovery.py
+    class_name: XboxGamepadDiscovery
+    process: LAUNCH
