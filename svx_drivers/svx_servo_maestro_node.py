@@ -217,7 +217,7 @@ class SvxServoMaestroNode:
     position_deg = 0.0
     goal_deg = 0.0
     home_pos_deg = 0.0
-    speed_ratio = 0.5
+    speed_ratio = 1.0
     speed_max_dps = 20.0
 
     connected = False
@@ -306,7 +306,7 @@ class SvxServoMaestroNode:
         #Factory Control Values
         self.FACTORY_CONTROLS = {
             'reverse_enabled' : False,
-            'speed_ratio' : 0.5
+            'speed_ratio' : 1.0
         }
 
         # Push the initial acceleration + speed to the board before we come up.

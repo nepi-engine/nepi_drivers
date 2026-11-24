@@ -144,7 +144,7 @@ class SidusSS109SerialPTXNode:
     current_position = [0.0,0.0]
     position_times = [0.0,0.0]
 
-    speed_ratio = 0.5
+    speed_ratio = 1.0
     speed_max_dps = 20
 
     drv_dict = dict()    
@@ -228,7 +228,7 @@ class SidusSS109SerialPTXNode:
                 'tilt_joint_name' : self.node_name + '_tilt_joint',
                 'reverse_pan_control' : False,
                 'reverse_tilt_control' : False,
-                'speed_ratio' : 0.5,
+                'speed_ratio' : 1.0,
                 'status_update_rate_hz' : 10
             }
             

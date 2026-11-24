@@ -144,7 +144,7 @@ class IqrPanTiltNode:
     current_position = [0.0,0.0]
     last_position = current_position
 
-    speed_ratio = 0.5
+    speed_ratio = 1.0
 
     drv_dict = dict()    
 
@@ -250,7 +250,7 @@ class IqrPanTiltNode:
                 'tilt_joint_name' : self.node_name + '_tilt_joint',
                 'reverse_pan_control' : False,
                 'reverse_tilt_control' : False,
-                'speed_ratio' : 0.5,
+                'speed_ratio' : 1.0,
                 'status_update_rate_hz' : 10
             }
             

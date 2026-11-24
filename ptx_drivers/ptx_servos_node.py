@@ -109,7 +109,7 @@ class ServosPTXNode:
     current_position = [0.0,0.0]
     position_times = [0.0,0.0]
 
-    speed_ratio = 0.5
+    speed_ratio = 1.0
 
     # Placeholder reported only before either axis has ever connected. It is deliberately
     # a poor speed rather than a plausible one: a wrong-but-believable max would scale
@@ -220,7 +220,7 @@ class ServosPTXNode:
             'tilt_joint_name' : self.node_name + '_tilt_joint',
             'reverse_pan_control' : False,
             'reverse_tilt_control' : False,
-            'speed_ratio' : 0.5,
+            'speed_ratio' : 1.0,
             'status_update_rate_hz' : 10
         }
         
