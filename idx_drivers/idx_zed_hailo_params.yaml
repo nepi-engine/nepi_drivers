@@ -1,0 +1,40 @@
+driver:
+  pkg_name: IDX_ZED_HAILO
+  display_name: Zed Stereo Camera (No CUDA)
+  description: Driver package for StereoLab Zed stereo cameras on hosts without an NVIDIA GPU (e.g. Raspberry Pi 5 with Hailo-8), read as USB video with OpenCV or Hailo depth
+  type: IDX
+  group_id: None
+  NODE_DICT:
+    file_name: idx_zed_hailo_node.py
+    class_name: ZedHailoCamNode
+  DRIVER_DICT:
+    file_name: idx_zed_hailo_driver.py
+    class_name: ZedHailoStereoDriver
+  DISCOVERY_DICT:
+    file_name: idx_zed_hailo_discovery.py
+    class_name: ZedHailoCamDiscovery
+    process: LAUNCH
+    OPTIONS:
+      resolution:
+        type: Selection
+        options:
+          - HD2K
+          - HD1080
+          - HD720
+          - VGA
+        default: VGA
+      framerate:
+        type: Selection
+        options:
+          - '15'
+          - '30'
+        default: '15'
+      data_products:
+        type: Selection
+        options:
+          - 'color_image'
+          - 'color_image,depth_map'
+        default: 'color_image,depth_map'
+      download_calibration:
+        type: Toggle
+        default: 'True'

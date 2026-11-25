@@ -23,6 +23,7 @@ import subprocess
 import time
 import copy
 import re
+import importlib.util
 
 
 from nepi_sdk import nepi_sdk
@@ -48,6 +49,9 @@ class ZedCamDiscovery:
 
   INCLUDE_DEVICES = ['ZED 2','ZED 2i','ZED-M','ZED-X'] 
   EXCLUDE_DEVICES = []         
+
+  # Where idx_zed_node.py looks for pyzed in addition to the default path
+  PYZED_FOLDER = '/home/nepi/.local/lib/python3.8/site-packages'
 
   settings_if = None
 
@@ -90,8 +94,16 @@ class ZedCamDiscovery:
         return
     
     ########################
+    # Without the ZED SDK this driver launches nothing; IDX_ZED_HAILO claims ZED cameras (checked once)
+    zed_sdk_found = (importlib.util.find_spec('pyzed') is not None or
+                     os.path.isdir(os.path.join(self.PYZED_FOLDER, 'pyzed')))
+    if not zed_sdk_found:
+      self.msg_if.pub_info("ZED SDK (pyzed) is not installed; ZED cameras are left to IDX_ZED_HAILO")
+
+    ########################
     # Start node processes
-    nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
+    if zed_sdk_found:
+      nepi_sdk.start_timer_process((1), self.detectAndManageDevices, oneshot = True)
     nepi_sdk.start_timer_process((1), self.updateDriverDictCb, oneshot = True)
     nepi_sdk.on_shutdown(self.cleanup_actions)
 
