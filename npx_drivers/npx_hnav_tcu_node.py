@@ -403,7 +403,7 @@ class HNavNode(object):
                 # Populate orientation using roll/pitch/heading
                 d['roll_deg']        = roll_deg
                 d['pitch_deg']       = pitch_deg
-                d['yaw_deg']         = head_deg
+                d['yaw_deg']         = nepi_nav.convert_yaw_ned2enu(head_deg)  # navpose is ENU, heading is NED
                 d['has_orientation'] = True
                 d['time_orientation']= t
 
