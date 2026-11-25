@@ -100,6 +100,21 @@ class ZedHailoStereoDriver(object):
   DEPTH_DOWNSCALE_OPTIONS = ['auto', '1', '2', '3', '4']
   DEPTH_AUTO_TARGET_WIDTH = 672
 
+  # Damaged-frame check. On the Pi 5 the damaged rows of a ZED frame are zero bytes,
+  # and all-zero YUYV decodes to dark pure green (B and R 0, G about 135). NEPI loads
+  # uvcvideo with nodrop=1, so frames the kernel flags as damaged still reach OpenCV,
+  # which cannot see the flag; at HD1080 that was 61% of frames. A frame is dropped
+  # when any sampled row has more than DAMAGE_ROW_FRACTION of its sampled pixels in
+  # that narrow colour range. Bright pure green content (G near 255) is outside it;
+  # only a flat, dark, pure green covering a tenth of the row width could trip it.
+  # The column step is odd so sampling cannot lock onto one phase of the bands'
+  # alternating green/grey pattern. About 8 ms per HD1080 frame on the Pi 5.
+  DAMAGE_ROW_STEP = 2
+  DAMAGE_COL_STEP = 5
+  DAMAGE_ROW_FRACTION = 0.10
+  DAMAGE_LOWER_BGR = (0, 128, 0)
+  DAMAGE_UPPER_BGR = (4, 160, 4)
+
   def __init__(self, cam_driver, resolution, cal_folder, hailo_folder, sysfs_root = '/sys'):
     if resolution not in self.RESOLUTIONS:
       raise Exception("Unsupported ZED resolution " + str(resolution) + ", expected one of " + str(list(self.RESOLUTIONS.keys())))
@@ -139,6 +154,7 @@ class ZedHailoStereoDriver(object):
     self.pair_rectified = False
     self.pair_fetch_time = None
     self.frame_interval = None
+    self.damaged_ts = None
 
     # Depth
     self.depth_lock = threading.Lock()
@@ -171,6 +187,7 @@ class ZedHailoStereoDriver(object):
     self.stats_rect_n = 0
     self.stats_depth_s = 0.0
     self.stats_depth_n = 0
+    self.stats_damaged = 0
 
 
   ###################
@@ -573,6 +590,27 @@ class ZedHailoStereoDriver(object):
       return None, None, ts, False, "No new frame"
     return left.copy(), right.copy(), ts, True, msg
 
+  def is_damaged_frame(self, frame):
+    """Return True when a captured frame shows USB transfer damage.
+
+    Damaged rows arrive as zero bytes, and all-zero YUYV decodes to dark pure green
+    (B and R near 0, G about 135). The frame is damaged when any sampled row has more
+    than DAMAGE_ROW_FRACTION of its sampled pixels in the DAMAGE_LOWER_BGR to
+    DAMAGE_UPPER_BGR range.
+
+    Args:
+      frame (numpy.ndarray): Captured BGR frame (side by side), as V4l2CamDriver returns it.
+
+    Returns:
+      bool: True if the frame should be dropped.
+    """
+    if frame is None or getattr(frame, 'ndim', 0) != 3 or frame.shape[2] != 3:
+      return False
+    sample = np.ascontiguousarray(frame[::self.DAMAGE_ROW_STEP, ::self.DAMAGE_COL_STEP])
+    mask = cv2.inRange(sample, self.DAMAGE_LOWER_BGR, self.DAMAGE_UPPER_BGR)
+    row_counts = np.count_nonzero(mask, axis=1)
+    return bool((row_counts > self.DAMAGE_ROW_FRACTION * sample.shape[1]).any())
+
   def getSharedPair(self):
     self.pair_lock.acquire()
     try:
@@ -587,6 +625,21 @@ class ZedHailoStereoDriver(object):
       self.pair_fetch_time = now
       if ts is not None and ts == self.pair_ts and self.pair_left is not None:
         return self.pair_left, self.pair_right, self.pair_ts, self.pair_rectified, True, "Success"
+      # A damaged frame is dropped: callers get the previous pair (same timestamp, so
+      # no new frame) and the same frame is not checked twice
+      if ts is not None and ts == self.damaged_ts:
+        damaged = True
+      else:
+        damaged = self.is_damaged_frame(frame)
+        if damaged:
+          self.damaged_ts = ts
+          self.stats_lock.acquire()
+          self.stats_damaged += 1
+          self.stats_lock.release()
+      if damaged:
+        if self.pair_left is not None:
+          return self.pair_left, self.pair_right, self.pair_ts, self.pair_rectified, True, "Success"
+        return None, None, None, False, False, "Dropped a frame damaged in USB transfer"
       h, w = frame.shape[:2]
       half = w // 2
       left = frame[:, :half]
@@ -1114,16 +1167,19 @@ class ZedHailoStereoDriver(object):
 
     Returns:
       dict: capture_fps (new frames split per second), rectify_ms and depth_ms
-      (mean per frame, None if none ran), backend (active depth backend).
+      (mean per frame, None if none ran), backend (active depth backend),
+      damaged_frames (frames dropped by is_damaged_frame).
     """
     self.stats_lock.acquire()
     elapsed = max(time.time() - self.stats_start, 1e-6)
     stats = {'capture_fps': self.stats_frames / elapsed,
              'rectify_ms': (1000.0 * self.stats_rect_s / self.stats_rect_n) if self.stats_rect_n > 0 else None,
              'depth_ms': (1000.0 * self.stats_depth_s / self.stats_depth_n) if self.stats_depth_n > 0 else None,
-             'backend': self.active_backend}
+             'backend': self.active_backend,
+             'damaged_frames': self.stats_damaged}
     self.stats_start = time.time()
     self.stats_frames = 0
+    self.stats_damaged = 0
     self.stats_rect_s = 0.0
     self.stats_rect_n = 0
     self.stats_depth_s = 0.0

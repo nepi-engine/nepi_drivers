@@ -539,7 +539,12 @@ class ZedHailoCamNode(object):
         rect_ms = 'n/a' if stats['rectify_ms'] is None else str(round(stats['rectify_ms'], 1))
         depth_ms = 'n/a' if stats['depth_ms'] is None else str(round(stats['depth_ms'], 1))
         self.msg_if.pub_debug("Stereo timing: capture " + str(round(stats['capture_fps'], 1)) + " fps, rectify " + rect_ms +
-                              " ms, depth " + depth_ms + " ms, backend " + stats['backend'])
+                              " ms, depth " + depth_ms + " ms, backend " + stats['backend'] +
+                              ", damaged frames dropped " + str(stats['damaged_frames']))
+        if stats['damaged_frames'] > 0:
+            self.msg_if.pub_warn("Dropped " + str(stats['damaged_frames']) + " frames damaged in USB transfer in the last " +
+                                 str(int(self.TIMING_LOG_INTERVAL_S)) + " s at " + str(self.resolution) +
+                                 "; a lower resolution or another USB 3 cable or port may reduce them", throttle_s = 60.0)
         self.logDriverMsgs()
 
     def setMaxFramerate(self, rate):
