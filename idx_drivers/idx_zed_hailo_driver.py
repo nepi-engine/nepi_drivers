@@ -84,6 +84,22 @@ class ZedHailoStereoDriver(object):
   SGBM_SPECKLE_RANGE = 2
   SGBM_DISP12_MAX_DIFF = 1
 
+  # Disparity post-filters. 'fill' is the median followed by an edge-aware hole
+  # fill: a guided filter (He et al.) on the disparity and on its validity mask,
+  # guided by the left image. Areas whose valid support stays below
+  # FILL_MIN_SUPPORT are left empty, not invented.
+  DEPTH_FILTERS = ['none', 'median', 'fill']
+  MEDIAN_KSIZE = 5
+  FILL_RADIUS = 8
+  FILL_EPS = 1e-3
+  FILL_MIN_SUPPORT = 0.3
+
+  # Depth is computed on the rectified pair shrunk by an integer factor, then
+  # scaled back to the full rectified size so depth stays aligned with the left
+  # image. 'auto' picks the factor that brings the per-eye width nearest VGA.
+  DEPTH_DOWNSCALE_OPTIONS = ['auto', '1', '2', '3', '4']
+  DEPTH_AUTO_TARGET_WIDTH = 672
+
   def __init__(self, cam_driver, resolution, cal_folder, hailo_folder, sysfs_root = '/sys'):
     if resolution not in self.RESOLUTIONS:
       raise Exception("Unsupported ZED resolution " + str(resolution) + ", expected one of " + str(list(self.RESOLUTIONS.keys())))
@@ -133,6 +149,8 @@ class ZedHailoStereoDriver(object):
     self.sgbm_num_disparities = 64
     self.sgbm_block_size = 5
     self.sgbm = None
+    self.depth_filter = 'fill'
+    self.depth_downscale = 'auto'
     self.hailo_swap_inputs = False
     self.hailo_hef_path = None
     self.hailo_device = None
@@ -226,9 +244,12 @@ class ZedHailoStereoDriver(object):
   def find_serial_number(self, device_path):
     """Find the ZED serial number in sysfs for a video device.
 
-    Looks for a USB device with vendor id 2b03 and an all-digit serial string on
-    the same USB hub as the video device (the ZED's sensor HID interface reports
-    the camera serial this way). The sysfs root is set at construction.
+    Looks for a USB device with vendor id 2b03 and an all-digit serial string (the
+    ZED's sensor HID interface reports the camera serial this way). On a USB 2
+    link the HID sits on the same hub as the video device. On a USB 3 link the
+    video device is on the SuperSpeed bus and the HID is under the device on the
+    video port's USB 2 peer port (<usb device>/port/peer/device), so that subtree
+    is searched too. The sysfs root is set at construction.
 
     Args:
       device_path (str): Video device path, e.g. /dev/video0.
@@ -248,6 +269,10 @@ class ZedHailoStereoDriver(object):
         return [None, "No USB device found above " + os.path.realpath(v4l_dev) + " in sysfs"]
       usb_dir = parent
     hub_dir = os.path.dirname(usb_dir)
+    peer_dir = None
+    peer_device = os.path.join(usb_dir, 'port', 'peer', 'device')
+    if os.path.exists(peer_device):
+      peer_dir = os.path.realpath(peer_device)
 
     usb_devices_dir = os.path.join(self.sysfs_root, 'bus', 'usb', 'devices')
     try:
@@ -257,7 +282,9 @@ class ZedHailoStereoDriver(object):
     serials = []
     for name in names:
       dev_dir = os.path.realpath(os.path.join(usb_devices_dir, name))
-      if os.path.dirname(dev_dir) != hub_dir:
+      on_hub = os.path.dirname(dev_dir) == hub_dir
+      under_peer = peer_dir is not None and (dev_dir == peer_dir or dev_dir.startswith(peer_dir + os.sep))
+      if not (on_hub or under_peer):
         continue
       vendor = self.readSysfsAttr(dev_dir, 'idVendor')
       serial = self.readSysfsAttr(dev_dir, 'serial')
@@ -266,11 +293,12 @@ class ZedHailoStereoDriver(object):
       if vendor.lower() == self.ZED_USB_VENDOR_ID and re.match(r'^[0-9]+$', serial) is not None:
         if serial not in serials:
           serials.append(serial)
+    where = "USB hub " + hub_dir + ("" if peer_dir is None else " or under USB 2 peer " + peer_dir)
     if len(serials) == 1:
-      return [serials[0], "Found ZED serial number " + serials[0] + " on USB hub " + hub_dir]
+      return [serials[0], "Found ZED serial number " + serials[0] + " on " + where]
     if len(serials) == 0:
-      return [None, "No USB device with vendor id " + self.ZED_USB_VENDOR_ID + " and a numeric serial number on USB hub " + hub_dir]
-    return [None, "More than one ZED serial number on USB hub " + hub_dir + ": " + str(serials)]
+      return [None, "No USB device with vendor id " + self.ZED_USB_VENDOR_ID + " and a numeric serial number on " + where]
+    return [None, "More than one ZED serial number on " + where + ": " + str(serials)]
 
   def readSysfsAttr(self, dev_dir, attr):
     try:
@@ -600,6 +628,10 @@ class ZedHailoStereoDriver(object):
   def get_depth_map(self, min_range_m = None, max_range_m = None, last_timestamp = None):
     """Compute the depth map of the latest frame with the active backend.
 
+    The rectified pair is shrunk by get_depth_scale_factor() before matching, the
+    disparity is post-filtered (depth_filter) at that size, then scaled back to
+    the full rectified size.
+
     Args:
       min_range_m (float or None): Near limit in meters; nearer pixels are NaN.
       max_range_m (float or None): Far limit in meters; farther pixels are NaN.
@@ -626,16 +658,27 @@ class ZedHailoStereoDriver(object):
         disp = self.disp_cache
       else:
         start = time.time()
+        h, w = left.shape[:2]
+        factor = self.get_depth_scale_factor()
+        if factor > 1:
+          small_size = (max(1, w // factor), max(1, h // factor))
+          left_d = cv2.resize(left, small_size, interpolation=cv2.INTER_AREA)
+          right_d = cv2.resize(right, small_size, interpolation=cv2.INTER_AREA)
+        else:
+          left_d = left
+          right_d = right
         disp = None
         if self.active_backend == 'hailo':
-          [success, msg, disp] = self.computeDisparityHailo(left, right)
+          [success, msg, disp] = self.computeDisparityHailo(left_d, right_d)
           if not success:
             disp = None
             self.releaseHailo()
             self.queueMsg('warn', "Hailo depth backend failed, using cpu_sgbm until hailo is selected again: " + msg)
             self.setActiveBackend('cpu_sgbm', "hailo inference failed")
         if disp is None:
-          disp = self.computeDisparitySgbm(left, right)
+          disp = self.computeDisparitySgbm(left_d, right_d)
+        disp = self.filter_disparity(disp, left_d)
+        disp = self.upsampleDisparity(disp, w, h)
         self.stats_lock.acquire()
         self.stats_depth_s += time.time() - start
         self.stats_depth_n += 1
@@ -758,6 +801,119 @@ class ZedHailoStereoDriver(object):
     self.disp_ts = None
     self.disp_cache = None
     self.depth_lock.release()
+
+  def set_depth_filter(self, depth_filter):
+    """Select the disparity post-filter: 'none', 'median' or 'fill'.
+
+    'median' is a 5x5 median. 'fill' is the median followed by an edge-aware hole
+    fill guided by the left image; it leaves areas with too little valid support
+    empty rather than inventing depth there.
+
+    Args:
+      depth_filter (str): One of DEPTH_FILTERS.
+
+    Returns:
+      list: [success, msg].
+    """
+    depth_filter = str(depth_filter)
+    if depth_filter not in self.DEPTH_FILTERS:
+      return [False, "Unknown depth filter " + depth_filter + ", expected one of " + str(self.DEPTH_FILTERS)]
+    self.depth_lock.acquire()
+    self.depth_filter = depth_filter
+    self.disp_ts = None
+    self.disp_cache = None
+    self.depth_lock.release()
+    return [True, "Depth filter set to " + depth_filter]
+
+  def set_depth_downscale(self, downscale):
+    """Select how much the rectified pair is shrunk before depth is computed.
+
+    'auto' brings the per-eye width nearest VGA (factor 1 at VGA, 2 at HD720,
+    3 at HD1080 and HD2K). The depth map is always published at the full
+    rectified size. sgbm_num_disparities applies at the shrunk size.
+
+    Args:
+      downscale (str or int): One of DEPTH_DOWNSCALE_OPTIONS.
+
+    Returns:
+      list: [success, msg].
+    """
+    downscale = str(downscale)
+    if downscale not in self.DEPTH_DOWNSCALE_OPTIONS:
+      return [False, "Unknown depth downscale " + downscale + ", expected one of " + str(self.DEPTH_DOWNSCALE_OPTIONS)]
+    self.depth_lock.acquire()
+    self.depth_downscale = downscale
+    self.disp_ts = None
+    self.disp_cache = None
+    self.depth_lock.release()
+    return [True, "Depth downscale set to " + downscale + " (factor " + str(self.get_depth_scale_factor()) + ")"]
+
+  def get_depth_scale_factor(self):
+    """Return the integer factor the rectified pair is shrunk by before depth is computed."""
+    if self.depth_downscale == 'auto':
+      eye_w = self.res_dict['eye'][0]
+      return max(1, int(round(float(eye_w) / float(self.DEPTH_AUTO_TARGET_WIDTH))))
+    try:
+      return max(1, int(self.depth_downscale))
+    except Exception:
+      return 1
+
+  def filter_disparity(self, disparity, left_rect):
+    """Apply the selected depth_filter to a disparity map.
+
+    Args:
+      disparity (numpy.ndarray): Disparity in pixels, <= 0 or non-finite where invalid.
+      left_rect (numpy.ndarray): Rectified left image at the same size, BGR or gray (the fill guide).
+
+    Returns:
+      numpy.ndarray: float32 disparity, 0 where invalid.
+    """
+    disp = np.array(disparity, dtype=np.float32)
+    disp[~np.isfinite(disp)] = 0
+    disp[disp < 0] = 0
+    if self.depth_filter == 'none':
+      return disp
+    disp = cv2.medianBlur(disp, self.MEDIAN_KSIZE)
+    if self.depth_filter == 'median':
+      return disp
+    gray = cv2.cvtColor(left_rect, cv2.COLOR_BGR2GRAY) if left_rect.ndim == 3 else left_rect
+    return self.fillDisparity(disp, gray)
+
+  def fillDisparity(self, disp, gray):
+    ksize = (2 * self.FILL_RADIUS + 1, 2 * self.FILL_RADIUS + 1)
+    guide = gray.astype(np.float32) / 255.0
+    valid = (disp > 0).astype(np.float32)
+    mean_i = cv2.boxFilter(guide, -1, ksize)
+    var_i = cv2.boxFilter(guide * guide, -1, ksize) - mean_i * mean_i
+    num = self.guidedFilter(guide, mean_i, var_i, disp * valid, ksize)
+    den = self.guidedFilter(guide, mean_i, var_i, valid, ksize)
+    out = np.zeros_like(disp)
+    ok = den > self.FILL_MIN_SUPPORT
+    out[ok] = num[ok] / den[ok]
+    out[out < 0] = 0
+    return out
+
+  def guidedFilter(self, guide, mean_i, var_i, src, ksize):
+    mean_p = cv2.boxFilter(src, -1, ksize)
+    cov_ip = cv2.boxFilter(guide * src, -1, ksize) - mean_i * mean_p
+    a = cov_ip / (var_i + self.FILL_EPS)
+    b = mean_p - a * mean_i
+    return cv2.boxFilter(a, -1, ksize) * guide + cv2.boxFilter(b, -1, ksize)
+
+  def upsampleDisparity(self, disp, width, height):
+    # Interpolates only between valid pixels (num/den), so a hole's edge is not
+    # pulled toward 0; values are scaled into full-size pixels
+    h, w = disp.shape[:2]
+    if w == width and h == height:
+      return disp
+    valid = (disp > 0).astype(np.float32)
+    num = cv2.resize(disp * valid, (width, height), interpolation=cv2.INTER_LINEAR)
+    den = cv2.resize(valid, (width, height), interpolation=cv2.INTER_LINEAR)
+    valid_up = cv2.resize(valid, (width, height), interpolation=cv2.INTER_NEAREST) > 0
+    out = np.zeros((height, width), dtype=np.float32)
+    ok = valid_up & (den > 1e-3)
+    out[ok] = num[ok] / den[ok]
+    return out * (float(width) / float(w))
 
   def computeDisparitySgbm(self, left, right):
     nd = self.sgbm_num_disparities

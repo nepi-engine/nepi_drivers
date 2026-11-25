@@ -22,7 +22,7 @@ driver:
           - HD1080
           - HD720
           - VGA
-        default: VGA
+        default: HD720
       framerate:
         type: Selection
         options:

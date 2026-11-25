@@ -53,7 +53,7 @@ TEST_DRV_DICT = {
     'file_name': 'idx_zed_hailo_driver.py' ,
     'class_name':  'ZedHailoStereoDriver'
 },
-'DEVICE_DICT': {'device_name': 'zed2_1-1', 'device_path': '/dev/video0', 'zed_type': 'zed2', 'resolution': 'VGA',
+'DEVICE_DICT': {'device_name': 'zed2_1-1', 'device_path': '/dev/video0', 'zed_type': 'zed2', 'resolution': 'HD720',
                 'framerate': 15, 'data_products': ['color_image','depth_map'], 'download_calibration': True},
 }
 
@@ -71,9 +71,17 @@ class ZedHailoCamNode(object):
 
     DEPTH_SETTINGS = dict(
       depth_backend = {'type': 'Selection', 'options': ['cpu_sgbm', 'hailo'], 'default': 'cpu_sgbm'},
+      depth_filter = {'type': 'Selection', 'options': ['none', 'median', 'fill'], 'default': 'fill'},
+      depth_downscale = {'type': 'Selection', 'options': ['auto', '1', '2', '3', '4'], 'default': 'auto'},
       sgbm_num_disparities = {'type': 'Int', 'bounds': [16, 256], 'default': 64},
       sgbm_block_size = {'type': 'Int', 'bounds': [3, 11], 'default': 5},
       hailo_swap_inputs = {'type': 'Toggle', 'default': False}
+    )
+
+    # Camera controls set at startup, before the settings defaults are read from the
+    # camera. The ZED powers up with sharpness 0; the ZED SDK's default is 4.
+    CAMERA_CONTROL_DEFAULTS = dict(
+      sharpness = 4
     )
 
     #Factory Control Values
@@ -116,7 +124,7 @@ class ZedHailoCamNode(object):
     dm_data_last_time = None
 
     zed_type = 'zed'
-    resolution = 'VGA'
+    resolution = 'HD720'
     framerate = 15
     data_products = []
     download_calibration = True
@@ -235,6 +243,17 @@ class ZedHailoCamNode(object):
         else:
             self.msg_if.pub_error(msg)
         self.framerate = fps
+
+        # Camera control defaults, applied before initSettingsDict reads the camera's values
+        camera_controls = self.cam_driver.getCameraControls()
+        for control_name in self.CAMERA_CONTROL_DEFAULTS.keys():
+            if control_name in camera_controls:
+                control_value = self.CAMERA_CONTROL_DEFAULTS[control_name]
+                [success, msg] = self.cam_driver.setCameraControl(control_name, control_value)
+                if success:
+                    self.msg_if.pub_info("Camera control " + control_name + " set to " + str(control_value))
+                else:
+                    self.msg_if.pub_warn("Could not set camera control " + control_name + " to " + str(control_value) + ": " + str(msg))
 
         # Serial number and calibration
         [self.serial_number, msg] = self.stereo_driver.find_serial_number(self.device_path)
@@ -369,6 +388,8 @@ class ZedHailoCamNode(object):
             setting_dict = copy.deepcopy(self.DEPTH_SETTINGS[setting_name])
             setting_dict['name'] = setting_name
             init_settings_dict[setting_name] = setting_dict
+        self.applyDepthSetting('depth_filter', self.DEPTH_SETTINGS['depth_filter']['default'])
+        self.applyDepthSetting('depth_downscale', self.DEPTH_SETTINGS['depth_downscale']['default'])
         self.applyDepthSetting('sgbm_num_disparities', self.DEPTH_SETTINGS['sgbm_num_disparities']['default'])
         self.applyDepthSetting('sgbm_block_size', self.DEPTH_SETTINGS['sgbm_block_size']['default'])
         self.applyDepthSetting('hailo_swap_inputs', self.DEPTH_SETTINGS['hailo_swap_inputs']['default'])
@@ -417,6 +438,10 @@ class ZedHailoCamNode(object):
         ### Depth settings, read back from the stereo driver
         if 'depth_backend' in settings_dict.keys():
             settings_dict = nepi_controls.set_value(settings_dict, 'depth_backend', self.stereo_driver.requested_backend)
+        if 'depth_filter' in settings_dict.keys():
+            settings_dict = nepi_controls.set_value(settings_dict, 'depth_filter', self.stereo_driver.depth_filter)
+        if 'depth_downscale' in settings_dict.keys():
+            settings_dict = nepi_controls.set_value(settings_dict, 'depth_downscale', self.stereo_driver.depth_downscale)
         if 'sgbm_num_disparities' in settings_dict.keys():
             settings_dict = nepi_controls.set_value(settings_dict, 'sgbm_num_disparities', int(self.stereo_driver.sgbm_num_disparities))
         if 'sgbm_block_size' in settings_dict.keys():
@@ -457,6 +482,10 @@ class ZedHailoCamNode(object):
         try:
             if setting_name == 'depth_backend':
                 return self.stereo_driver.set_depth_backend(str(setting_value))
+            elif setting_name == 'depth_filter':
+                return self.stereo_driver.set_depth_filter(str(setting_value))
+            elif setting_name == 'depth_downscale':
+                return self.stereo_driver.set_depth_downscale(str(setting_value))
             elif setting_name == 'sgbm_num_disparities':
                 [nd, bs] = self.stereo_driver.set_sgbm_params(int(float(setting_value)), self.stereo_driver.sgbm_block_size)
                 return True, "sgbm_num_disparities set to " + str(nd)
@@ -484,6 +513,8 @@ class ZedHailoCamNode(object):
         device_info_str += "\tCalibrated: " + str(self.stereo_driver.is_calibrated()) + "\n"
         device_info_str += "\tRectifying: " + str(self.stereo_driver.is_rectifying()) + "\n"
         device_info_str += "\tDepth Backend: " + str(self.stereo_driver.get_active_backend()) + "\n"
+        device_info_str += "\tDepth Filter: " + str(self.stereo_driver.depth_filter) + "\n"
+        device_info_str += "\tDepth Scale Factor: " + str(self.stereo_driver.get_depth_scale_factor()) + "\n"
         device_info_str += "\tRight Image Topic: " + str(self.right_image_topic) + "\n"
         self.msg_if.pub_info(device_info_str)
         self.msg_if.pub_info(str(self.device_info_dict))
